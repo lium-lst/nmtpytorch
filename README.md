@@ -62,7 +62,8 @@ tensorboard_dir: ~/tb_dir
 
 ![tensorboard](docs/tensorboard.png?raw=true "tensorboard")
 
-#### A Single Command-Line Interface
+
+#### A Single Command-Line Interface
 
 Instead of shipping several tools for training, rescoring, translating, etc.
 here we provide a single command-line interface `nmtpy` which implements
