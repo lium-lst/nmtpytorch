@@ -2,8 +2,6 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# NMTPyTorch
-
 This is the PyTorch fork of [nmtpy](https://github.com/lium-lst/nmtpy),
 a sequence-to-sequence framework which was originally a fork of
 [dl4mt-tutorial](https://github.com/nyu-dl/dl4mt-tutorial).

@@ -96,7 +96,7 @@ def read_sentences(fname, vocab, bos=False, slist_max=0, verbose=False):
 
             # Empty lines will cause a lot of headaches,
             # get rid of them during preprocessing!
-            assert line != "", "Empty line found in %s" % fname
+            assert line, "Empty line (%d) found in %s" % (idx + 1, fname)
 
             # Map and append
             seq = vocab.sent_to_idxs(line, limit=slist_max, explicit_bos=bos)
