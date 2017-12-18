@@ -1,0 +1,5 @@
+include nmtpytorch/lib/data/*.gz
+include nmtpytorch/lib/multi-bleu.perl
+include nmtpytorch/lib/meteor-1.5.jar
+include nmtpytorch/lib/subword_nmt/apply_bpe.py
+include nmtpytorch/lib/subword_nmt/learn_bpe.py

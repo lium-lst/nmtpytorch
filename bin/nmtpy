@@ -1,0 +1,136 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import sys
+import platform
+import argparse
+
+import numpy as np
+import torch
+
+from nmtpytorch.config import Options
+from nmtpytorch import logger
+from nmtpytorch.utils.misc import setup_experiment, load_pt_file
+from nmtpytorch.utils.gpu import GPUManager
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='nmtpy',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="nmtpy trains/resumes/translates a given "
+                    "configuration/checkpoint/snapshot",
+        argument_default=argparse.SUPPRESS)
+
+    subparsers = parser.add_subparsers(dest='name', title='sub-commands',
+                                       description='Valid sub-commands')
+
+    # train command
+    parser_train = subparsers.add_parser('train', help='train help')
+    parser_train.add_argument('-C', '--config', type=str, required=True,
+                              help="Experiment configuration file")
+    parser_train.add_argument('-s', '--suffix', type=str, default="",
+                              help="Optional experiment suffix.")
+    parser_train.add_argument('overrides', nargs="*", default=[],
+                              help="(section).key:value overrides for config")
+
+    # resume command
+    parser_resume = subparsers.add_parser('resume', help='resume help')
+    parser_resume.add_argument('model', type=str,
+                               help="Checkpoint (.ckpt) file for resuming")
+
+    # translate command
+    parser_trans = subparsers.add_parser('translate', help='translate help')
+    parser_trans.add_argument('-n', '--disable-filters', action='store_true',
+                              help='Disable text filters given in config.')
+    parser_trans.add_argument('-s', '--splits', type=str, required=True,
+                              help='Comma separated splits to translate')
+    parser_trans.add_argument('-b', '--batch-size', type=int, default=16,
+                              help='Batch size for beam-search')
+    parser_trans.add_argument('-k', '--beam-size', type=int, default=6,
+                              help='Beam size for beam-search')
+    parser_trans.add_argument('-m', '--max-len', type=int, default=100,
+                              help='Maximum sequence length')
+    parser_trans.add_argument('-p', '--avoid-double', action='store_true',
+                              help='Suppress previous token probs')
+    parser_trans.add_argument('-u', '--avoid-unk', action='store_true',
+                              help='Suppress <unk> generation')
+    parser_trans.add_argument('-d', '--device', type=str, default='auto_1',
+                              help='Select GPU device(s)')
+    parser_trans.add_argument('-e', '--ensemble', action='store_true',
+                              help='Enable ensembling for multiple models.')
+    parser_trans.add_argument('models', type=str, nargs='+',
+                              help="Saved model/checkpoint file(s)")
+
+    # Parse command-line arguments first
+    args = parser.parse_args()
+    if args.name is None:
+        parser.print_help()
+        sys.exit(1)
+
+    history, weights = {}, None
+
+    # Mode selection
+    if args.name == 'train':
+        # Parse configuration file and merge with the rest
+        opts = Options(args.config, args.overrides)
+
+        # Setup experiment folders
+        setup_experiment(opts, args.suffix)
+
+    elif args.name == 'resume':
+        # Load everything to CPU without messing with storage tags
+        weights, history, opts = load_pt_file(args.model)
+        opts = Options.from_dict(opts)
+
+    elif args.name == 'translate':
+        # Just for configuration bootstrapping
+        _, _, opts = load_pt_file(args.models[0])
+        opts = Options.from_dict(opts)
+        opts.train['device_id'] = args.device
+
+    # Reserve GPUs
+    gpu_devs = GPUManager()(opts.train['device_id'], strict=True)
+    assert len(gpu_devs) == 1, "Multi-GPU mode not implemented yet."
+
+    # Get logger
+    log = logger.setup(opts.train, args.name)
+
+    # Instantiate the model object
+    from nmtpytorch import models
+    model = getattr(models, opts.train['model_type'])(opts=opts, logger=log)
+
+    #######################
+    # translate entry point
+    #######################
+    if args.name == 'translate':
+        from nmtpytorch.translator import Translator
+        assert not args.ensemble, "Ensembling not implemented yet."
+        # NOTE: Assumes same model_type across checkpoints
+        translator = Translator(log, model,
+                                args.batch_size, args.beam_size,
+                                args.max_len, args.avoid_double,
+                                args.avoid_unk, not args.disable_filters)
+
+        # Multi model, multi test split translation
+        for model_file in args.models:
+            log.info('--> Translating with "{}"'.format(model_file))
+            translator.load(model_file)
+            for split in args.splits.split(','):
+                translator.translate(split, dump=True)
+        sys.exit(0)
+
+    #################################
+    # Training / Resuming entry point
+    #################################
+    from nmtpytorch.mainloop import MainLoop
+
+    if opts.train['seed'] != 0:
+        np.random.seed(opts.train['seed'])
+        torch.manual_seed(opts.train['seed'])
+
+    # Be verbose and fire the loop!
+    opts.info(log)
+    log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
+        torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
+    loop = MainLoop(model, log, opts.train, history, weights, mode=args.name)
+    loop.run()

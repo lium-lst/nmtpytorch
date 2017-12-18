@@ -1,0 +1,7 @@
+__pycache__/
+nmtpytorch/lib/data/*gz
+nmtpytorch.egg-info
+.cache
+build/
+docs/build/
+ipynb/.ipynb_checkpoints
