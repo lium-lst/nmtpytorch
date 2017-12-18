@@ -1,4 +1,4 @@
-# nmtpytorch
+# NMTPyTorch
 
 This is the PyTorch fork of [nmtpy](https://github.com/lium-lst/nmtpy),
 a sequence-to-sequence framework which was originally a fork of
