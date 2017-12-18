@@ -29,11 +29,18 @@ Install using `develop` mode:
 python setup.py develop
 ```
 
-## Examples
+## Usage Example
 
 A [sample NMT configuration](examples/multi30k-en-de-bpe10k.conf) for
 English-to-German Multi30k is provided which covers nearly all of the `[train]`
 and `[model]` specific options to `NMT`.
+
+After creating a configuration file for your own dataset that suits your need,
+you can run the following command to start training:
+
+```
+nmtpy train -C <config file>
+```
 
 ## Release Notes
 
