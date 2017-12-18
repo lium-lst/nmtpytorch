@@ -42,6 +42,12 @@ you can run the following command to start training:
 nmtpy train -C <config file>
 ```
 
+It is possible to override any configuration option through the command-line:
+
+```
+nmtpy train -C <config file> train.<opt>:<val> model.<opt>:<val> ...
+```
+
 ## Release Notes
 
 ### Initial Release v1.0 (18/12/2017)
