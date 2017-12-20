@@ -12,7 +12,7 @@ from ..utils.data import get_collate_fn, read_sentences
 
 
 class BitextDataset(Dataset):
-    r"""A PyTorch dataset for one-to-one bitext NMT."""
+    r"""A PyTorch dataset for parallel corpora."""
     def __init__(self, split, data_dict, vocabs, topology,
                  logger=None, max_trg_len=None, drop_last=False):
         self.data = {}
@@ -49,19 +49,20 @@ class BitextDataset(Dataset):
         self.data[self.sl], self.lens[self.sl] = \
             read_sentences(fnames[0], self.src_vocab)
 
+        self.size = len(self.data[self.sl])
+
         #######################
         # Load target sentences
         #######################
-        path = self.data_dict[self.txt_split][self.tl]
-        fnames = sorted(path.parent.glob(path.name))
-        assert len(fnames) == 1, "Multiple source files not supported."
-        self.data[self.tl], self.lens[self.tl] = \
-            read_sentences(fnames[0], self.trg_vocab, bos=True)
+        if self.tl in self.data_dict[self.txt_split]:
+            path = self.data_dict[self.txt_split][self.tl]
+            fnames = sorted(path.parent.glob(path.name))
+            assert len(fnames) == 1, "Multiple target files not supported."
+            self.data[self.tl], self.lens[self.tl] = \
+                read_sentences(fnames[0], self.trg_vocab, bos=True)
 
-        assert len(self.data[self.tl]) == len(self.data[self.sl]), \
-            "Number of sentences on both sides differ!"
-
-        self.size = len(self.data[self.tl])
+            assert len(self.data[self.tl]) == len(self.data[self.sl]), \
+                "Number of sentences on both sides differ!"
 
         # Set keys that will be used by getitem to traverse dataset
         self.data_keys = sorted(list(self.data.keys()))
