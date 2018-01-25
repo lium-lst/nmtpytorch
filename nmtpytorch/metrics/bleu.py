@@ -9,18 +9,18 @@ BLEU_SCRIPT = pkg_resources.resource_filename('nmtpytorch',
                                               'lib/multi-bleu.perl')
 
 
-class MultiBleuScorer(object):
-    """MultiBleuScorer class."""
-    def __init__(self, lowercase=False):
+class BLEUScorer(object):
+    """BLEUScorer class."""
+    def __init__(self):
         # For multi-bleu.perl we give the reference(s) files as argv,
         # while the candidate translations are read from stdin.
-        self.lowercase = lowercase
         self.__cmdline = [BLEU_SCRIPT]
-        if self.lowercase:
-            self.__cmdline.append("-lc")
 
-    def compute(self, refs, hyps):
+    def compute(self, refs, hyps, language=None, lowercase=False):
         cmdline = self.__cmdline[:]
+
+        if lowercase:
+            cmdline.append("-lc")
 
         # Make reference files a list
         cmdline.extend(listify(refs))
