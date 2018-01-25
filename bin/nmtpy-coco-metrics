@@ -49,7 +49,6 @@ if __name__ == '__main__':
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
         (Meteor(args.language), ["METEOR"]),
-        (Meteor(args.language, norm=True), ["METEOR (norm)"]),
         (Cider(), ["CIDEr"]),
         (Rouge(), ["ROUGE_L"]),
     ]
