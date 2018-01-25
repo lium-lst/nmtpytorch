@@ -6,42 +6,51 @@ import torch.nn.functional as F
 
 class Attention(nn.Module):
     """Attention layer for seq2seq NMT."""
-    def __init__(self, ctx_dim, hid_dim, activ='tanh', att_type='mlp'):
+    def __init__(self, ctx_dim, hid_dim, att_bottleneck='ctx',
+                 att_activ='tanh', att_type='mlp'):
         super(Attention, self).__init__()
 
         # Get activation function
-        self.activ = getattr(F, activ)
-
-        # 'dot' or 'mlp'
-        self.att_type = att_type
-        assert self.att_type in ('mlp', 'dot'), \
-            'Unknown attention type {}'.format(att_type)
+        self.activ = getattr(F, att_activ)
 
         # Annotation dimensionality
         self.ctx_dim = ctx_dim
 
-        # Hidden state of the RNN (or another arbitrary entity)
+        # Hidden state of the RNN (or another arbitrary query entity)
         self.hid_dim = hid_dim
+
+        # The common dimensionality for inner formulation
+        if att_bottleneck == 'ctx':
+            self.mid_dim = self.ctx_dim
+        elif att_bottleneck == 'hid':
+            self.mid_dim = self.hid_dim
+
+        # 'dot' or 'mlp'
+        self.att_type = att_type
 
         # MLP attention, i.e. Bahdanau et al.
         if self.att_type == 'mlp':
-            self.mlp = nn.Linear(self.ctx_dim, 1, bias=False)
+            self.mlp = nn.Linear(self.mid_dim, 1, bias=False)
             self.forward = self.forward_mlp
         elif self.att_type == 'dot':
             self.forward = self.forward_dot
+        else:
+            raise Exception('Unknown attention type {}'.format(att_type))
 
-        # Adaptor from RNN's hidden dim to context dim
-        self.hid2ctx = nn.Linear(self.hid_dim, self.ctx_dim, bias=False)
+        # Adaptor from RNN's hidden dim to mid_dim
+        self.hid2ctx = nn.Linear(self.hid_dim, self.mid_dim, bias=False)
 
         # Additional context projection within same dimensionality
-        self.ctx2ctx = nn.Linear(self.ctx_dim, self.ctx_dim, bias=False)
+        self.ctx2ctx = nn.Linear(self.ctx_dim, self.mid_dim, bias=False)
 
-        # Final transformation of attended context to hidden dim
+        # ctx2hid: final transformation from ctx to hid
         self.ctx2hid = nn.Linear(self.ctx_dim, self.hid_dim, bias=False)
 
-    def forward_mlp(self, hid, ctx, ctx_mask):
+    def forward_mlp(self, hid, ctx, ctx_mask=None):
         r"""Computes Bahdanau-style MLP attention probabilities between
         decoder's hidden state and source annotations.
+
+        score_t = softmax(mlp * tanh(ctx2ctx*ctx + hid2ctx*hid))
 
         Arguments:
             hid(Variable): A set of decoder hidden states of shape `T*B*H`
@@ -50,7 +59,7 @@ class Attention(nn.Module):
                 is the source timestep dim, `B` is batch dim and `C`
                 is annotation dim.
             ctx_mask(FloatTensor): A binary mask of shape `S*B` with zeroes
-                in the padded timesteps.
+                in the padded positions.
 
         Returns:
             scores(Variable): A variable of shape `S*B` containing normalized
@@ -69,6 +78,10 @@ class Attention(nn.Module):
         scores = self.mlp(self.activ(ctx_ + hid_)).squeeze(-1)
 
         # Normalize attention scores correctly -> S*B
+        # NOTE: We can directly use softmax if no mask is given
+        if ctx_mask is None:
+            ctx_mask = 1.
+
         alpha = (scores - scores.max(0)[0]).exp().mul(ctx_mask)
         alpha = alpha / alpha.sum(0)
 
