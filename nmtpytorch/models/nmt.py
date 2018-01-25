@@ -61,8 +61,8 @@ class NMT(nn.Module):
         opts.model['n_decoders'] = kwargs.pop('n_decoders', 1)
 
         # How to initialize decoder (zero/mean_ctx)
-        opts.model['dec_init'] = kwargs.pop('dec_init', 'zero')
-        opts.model['att_type'] = kwargs.pop('att_type', 'dot')
+        opts.model['dec_init'] = kwargs.pop('dec_init', 'mean_ctx')
+        opts.model['att_type'] = kwargs.pop('att_type', 'mlp')
 
         # Various dropouts
         opts.model['dropout_emb'] = kwargs.pop('dropout_emb', 0.)
@@ -70,9 +70,6 @@ class NMT(nn.Module):
         opts.model['dropout_out'] = kwargs.pop('dropout_out', 0.)
         opts.model['dropout_enc'] = kwargs.pop('dropout_enc', 0.)
         opts.model['dropout_dec'] = kwargs.pop('dropout_dec', 0.)
-
-        # TODO: Not implemented
-        opts.model['enc_lnorm'] = kwargs.pop('enc_lnorm', False)
 
         # Tie embeddings: False/2way/3way
         opts.model['tied_emb'] = kwargs.pop('tied_emb', False)
@@ -84,8 +81,8 @@ class NMT(nn.Module):
         opts.model['drop_last'] = kwargs.pop('drop_last', False)
 
         # Sanity check after consuming all arguments
-        assert len(kwargs) == 0, \
-            "Untreated model arguments: {}".format(",".join(kwargs.keys()))
+        if len(kwargs) > 0:
+            self.print('Unused model args: {}'.format(','.join(kwargs.keys())))
 
         # Check vocabulary sizes for 3way tying
         if opts.model['tied_emb'] == '3way':
@@ -104,10 +101,10 @@ class NMT(nn.Module):
 
     def reset_parameters(self):
         for name, param in self.named_parameters():
-            if 'bias' not in name:
+            if param.requires_grad and 'bias' not in name:
                 nn.init.kaiming_normal(param.data)
 
-    def setup(self):
+    def setup(self, reset_params=True):
         """Sets up NN topology by creating the layers."""
         ################
         # Create encoder
@@ -138,7 +135,8 @@ class NMT(nn.Module):
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
 
-        self.reset_parameters()
+        if reset_params:
+            self.reset_parameters()
 
     def get_iterator(self, split, batch_size, only_source=False):
         """Returns a DataLoader for the requested dataset split."""
@@ -280,21 +278,14 @@ class NMT(nn.Module):
             # Put an explicit <eos> to make idxs_to_sent happy
             beam[max_len - 1] = eos
 
-            # Get beam and scores to CPU
-            beam = beam.cpu().numpy()
-            nll = nll.cpu().numpy()
-
+            # Find lengths by summing tokens not in (pad,bos,eos)
+            lens = (beam.transpose(0, 2) > 2).sum(-1).t().float().clamp(min=1)
             # Normalize scores by length
-            lens, idxs = np.where(beam.reshape(max_len, -1) == eos)
-            idxs = idxs.tolist()
-            # Get sequence lengths
-            lens = [lens[idxs.index(i)] for i in range(n * k)]
-            # Avoid divide-by-zero in extreme case where hyp is only <eos>
-            lens = [len_ if len_ != 0 else 1 for len_ in lens]
-            nll /= np.array(lens).reshape(n, k)
+            nll /= lens.float()
+            top_hyps = nll.topk(1, sorted=False, largest=False)[1].squeeze(1)
 
             # Get best hyp for each sample in the batch
-            hyps = beam[:, range(n), nll.argmin(axis=1)].T
-            results.extend([self.trg_vocab.idxs_to_sent(hy) for hy in hyps])
+            hyps = beam[:, range(n), top_hyps].cpu().numpy().T
+            results.extend(self.trg_vocab.list_of_idxs_to_sents(hyps))
 
         return results
