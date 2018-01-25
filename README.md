@@ -54,6 +54,75 @@ nmtpy train -C <config file> train.<opt>:<val> model.<opt>:<val> ...
 
 ## Release Notes
 
+### v1.1 (25/01/2018)
+
+ - New experimental `Multi30kDataset` and `ImageFolderDataset` classes
+ - `torchvision` dependency added for CNN support
+ - `nmtpy-coco-metrics` now computes one METEOR without `norm=True`
+ - Mainloop mechanism is completely refactored with **backward-incompatible**
+   configuration option changes for `[train]` section:
+    - `patience_delta` option is removed
+    - Added `eval_batch_size` to define batch size for GPU beam-search during training
+    - `eval_freq` default is now `3000` which means per `3000` minibatches
+    - `eval_metrics` now defaults to `loss`. As before, you can provide a list
+      of metrics like `bleu,meteor,loss` to compute all of them and early-stop
+      based on the first
+    - Added `eval_zero (default: False)` which tells to evaluate the model
+      once on dev set right before the training starts. Useful for sanity
+      checking if you fine-tune a model initialized with pre-trained weights
+    - Removed `save_best_n`: we no longer save the best `N` models on dev set
+      w.r.t. early-stopping metric
+    - Added `save_best_metrics (default: True)` which will save best models
+      on dev set w.r.t each metric provided in `eval_metrics`. This kind of
+      remedies the removal of `save_best_n`
+    - `checkpoint_freq` now to defaults to `5000` which means per `5000`
+      minibatches.
+    - Added `n_checkpoints (default: 5)` to define the number of last
+      checkpoints that will be kept if `checkpoint_freq > 0` i.e. checkpointing enabled
+  - Added `ExtendedInterpolation` support to configuration files:
+    - You can now define intermediate variables in `.conf` files to avoid
+      typing same paths again and again. A variable can be referenced
+      from within its **section** using `tensorboard_dir: ${save_path}/tb` notation
+      Cross-section references are also possible: `${data:root}` will be replaced
+      by the value of the `root` variable defined in the `[data]` section.
+  - Added `-p/--pretrained` to `nmtpy train` to initialize the weights of
+    the model using another checkpoint `.ckpt`.
+  - Improved input/output handling for `nmtpy translate`:
+    - `-s` accepts a comma-separated test sets **defined** in the configuration
+      file of the experiment to translate them at once. Example: `-s val,newstest2016,newstest2017`
+    - The mutually exclusive counterpart of `-s` is `-S` which receives a
+      single input file of source sentences.
+    - For both cases, an output prefix **should now be** provided with `-o`.
+      In the case of multiple test sets, the output prefix will be appended
+      the name of the test set and the beam size. If you just provide a single file with `-S`
+      the final output name will only reflect the beam size information.
+ - Two new arguments for `nmtpy-build-vocab`:
+    - `-f`: Stores frequency counts as well inside the final `json` vocabulary
+    - `-x`: Does not add special markers `<eos>,<bos>,<unk>,<pad>` into the vocabulary
+
+#### Layers/Architectures
+
+ - Added `Fusion()` layer to `concat,sum,mul` an arbitrary number of inputs
+ - Added *experimental* `ImageEncoder()` layer to seamlessly plug a VGG or ResNet
+   CNN using `torchvision` pretrained models
+ - `Attention` layer arguments improved. You can now select the bottleneck
+   dimensionality for MLP attention with `att_bottleneck`. The `dot`
+   attention is **still not tested** and probably broken.
+
+New layers/architectures:
+
+ - Added **AttentiveMNMT** which implements modality-specific multimodal attention
+   from the paper [Multimodal Attention for Neural Machine Translation](https://arxiv.org/abs/1609.03976)
+ - Added **ShowAttendAndTell** [model](http://www.jmlr.org/proceedings/papers/v37/xuc15.pdf)
+
+Changes in **NMT**:
+
+  - `dec_init` defaults to `mean_ctx`, i.e. the decoder will be initialized
+    with the mean context computed from the source encoder
+  - `enc_lnorm` which was just a placeholder is now removed since we do not
+    provided layer-normalization for now
+  - Beam Search is completely moved to GPU
+
 ### Initial Release v1.0 (18/12/2017)
 
 The initial release aims to be (as much as) feature compatible with respect
