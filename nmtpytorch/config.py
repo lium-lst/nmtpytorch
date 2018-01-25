@@ -4,37 +4,39 @@ import pathlib
 
 from collections import defaultdict
 
-from configparser import ConfigParser
+from configparser import ConfigParser, ExtendedInterpolation
 from ast import literal_eval
 
 # Default data types
 INT = 'int64'
 FLOAT = 'float32'
 
-
 TRAIN_DEFAULTS = {
-    'seed': 1234,            # RNG seed
-    'gclip': 5.,             # Clip gradients above clip_c
-    'l2_reg': 0.,            # L2 penalty factor
-    'patience': 10,          # Early stopping patience
-    'optimizer': 'adam',     # adadelta, sgd, rmsprop, adam
-    'lr': 0,                 # 0: Use default lr if not precised further
-    'device_id': 'auto_1',   # auto_N for automatic N gpus
-                             # 0,1,2 for manual N gpus
-                             # 0 for 0th (single) GPU
-    'disp_freq': 30,         # Training display frequency (/batch)
-    'batch_size': 32,        # Training batch size
-    'max_epochs': 100,       # Max number of epochs to train
-    'eval_beam': 6,          # Validation beam_size
-    'eval_freq': 0,          # 0: End of epochs
-    'eval_start': 1,         # Epoch which validation will start
-    'save_best_n': 4,        # Store a set of 4 best validation models
-    'eval_metrics': 'bleu',  # comma sep. metrics, 1st -> earlystopping
-    'eval_filters': '',      # comma sep. filters to apply to refs and hyps
-    'checkpoint_freq': 0,    # Checkpoint frequency for resuming
-    'max_iterations': int(1e6),     # Max number of updates to train
-    'patience_delta': 0.,           # Abs. difference that counts for metrics
-    'tensorboard_dir': '',          # Enable TB and give global log folder
+    'device_id': 'auto_1',       # auto_N for automatic N gpus
+                                 # 0,1,2 for manual N gpus
+                                 # 0 for 0th (single) GPU
+    'seed': 1234,                # RNG seed. 0 -> Don't init
+    'gclip': 5.,                 # Clip gradients above clip_c
+    'l2_reg': 0.,                # L2 penalty factor
+    'patience': 20,              # Early stopping patience
+    'optimizer': 'adam',         # adadelta, sgd, rmsprop, adam
+    'lr': 0.0004,                # 0 -> Use default lr from Pytorch
+    'disp_freq': 30,             # Training display frequency (/batch)
+    'batch_size': 32,            # Training batch size
+    'max_epochs': 100,           # Max number of epochs to train
+    'max_iterations': int(1e6),  # Max number of updates to train
+    'eval_metrics': 'loss',      # comma sep. metrics, 1st -> earlystopping
+    'eval_filters': '',          # comma sep. filters to apply to refs and hyps
+    'eval_beam': 6,              # Validation beam size
+    'eval_batch_size': 16,       # batch_size for GPU beam-search
+    'eval_freq': 3000,           # 0 means 'End of epochs'
+    'eval_start': 1,             # Epoch which validation will start
+    'eval_zero': False,          # Evaluate once before starting training
+                                 # Useful when using pretrained init.
+    'save_best_metrics': True,   # Save best models for each eval_metric
+    'checkpoint_freq': 5000,     # Periodic checkpoint frequency
+    'n_checkpoints': 5,          # Number of checkpoints to keep
+    'tensorboard_dir': '',       # Enable TB and give global log folder
 }
 
 
@@ -80,7 +82,7 @@ class Options(object):
         return obj
 
     def __init__(self, filename, overrides=None):
-        self.__parser = ConfigParser()
+        self.__parser = ConfigParser(interpolation=ExtendedInterpolation())
         self.filename = filename
         self.overrides = defaultdict(dict)
         self.sections = []
