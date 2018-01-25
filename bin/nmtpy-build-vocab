@@ -13,7 +13,8 @@ from nmtpytorch.vocabulary import Vocabulary
 from nmtpytorch.utils.misc import get_language, pbar
 
 
-def freqs_to_dict(token_freqs, min_freq=0, max_items=0):
+def freqs_to_dict(token_freqs, min_freq=0, max_items=0,
+                  store_freqs=False, exclude_markers=False):
     # Get list of tokens
     tokens = list(token_freqs.keys())
 
@@ -21,25 +22,29 @@ def freqs_to_dict(token_freqs, min_freq=0, max_items=0):
     freqs = np.array(list(token_freqs.values()))
 
     tokendict = OrderedDict()
-    for key, value in Vocabulary.TOKENS.items():
-        tokendict[key] = value
-
-    offset = len(tokendict)
+    if not exclude_markers:
+        for key, value in Vocabulary.TOKENS.items():
+            tokendict[key] = value
 
     # Sort in descending order of frequency
     sorted_idx = np.argsort(freqs)
     if min_freq > 0:
-        sorted_tokens = [tokens[ii] for ii in sorted_idx[::-1]
+        sorted_tokens = [(tokens[ii], freqs[ii]) for ii in sorted_idx[::-1]
                          if freqs[ii] >= min_freq]
     else:
-        sorted_tokens = [tokens[ii] for ii in sorted_idx[::-1]]
+        sorted_tokens = [(tokens[ii], freqs[ii]) for ii in sorted_idx[::-1]]
 
     if max_items > 0:
         sorted_tokens = sorted_tokens[:max_items]
 
-    # Start inserting from index 2
-    for ii, ww in enumerate(sorted_tokens):
-        tokendict[ww] = ii + offset
+    # Start inserting from index offset
+    offset = len(tokendict)
+    if store_freqs:
+        for ii, (token, freq) in enumerate(sorted_tokens):
+            tokendict[token] = (ii + offset, int(freq))
+    else:
+        for ii, (token, freq) in enumerate(sorted_tokens):
+            tokendict[token] = ii + offset
 
     return tokendict
 
@@ -84,10 +89,14 @@ if __name__ == '__main__':
                         help='Output directory')
     parser.add_argument('-s', '--single', type=str, default=None,
                         help='Name of the combined vocabulary file')
+    parser.add_argument('-f', '--store-freqs', action='store_true',
+                        help='Store occurrence counts inside .json.')
     parser.add_argument('-m', '--min-freq', type=int, default=0,
                         help='Filter out tokens occuring < m times')
     parser.add_argument('-M', '--max-items', type=int, default=0,
                         help='Keep the final vocabulary size less than this')
+    parser.add_argument('-x', '--exclude-symbols', action='store_true',
+                        help='Do not add special <eos>, <bos>, <pad>, <unk>')
     parser.add_argument('files', type=str, nargs='+',
                         help='Sentence files')
     args = parser.parse_args()
@@ -110,7 +119,9 @@ if __name__ == '__main__':
             # Get frequencies
             freqs = get_freqs(filename)
             # Build dictionary from frequencies
-            tokendict = freqs_to_dict(freqs, args.min_freq, args.max_items)
+            tokendict = freqs_to_dict(freqs, args.min_freq, args.max_items,
+                                      args.store_freqs,
+                                      args.exclude_symbols)
 
             if args.min_freq > 0:
                 vocab_fname += "-min%d" % args.min_freq
@@ -120,5 +131,7 @@ if __name__ == '__main__':
             write_dict(vocab_fname, tokendict)
 
     if args.single:
-        tokendict = freqs_to_dict(all_freqs, args.min_freq, args.max_items)
+        tokendict = freqs_to_dict(all_freqs, args.min_freq, args.max_items,
+                                  args.store_freqs,
+                                  args.exclude_markers)
         write_dict(args.single, tokendict)
