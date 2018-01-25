@@ -7,6 +7,8 @@ a sequence-to-sequence framework which was originally a fork of
 [dl4mt-tutorial](https://github.com/nyu-dl/dl4mt-tutorial).
 
 The core parts of `nmtpytorch` depends on `numpy`, `torch` and `tqdm`.
+For multimodal architectures, you also need to install `torchvision` which
+is used to integrate pre-trained CNN models.
 
 `nmtpytorch` is developed and tested on Python 3.6 and will not support
 Python 2.x whatsoever.
