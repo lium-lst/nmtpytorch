@@ -72,7 +72,6 @@ class AttentiveMNMT(nn.Module):
         opts.model['enc_type'] = kwargs.pop('enc_type', 'gru')
         opts.model['dec_type'] = kwargs.pop('dec_type', 'gru')
         opts.model['n_encoders'] = kwargs.pop('n_encoders', 1)
-        opts.model['n_decoders'] = kwargs.pop('n_decoders', 1)
 
         # How to initialize decoder (zero/mean_ctx)
         opts.model['dec_init'] = kwargs.pop('dec_init', 'mean_ctx')
@@ -89,7 +88,6 @@ class AttentiveMNMT(nn.Module):
         opts.model['dropout_ctx'] = kwargs.pop('dropout_ctx', 0.)
         opts.model['dropout_out'] = kwargs.pop('dropout_out', 0.)
         opts.model['dropout_enc'] = kwargs.pop('dropout_enc', 0.)
-        opts.model['dropout_dec'] = kwargs.pop('dropout_dec', 0.)
 
         # Tie embeddings: False/2way/3way
         opts.model['tied_emb'] = kwargs.pop('tied_emb', False)
