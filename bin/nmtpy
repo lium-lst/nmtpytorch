@@ -64,9 +64,9 @@ if __name__ == '__main__':
 
     group = parser_trans.add_mutually_exclusive_group(required=True)
     # You can translate a set of splits defined in the .conf file
-    # In this case, outputs will be automatically <model_file>.<split>.<beam>
     group.add_argument('-s', '--splits', type=str,
                        help='Comma separated splits from config file')
+    # Or you can provide another input file with -S
     group.add_argument('-S', '--source', type=str,
                        help='A text file to translate')
     parser_trans.add_argument('-o', '--output', type=str, required=True,
