@@ -62,7 +62,7 @@ class TensorBoard(object):
             # Set up summary writer
             self.writer = SummaryWriter(self.log_dir)
 
-    def _nop(self, *args):
+    def _nop(self, *args, **kwargs):
         return
 
     def close(self):
@@ -70,10 +70,10 @@ class TensorBoard(object):
         if self.available:
             self.writer.close()
 
-    def log_metrics(self, metrics, step):
+    def log_metrics(self, metrics, step, suffix=''):
         """Logs evaluation metrics as scalars."""
         for metric in metrics:
-            self.writer.add_scalar(metric.name, metric.score,
+            self.writer.add_scalar(suffix + metric.name, metric.score,
                                    global_step=step)
 
     def log_scalar(self, name, value, step):

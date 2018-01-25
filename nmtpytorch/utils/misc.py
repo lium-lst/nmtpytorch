@@ -89,16 +89,6 @@ def fopen(filename, key=None):
         return open(filename, 'r')
 
 
-def force_symlink(origfile, linkname, relative=False):
-    if relative:
-        origfile = os.path.basename(origfile)
-    try:
-        os.symlink(origfile, linkname)
-    except FileExistsError as e:
-        os.unlink(linkname)
-        os.symlink(origfile, linkname)
-
-
 def readable_size(n):
     """Return a readable size string."""
     sizes = ['K', 'M', 'G']
@@ -131,7 +121,7 @@ def get_n_params(module):
 def get_temp_file(suffix="", name=None, delete=False):
     """Creates a temporary file under /tmp."""
     if name:
-        name = os.path.join("/tmp", name)
+        name = str(pathlib.Path('/tmp') / name)
         t = open(name, "w")
         cleanup.register_tmp_file(name)
     else:
@@ -167,6 +157,9 @@ def setup_experiment(opts, suffix=None):
     if 'att_type' in mopts:
         names.append("att_%s" % mopts['att_type'])
 
+    if 'fusion_type' in mopts:
+        names.append("ctx_%s" % mopts['fusion_type'])
+
     # Join so far
     name = '-'.join(names)
 
@@ -199,6 +192,9 @@ def setup_experiment(opts, suffix=None):
     # need to let models to append their custom fields afterwards
     if mopts.get('tied_emb', False):
         name += "-%stied" % mopts['tied_emb']
+
+    if mopts.get('dec_init', False):
+        name += "-init_{}".format(mopts['dec_init'].replace('_', ''))
 
     if mopts.get('simple_output', False):
         name += "-smpout"

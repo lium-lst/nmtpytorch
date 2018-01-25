@@ -4,10 +4,10 @@ import numpy as np
 from ..config import FLOAT
 
 
-def freeze_parameters(module):
+def set_learnable(module, value=False):
     """Disables updating the weights of CNN to use it as feature extractor."""
     for param in module.parameters():
-        param.requires_grad = False
+        param.requires_grad = value
 
 
 def normalize_images(x):

@@ -33,6 +33,8 @@ if __name__ == '__main__':
                               help="Experiment configuration file")
     parser_train.add_argument('-s', '--suffix', type=str, default="",
                               help="Optional experiment suffix.")
+    parser_train.add_argument('-p', '--pretrained', type=str, default=None,
+                              help=".ckpt file for model initialization")
     parser_train.add_argument('overrides', nargs="*", default=[],
                               help="(section).key:value overrides for config")
 
@@ -62,21 +64,19 @@ if __name__ == '__main__':
 
     group = parser_trans.add_mutually_exclusive_group(required=True)
     # You can translate a set of splits defined in the .conf file
-    # In this case, outputs will be automatically <model_file>.<split>.<beam>
     group.add_argument('-s', '--splits', type=str,
                        help='Comma separated splits from config file')
+    # Or you can provide another input file with -S
     group.add_argument('-S', '--source', type=str,
-                       help='A text file to translate (pass - for stdin)')
-    parser_trans.add_argument('-o', '--output', type=str,
-                              help='Explicit output file if using -S <input>')
+                       help='A text file to translate')
+    parser_trans.add_argument('-o', '--output', type=str, required=True,
+                              help='Output filename prefix')
 
     # Parse command-line arguments first
     args = parser.parse_args()
     if args.cmd is None:
         parser.print_help()
         sys.exit(1)
-
-    opts, history, weights = {}, {}, None
 
     # Mode selection
     if args.cmd == 'train':
@@ -86,13 +86,19 @@ if __name__ == '__main__':
         # Setup experiment folders
         setup_experiment(opts, args.suffix)
 
+        weights, history = None, None
+        if args.pretrained:
+            weights, _, _ = load_pt_file(args.pretrained)
+            opts.train['pretrained'] = args.pretrained
+
     elif args.cmd == 'resume':
         # Load everything to CPU without messing with storage tags
         weights, history, opts = load_pt_file(args.checkpoint)
         opts = Options.from_dict(opts)
 
     # Detect device_id
-    device_id = opts.train['device_id'] if opts else args.device_id
+    device_id = (opts.train['device_id'] if args.cmd != 'translate' else
+                 args.device_id)
 
     # Reserve GPUs
     gpu_devs = GPUManager()(device_id, strict=True)
@@ -102,7 +108,6 @@ if __name__ == '__main__':
     # translate entry point
     #######################
     if args.cmd == 'translate':
-        assert len(args.models) == 1, "Ensembling not implemented yet."
         Translator(**args.__dict__)()
         sys.exit(0)
 
@@ -123,5 +128,5 @@ if __name__ == '__main__':
     log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
         torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
     loop = MainLoop(model, log, opts.train, history, weights, mode=args.cmd)
-    loop.run()
+    loop()
     sys.exit(0)

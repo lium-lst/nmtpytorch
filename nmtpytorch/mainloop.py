@@ -1,67 +1,72 @@
 # -*- coding: utf-8 -*-
 import time
 import math
-import pathlib
-from collections import OrderedDict
 
 import numpy as np
 
-import torch
-
-from nmtpytorch.metrics import Evaluator
-from nmtpytorch.utils.misc import force_symlink, get_n_params
-from nmtpytorch.utils.data import to_var
-from nmtpytorch.utils.tensorboard import TensorBoard
-from nmtpytorch.optimizer import Optimizer
+from .metrics import Metric
+from .evaluator import Evaluator
+from .optimizer import Optimizer
+from .monitor import Monitor
+from .utils.misc import get_n_params
+from .utils.data import to_var
+from .utils.tensorboard import TensorBoard
 
 
 class MainLoop(object):
-    def __init__(self, model, logger, train_opts, history, model_weights,
-                 mode='train'):
-        # Set print function to logger's info()
-        self.print = logger.info
-
-        # Set model
-        self.model = model
-
+    def __init__(self, model, logger, train_opts,
+                 history=None, weights=None, mode='train'):
         # Get all training options into this mainloop
         self.__dict__.update(train_opts)
 
-        # Convert save_path to pathlib for easy manipulation
-        self.save_path = pathlib.Path(self.save_path)
+        self.print = logger.info
+        self.model = model
+        self.mode = mode    # (train|resume)
+        self.epoch_valid = (self.eval_freq == 0)
 
-        # Initialize stateful variables from zero or checkpoint
-        self.load_state(history)
-
+        # Load training and validation data & create iterators
         self.print('Loading dataset(s)')
         self.model.load_data('train')
-        self.model.load_data('val')
         self.train_iterator = self.model.datasets['train'].get_iterator(
             self.batch_size)
-        self.valloss_iterator = self.model.datasets['val'].get_iterator(
-            self.batch_size)
-        # For batched GPU beam-search, an effective batch_size of 48
-        # seems to give good speed
-        self.beam_iterator = self.model.datasets['val'].get_iterator(
-            48 // self.eval_beam, only_source=True)
 
-        # If pretrained weights are given, evaluate before starting
-        self.immediate_eval = (mode == 'train') and model_weights
+        # Create monitor for validation, evaluation, checkpointing stuff
+        self.monitor = Monitor(self.save_path / self.subfolder, self.exp_id,
+                               self.model, logger, self.patience,
+                               self.eval_metrics,
+                               history=history,
+                               save_best_metrics=self.save_best_metrics,
+                               n_checkpoints=self.n_checkpoints)
+
+        # If a validation set exists
+        if 'val_set' in self.model.opts.data and self.eval_freq >= 0:
+            self.model.load_data('val')
+            val_set = self.model.datasets['val']
+            if 'LOSS' in self.monitor.eval_metrics:
+                self.vloss_iterator = val_set.get_iterator(self.batch_size)
+            if self.monitor.beam_metrics:
+                self.beam_iterator = val_set.get_iterator(
+                    self.eval_batch_size, only_source=True)
+                # Create hypothesis evaluator
+                self.evaluator = Evaluator(
+                    self.model.val_refs, self.monitor.beam_metrics,
+                    filters=self.eval_filters)
 
         # Setup model
         self.model.setup()
 
         # This should come after model.setup()
-        if model_weights is not None:
-            self.print('Loading previous model weights')
-            # If not resuming -> pretrained weights are loaded from an
-            # arbitrary model, relax the strict condition.
-            model.load_state_dict(model_weights, strict=(mode == 'resume'))
+        if weights is not None:
+            self.print('Loading pretrained model weights')
+            # If not resuming -> pretrained weights may be partial
+            # so relax the strict condition.
+            model.load_state_dict(weights, strict=(self.mode == 'resume'))
 
         # Move to cuda
         self.model.cuda()
 
-        # Print number of parameters
+        # Print model topology and number of parameters
+        self.print(self.model)
         self.print("# parameters: {} ({} learnable)".format(
             *get_n_params(self.model)))
 
@@ -69,94 +74,29 @@ class MainLoop(object):
         if self.seed != 0:
             np.random.seed(self.seed)
 
-        # Add an attribute for end-of-epoch validations
-        self.epoch_valid = (self.eval_freq == 0)
-
         # Create optimizer instance
         self.optim = Optimizer(
-            self.optimizer, self.model,
-            lr=self.lr, weight_decay=self.l2_reg, gclip=self.gclip)
-
+            self.optimizer, self.model, lr=self.lr,
+            weight_decay=self.l2_reg, gclip=self.gclip)
         self.print(self.optim)
 
-        # We may have no validation data.
-        self.beam_metrics = []
-        if self.eval_freq >= 0:
-
-            # Requested metrics
-            metrics = self.eval_metrics.split(',')
-
-            # first one is for early-stopping
-            self.early_metric = metrics[0]
-
-            for metric in metrics:
-                if metric not in self.evals:
-                    self.evals[metric] = []
-
-            # Prepare the string to pass to beam_search
-            self.beam_metrics = [m for m in self.evals if m != 'loss']
-
-        # Create evaluator object
-        self.evaluator = Evaluator(self.model.val_refs, self.beam_metrics,
-                                   filters=self.eval_filters)
-
         # Create TensorBoard logger if possible and requested
-        self.tb = TensorBoard(self.model, self.tensorboard_dir, self.exp_id,
-                              self.subfolder)
-        # Print information
+        self.tb = TensorBoard(self.model, self.tensorboard_dir,
+                              self.exp_id, self.subfolder)
         self.print(self.tb)
 
-    def save_best_model(self):
-        """Saves best N models to disk."""
-        # Get the score of the system that will be saved
-        cur_score = self.evals[self.early_metric][-1]
-
-        # Custom filename with metric score
-        cur_fname = "%s-val%3.3d-%s_%.3f.pt" % (self.exp_id, self.vctr,
-                                                self.early_metric,
-                                                cur_score)
-
-        # Stack is empty, save the model whatsoever
-        if len(self.best_models) < self.save_best_n:
-            self.best_models.append((cur_score, cur_fname))
-
-        # Stack is full, replace the worst model
-        else:
-            prune = self.best_models[self.next_prune_idx][1]
-            (self.save_path / self.subfolder / prune).unlink()
-            self.best_models[self.next_prune_idx] = (cur_score, cur_fname)
-
-        self.print('Saving model with best validation %s' %
-                   self.early_metric.upper())
-        self.save(cur_fname)
-
-        # Create a .best symlink
-        symlink = str(self.save_path / self.subfolder / self.exp_id) + '.best'
-        force_symlink(cur_fname, symlink, relative=True)
-
-        # In the next best, we'll remove the following idx from the store
-        # Metric specific comparator stuff
-        where = self.evaluator.comparators[self.early_metric][-1]
-        getitem = self.best_models.__getitem__
-        self.next_prune_idx = sorted(range(len(self.best_models)),
-                                     key=getitem)[where]
-
     def train_epoch(self):
-        """Train a full epoch."""
-
+        """Trains a full epoch."""
         # Even if we resume, we'll start over a clean epoch
-        self.print('Starting Epoch %d' % self.ectr)
-        epoch_time = 0.0
-        start_uctr = self.uctr
-        n_tokens_seen = 0
+        self.print('Starting Epoch {}'.format(self.monitor.ectr))
+        epoch_sec = 0.0
         total_loss = 0.0
+        n_tokens_seen = 0
 
         # Iterate over batches
         for batch in self.train_iterator:
+            self.monitor.uctr += 1
             start_time = time.time()
-
-            # Increment update counter
-            self.uctr += 1
 
             # Reset gradients
             self.optim.zero_grad()
@@ -173,186 +113,122 @@ class MainLoop(object):
             # Update parameters (includes gradient clipping logic)
             self.optim.step()
 
-            # Accumulate time spent
-            epoch_time += (time.time() - start_time)
-
             # Keep stats
+            epoch_sec += (time.time() - start_time)
             batch_loss = loss.data.cpu()[0]
             total_loss += batch_loss * self.model.n_tokens
             n_tokens_seen += self.model.n_tokens
 
-            # Verbose
-            if self.uctr % self.disp_freq == 0:
-                self.print("Epoch: %6d, update: %7d, loss: %5.3f "
-                           "(aux_loss: %5.3f)" %
-                           (self.ectr, self.uctr, batch_loss, aux_loss))
+            if self.monitor.uctr % self.disp_freq == 0:
+                self.print("Epoch {} - update {:10d} => loss: {:.3f} "
+                           "(aux_loss: {:.3f})".format(self.monitor.ectr,
+                                                       self.monitor.uctr,
+                                                       batch_loss,
+                                                       aux_loss))
 
                 # Send statistics
-                self.tb.log_scalar('train_loss', batch_loss, self.uctr)
+                self.tb.log_scalar('train_LOSS', batch_loss, self.monitor.uctr)
 
-            # Checkpoint?
-            if self.checkpoint_freq and self.uctr % self.checkpoint_freq == 0:
-                self.save(self.exp_id, checkpoint=True)
-
-            # Should we stop
-            if self.uctr == self.max_iterations:
-                self.print("Max iterations %d reached." % self.uctr)
-                return False
-
-            # Do validation
-            if not self.epoch_valid and self.ectr >= self.eval_start \
-                    and self.eval_freq > 0 \
-                    and self.uctr % self.eval_freq == 0:
+            # Do validation?
+            if (not self.epoch_valid and
+                    self.monitor.ectr >= self.eval_start and
+                    self.eval_freq > 0 and
+                    self.monitor.uctr % self.eval_freq == 0):
                 self.do_validation()
 
+            if (self.checkpoint_freq and self.n_checkpoints > 0 and
+                    self.monitor.uctr % self.checkpoint_freq == 0):
+                self.print('Saving checkpoint...')
+                self.monitor.save_checkpoint()
+
             # Check stopping conditions
-            if self.early_bad == self.patience:
+            if self.monitor.early_bad == self.monitor.patience:
                 self.print("Early stopped.")
+                return False
+
+            if self.monitor.uctr == self.max_iterations:
+                self.print("Max iterations {} reached.".format(
+                    self.max_iterations))
                 return False
 
         # Compute epoch loss
         epoch_loss = total_loss / n_tokens_seen
-        self.epoch_losses.append(epoch_loss)
+        self.monitor.train_loss.append(epoch_loss)
 
         self.print(
-            "--> Epoch %d finished in %.3f minutes (%.3f sec/batch)"
-            " with mean loss %.5f (PPL: %4.5f)" %
-            (self.ectr, epoch_time / 60,
-             epoch_time / (self.uctr - start_uctr),
-             epoch_loss, np.exp(epoch_loss)))
+            "--> Epoch {} finished in {:.3f} minutes ({} sent/sec) "
+            "with mean loss {:.5f}".format(
+                self.monitor.ectr, epoch_sec / 60,
+                int(len(self.model.datasets['train']) / epoch_sec),
+                epoch_loss))
 
         # Do validation?
-        if self.epoch_valid and self.ectr >= self.eval_start:
+        if self.epoch_valid and self.monitor.ectr >= self.eval_start:
             self.do_validation()
 
         # Check whether maximum epoch is reached
-        if self.ectr == self.max_epochs:
-            self.print("Max epochs %d reached." % self.max_epochs)
+        if self.monitor.ectr == self.max_epochs:
+            self.print("Max epochs {} reached.".format(self.max_epochs))
             return False
 
-        # Increment now for the next epoch
-        self.ectr += 1
-
+        self.monitor.ectr += 1
         return True
 
     def do_validation(self):
         """Do early-stopping validation."""
+        results = []
+        self.monitor.vctr += 1
         self.model.train(False)
-        self.vctr += 1
 
-        # Compute validation loss
-        cur_loss = self.model.compute_loss(self.valloss_iterator)
+        if 'LOSS' in self.monitor.eval_metrics:
+            # Compute validation loss and add it
+            val_loss = self.model.compute_loss(self.vloss_iterator)
+            results.append(Metric('LOSS', val_loss, higher_better=False))
 
-        # Add val_loss
-        self.evals['loss'].append(cur_loss)
-
-        # Print validation loss
-        self.print("Validation %2d - LOSS = %.3f (PPL: %.3f)" %
-                   (self.vctr, cur_loss, math.exp(cur_loss)))
-
-        self.tb.log_scalar('val_loss', cur_loss, self.uctr)
-
-        if any(self.beam_metrics):
+        if self.monitor.beam_metrics:
             self.print('Performing translation search (beam_size:{})'.format(
                 self.eval_beam))
             beam_time = time.time()
             hyps = self.model.beam_search(self.beam_iterator, k=self.eval_beam)
-            spent = (time.time() - beam_time) / 60.
-            self.print('Completed in %.3f minutes.' % spent)
+            up_time = time.time() - beam_time
+            self.print('Took {:.3f} seconds, {} sent/sec'.format(
+                up_time, math.floor(len(hyps) / up_time)))
 
-            # Compute metrics
-            results = list(self.evaluator.score(hyps).values())
+            # Compute metrics and update results
+            results.extend(self.evaluator.score(hyps))
 
-            # Send to tensorboard
-            self.tb.log_metrics(results, self.uctr)
+        # Log metrics to tensorboard
+        self.tb.log_metrics(results, self.monitor.uctr, suffix='val_')
 
-            # Metric() instances are printable
-            for metric in results:
-                self.print("Validation %2d - %s" % (self.vctr, metric))
-                self.evals[metric.name.lower()].append(metric.score)
+        # Add new scores to history
+        self.monitor.update_scores(results)
 
-        # Check whether this is the best or not
-        if self.evaluator.is_last_best(self.early_metric,
-                                       self.evals[self.early_metric],
-                                       self.patience_delta):
-            self.early_bad = 0
-            if self.save_best_n > 0:
-                self.save_best_model()
-        else:
-            self.early_bad += 1
-            self.print("Early stopping patience: %d left" %
-                       (self.patience - self.early_bad))
+        # Check early-stop criteria and save snapshots if any
+        self.monitor.save_models()
 
-        # Dump summary
-        self.dump_val_summary()
+        # Dump summary and switch back to training mode
+        self.monitor.val_summary()
         self.model.train(True)
 
-    def dump_val_summary(self):
-        """Print validation summary."""
-        for metric, history in self.evals.items():
-            # Find the best validation idx and value so far
-            best_idx, best_val = self.evaluator.find_best(metric, history)
-            if metric == 'loss':
-                msg = "Best %s = %.2f (PPL: %.2f)" % (metric.upper(),
-                                                      best_val,
-                                                      np.exp(best_val))
-            else:
-                msg = "Best %s = %.2f" % (metric.upper(), best_val)
-
-            self.print('--> Current %s at validation %d' % (msg, best_idx))
-
-        # Remember who we are
-        self.print('--> This is model: %s' % self.exp_id)
-
-    def run(self):
+    def __call__(self):
         """Runs training loop."""
-        if self.immediate_eval:
+        self.print('Training started on %s' % time.strftime('%d-%m-%Y %H:%M'))
+        self.model.train(True)
+
+        # Evaluate once before even starting training
+        if self.eval_zero:
             self.do_validation()
 
-        self.model.train(True)
-        self.print('Training started on %s' % time.strftime('%d-%m-%Y %H:%M'))
         while self.train_epoch():
             pass
 
-        # Final summary
-        if len(self.evals['loss']) > 0:
-            self.dump_val_summary()
+        if self.monitor.vctr > 0:
+            self.monitor.val_summary()
         else:
-            # No validation data used, save the final model
+            # No validation done, save final model
             self.print('Saving final model.')
-            self.save(self.exp_id)
+            self.monitor.save_model(suffix='final')
 
         self.print('Training finished on %s' % time.strftime('%d-%m-%Y %H:%M'))
         # Close tensorboard
         self.tb.close()
-
-    def save(self, fname, checkpoint=False):
-        """Saves the current model optionally with stateful variables."""
-        d = {'opts': self.model.opts.to_dict(),
-             'model': self.model.state_dict()}
-        if checkpoint:
-            d['history'] = self.get_state()
-            fname = fname if fname.endswith('.ckpt') else fname + '.ckpt'
-        else:
-            fname = fname if fname.endswith('.pt') else fname + '.pt'
-
-        torch.save(d, self.save_path / self.subfolder / fname)
-
-    def load_state(self, history):
-        """Restores stateful variables from dictionary if not empty."""
-        if history:
-            self.print('Restoring previous history.')
-
-        states = {'uctr': history.pop('uctr', 0),   # update ctr
-                  'ectr': history.pop('ectr', 1),   # epoch ctr
-                  'vctr': history.pop('vctr', 0),   # validation ctr
-                  'early_bad': history.pop('early_bad', 0),
-                  'epoch_losses': history.pop('epoch_losses', []),
-                  'best_models': history.pop('save_best_n', []),
-                  'evals': history.pop('evals', OrderedDict({'loss': []}))}
-        self._stateful = list(states.keys())
-        self.__dict__.update(states)
-
-    def get_state(self):
-        """Returns the current values of stateful variables."""
-        return {k: getattr(self, k) for k in self._stateful}

@@ -74,11 +74,3 @@ class GPUManager(object):
 
         # Return list of indices
         return devices
-
-    @staticmethod
-    def get_torch_devices():
-        import torch
-        devs = []
-        for idx in range(torch.cuda.device_count()):
-            devs.append(torch.cuda.get_device_name(idx))
-        return devs

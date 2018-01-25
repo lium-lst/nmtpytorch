@@ -4,8 +4,20 @@ from functools import total_ordering
 
 @total_ordering
 class Metric(object):
-    def __init__(self, name, score=0.0, detailed_score="", higher_better=True):
-        self.name = name
+    """A Metric object to represent evaluation metrics.
+
+    Arguments:
+        name(str): A name for the metric that will be kept internally
+            after upper-casing
+        score(float): A floating point score
+        detailed_score(str, optional): A custom, more detailed string
+            representing the score given above (Default: "")
+        higher_better(bool, optional): If ``False``, the smaller the better
+            (Default: ``True``)
+    """
+
+    def __init__(self, name, score, detailed_score="", higher_better=True):
+        self.name = name.upper()
         self.score = score
         self.detailed_score = detailed_score
         self.higher_better = higher_better
@@ -16,16 +28,7 @@ class Metric(object):
     def __lt__(self, other):
         return self.score < other.score
 
-    def better(self, other):
-        less_than_other = self.__lt__(other)
-        if not self.higher_better:
-            # lower is better
-            return less_than_other
-        else:
-            return not less_than_other
-
     def __repr__(self):
-        if self.detailed_score:
-            return "%s = %s" % (self.name, self.detailed_score)
-        else:
-            return "%s = %.2f" % (self.name, self.score)
+        rhs = (self.detailed_score if self.detailed_score
+               else "%.2f" % self.score)
+        return self.name + ' = ' + rhs

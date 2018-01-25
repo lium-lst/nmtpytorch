@@ -3,27 +3,22 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from ..vocabulary import Vocabulary
-from ..layers import TextEncoder
-from ..layers import ConditionalDecoder
-from ..utils.nn import get_network_topology
+from ..layers import ImageEncoder, TextEncoder, ConditionalMMDecoder
+from ..utils.nn import get_network_topology, set_learnable
 from ..utils.data import to_var
 from ..utils.misc import pbar
 
-from ..datasets import BitextDataset
+from ..datasets import Multi30kDataset
 
 
-class NMT(nn.Module):
-    r"""A sequence-to-sequence NMT model.
-
-    Encoder RNN's will use CuDNN's optimized versions with packing and
-    padding. The decoder currently used is ConditionalDecoder which is a
-    Conditional GRU architecture unrolled manually.
-    """
+class AttentiveMNMT(nn.Module):
+    r"""A sequence-to-sequence NMT model with visual attention."""
     def __init__(self, opts, logger=None):
         """This should only be used for argument processing."""
-        super(NMT, self).__init__()
+        super(AttentiveMNMT, self).__init__()
 
         self.vocabs = {}
         self.datasets = {}
@@ -52,6 +47,25 @@ class NMT(nn.Module):
         self.n_src_vocab = len(self.src_vocab)
         self.n_trg_vocab = len(self.trg_vocab)
 
+        # CNN stuff
+        opts.model['img_mode'] = kwargs.pop('img_mode', 'raw')
+        if opts.model['img_mode'] == 'raw':
+            assert 'cnn_type' in opts.model, "cnn_type not provided"
+            assert 'cnn_layer' in opts.model, "cnn_layer not provided"
+            opts.model['cnn_trainable'] = kwargs.pop('cnn_trainable', False)
+            opts.model['cnn_pretrained'] = kwargs.pop('cnn_pretrained', True)
+            opts.model['cnn_type'] = kwargs.pop('cnn_type', 'resnet50')
+            opts.model['cnn_layer'] = kwargs.pop('cnn_layer', 'res4f_relu')
+        else:
+            # Make this fail to make it mandatory
+            assert 'img_ctx_dim' in opts.model, \
+                "You should provide img_ctx_dim for the given conv features."
+
+            opts.model['img_ctx_dim'] = kwargs.pop('img_ctx_dim')
+
+        # How to fusion multimodal contexts (sum/mul/concat)
+        opts.model['fusion_type'] = kwargs.pop('fusion_type', 'sum')
+
         opts.model['emb_dim'] = kwargs.pop('emb_dim', 256)
         opts.model['enc_dim'] = kwargs.pop('enc_dim', 512)
         opts.model['dec_dim'] = kwargs.pop('dec_dim', 1024)
@@ -62,7 +76,13 @@ class NMT(nn.Module):
 
         # How to initialize decoder (zero/mean_ctx)
         opts.model['dec_init'] = kwargs.pop('dec_init', 'mean_ctx')
+
+        # Attention related parameters
         opts.model['att_type'] = kwargs.pop('att_type', 'mlp')
+
+        # The bottleneck dimension during attention computation
+        opts.model['att_bottleneck'] = kwargs.pop('att_bottleneck', 'ctx')
+        opts.model['att_activ'] = kwargs.pop('att_activ', 'tanh')
 
         # Various dropouts
         opts.model['dropout_emb'] = kwargs.pop('dropout_emb', 0.)
@@ -74,12 +94,6 @@ class NMT(nn.Module):
         # Tie embeddings: False/2way/3way
         opts.model['tied_emb'] = kwargs.pop('tied_emb', False)
 
-        # Filter out sentence pairs where target >= 80 tokens
-        opts.model['max_trg_len'] = kwargs.pop('max_trg_len', 80)
-
-        # Should we drop residual buckets with n_elem < batch_size
-        opts.model['drop_last'] = kwargs.pop('drop_last', False)
-
         # Sanity check after consuming all arguments
         if len(kwargs) > 0:
             self.print('Unused model args: {}'.format(','.join(kwargs.keys())))
@@ -89,9 +103,9 @@ class NMT(nn.Module):
             assert self.n_src_vocab == self.n.trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
 
-        # Context size is always equal to encoder hidden dim * 2 since
+        # Textual context size is always equal to enc_dim * 2 since
         # it is the concatenation of forward and backward hidden states
-        self.ctx_size = opts.model['enc_dim'] * 2
+        self.txt_ctx_dim = opts.model['enc_dim'] * 2
 
         # Set some shortcuts
         self.opts = opts
@@ -104,11 +118,40 @@ class NMT(nn.Module):
             if param.requires_grad and 'bias' not in name:
                 nn.init.kaiming_normal(param.data)
 
+    def setup_cnn(self):
+        def process_raw_image(image):
+            # Extract convolutional features
+            # Section 3.1: a = {a_1 ... a_L}, a_i \in \mathrm{R}^D
+            img_ctx = self.cnn(image).view(
+                (image.shape[0], self.opts.model['img_ctx_dim'], -1))
+            # make them (batch_size, w*h, ctx_dim)
+            img_ctx.transpose_(1, 2)
+            return img_ctx
+
+        # Get CNN encoder for the images
+        if self.opts.model['img_mode'] == 'raw':
+            self.print('Loading CNN')
+            cnn_encoder = ImageEncoder(
+                cnn_type=self.opts.model['cnn_type'],
+                pretrained=self.opts.model['cnn_pretrained'])
+            self.cnn, dims = cnn_encoder.get(self.opts.model['cnn_layer'])
+            self.opts.model['img_ctx_dim'] = dims[1]
+            self.img_ctx_dim = self.opts.model['img_ctx_dim']
+            self._process_image = process_raw_image
+
+            # Set learnable flag
+            set_learnable(self.cnn, self.opts.model['cnn_trainable'])
+        else:
+            # no-op as features are provided as inputs directly
+            self._process_image = lambda x: x
+
     def setup(self, reset_params=True):
         """Sets up NN topology by creating the layers."""
-        ################
+
+        # Setup CNN
+        self.setup_cnn()
+
         # Create encoder
-        ################
         self.enc = TextEncoder(input_size=self.opts.model['emb_dim'],
                                hidden_size=self.opts.model['enc_dim'],
                                n_vocab=self.n_src_vocab,
@@ -118,17 +161,18 @@ class NMT(nn.Module):
                                dropout_rnn=self.opts.model['dropout_enc'],
                                num_layers=self.opts.model['n_encoders'])
 
-        ################
         # Create Decoder
-        ################
-        self.dec = ConditionalDecoder(
+        self.dec = ConditionalMMDecoder(
             input_size=self.opts.model['emb_dim'],
             hidden_size=self.opts.model['dec_dim'],
-            ctx_size=self.ctx_size,
             n_vocab=self.n_trg_vocab,
+            ctx_size_dict={'img': self.img_ctx_dim, 'txt': self.txt_ctx_dim},
+            fusion_type=self.opts.model['fusion_type'],
             tied_emb=self.opts.model['tied_emb'],
             dec_init=self.opts.model['dec_init'],
             att_type=self.opts.model['att_type'],
+            att_activ=self.opts.model['att_activ'],
+            att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'])
 
         # Share encoder and decoder weights
@@ -145,18 +189,12 @@ class NMT(nn.Module):
     def load_data(self, split):
         """Loads the requested dataset split."""
         if split not in self.datasets:
-            # Only for training
-            drop_last, max_trg_len = False, None
-            if split == 'train':
-                max_trg_len = self.opts.model['max_trg_len']
-                drop_last = self.opts.model['drop_last']
-            dataset = BitextDataset(split=split,
-                                    data_dict=self.opts.data,
-                                    vocabs=self.vocabs,
-                                    topology=self.topo,
-                                    logger=self.logger,
-                                    max_trg_len=max_trg_len,
-                                    drop_last=drop_last)
+            dataset = Multi30kDataset(split=split,
+                                      img_mode=self.opts.model['img_mode'],
+                                      data_dict=self.opts.data,
+                                      vocabs=self.vocabs,
+                                      topology=self.topo,
+                                      logger=self.logger)
             self.datasets[split] = dataset
             self.print(dataset)
 
@@ -176,18 +214,58 @@ class NMT(nn.Module):
 
         return total_loss.data.cpu()[0] / n_tokens_seen
 
+    def encode(self, data):
+        """Encodes all inputs and returns a dictionary.
+
+        Arguments:
+            data (dict): A batch of samples with keys designating the source
+                and target modalities.
+
+        Returns:
+            dict:
+                A dictionary where keys are source modalities compatible
+                with the data loader and the values are tuples where the
+                elements are encodings and masks. The mask can be ``None``
+                if the relevant modality does not require a mask.
+        """
+        return {
+            'image': (self._process_image(data['image']).transpose(0, 1), None),
+            'txt': self.enc(data[self.sl]),
+        }
+
     def forward(self, data):
-        # Get sequences
-        src_seqs, trg_seqs = data[self.sl], data[self.tl]
+        """Computes the forward-pass of the network and returns batch loss.
+
+        Arguments:
+            data (dict): A batch of samples with keys designating the source
+                and target modalities.
+
+        Returns:
+            Variable:
+                A scalar loss normalized w.r.t batch size and token counts.
+
+        Note:
+            This method should assign the number of target tokens for which
+            the loss is computed inside ``self.n_tokens`` in order for the
+            ``MainLoop`` to correctly compute epoch loss.
+        """
+
+        # Get all source encodings
+        ctx_dict = self.encode(data)
 
         # Save number of target tokens for loss normalization
-        self.n_tokens = trg_seqs[1:].numel()
-
-        # Encode them into S*B*C
-        ctxs, ctx_mask = self.enc(src_seqs)
+        self.n_tokens = data[self.tl][1:].numel()
 
         # Get final loss as a sum
-        return self.dec(ctxs, ctx_mask, trg_seqs) / self.n_tokens
+        return self.dec(ctx_dict, data[self.tl]) / self.n_tokens
+
+    @staticmethod
+    def tile_ctx_dict(ctx_dict, tile):
+        # FIXME: Can be a utility method
+        return {
+            k: (v[0][:, tile], None if v[1] is None else v[1][:, tile])
+            for k, v in ctx_dict.items()
+        }
 
     def beam_search(self, data_loader, k=12, max_len=100,
                     avoid_rep=False, avoid_unk=False):
@@ -211,16 +289,17 @@ class NMT(nn.Module):
             beam = torch.zeros((max_len, n, k)).long().cuda()
 
             # Encode source sentences into ctxs (S*N*C)
-            ctxs, ctx_mask = self.enc(to_var(batch[self.sl], volatile=True))
+            # Encode image
+            ctx_dict = self.encode(to_var(batch, volatile=True))
 
             # Get initial decoder state (N*H)
-            h_t = self.dec.f_init(ctxs, ctx_mask)
+            h_t = self.dec.f_init(*ctx_dict['txt'])
 
             # Initial y_t for <bos> embs: N x emb_dim
             y_t = self.dec.emb(to_var(
                 torch.ones(n).long() * bos, volatile=True))
 
-            log_p, h_t = self.dec.f_next(ctxs, ctx_mask, y_t, h_t)
+            log_p, h_t = self.dec.f_next(ctx_dict, y_t, h_t)
             nll, beam[0] = log_p.data.topk(k, sorted=False, largest=False)
 
             for t in range(1, max_len):
@@ -234,8 +313,8 @@ class NMT(nn.Module):
                 y_t = self.dec.emb(to_var(cur_tokens, volatile=True))
 
                 # Get log_probs and new LSTM states (log_p, N*K, V)
-                ctxs, ctx_mask = ctxs[:, tile], ctx_mask[:, tile]
-                log_p, h_t = self.dec.f_next(ctxs, ctx_mask, y_t, h_t[tile])
+                ctx_dict = self.tile_ctx_dict(ctx_dict, tile)
+                log_p, h_t = self.dec.f_next(ctx_dict, y_t, h_t[tile])
                 log_p = log_p.data
 
                 # Suppress probabilities of previous tokens

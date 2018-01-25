@@ -18,7 +18,7 @@ class METEORScorer(object):
         self.env = os.environ
         self.env['LC_ALL'] = 'en_US.UTF-8'
 
-    def compute(self, refs, hyps, language="auto", norm=False):
+    def compute(self, refs, hyps, language="auto"):
         cmdline = self.__cmdline[:]
         refs = listify(refs)
 
@@ -29,8 +29,6 @@ class METEORScorer(object):
         if language == "auto":
             # Take the extension of the 1st reference file, e.g. ".de"
             language = pathlib.Path(refs[0]).suffix[1:]
-        if norm:
-            cmdline.append("-norm")
 
         cmdline.extend(["-l", language])
 
