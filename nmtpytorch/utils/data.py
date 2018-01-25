@@ -12,7 +12,7 @@ from ..utils.misc import fopen, pbar
 def sort_batch(seqbatch):
     """Sorts torch tensor of integer indices by decreasing order."""
     # 0 is padding_idx
-    omask = (seqbatch != 0)
+    omask = (seqbatch != 0).long()
     olens = omask.sum(0)
     slens, sidxs = torch.sort(olens, descending=True)
     oidxs = torch.sort(sidxs)[1]

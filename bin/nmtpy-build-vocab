@@ -101,6 +101,10 @@ if __name__ == '__main__':
                         help='Sentence files')
     args = parser.parse_args()
 
+    if args.store_freqs or args.exclude_symbols:
+        print('Warning: -x and/or -f do not create vocabularies compatible '
+              'with nmtpytorch at all')
+
     output_dir = pathlib.Path(args.output_dir).expanduser()
 
     # In case it is needed
