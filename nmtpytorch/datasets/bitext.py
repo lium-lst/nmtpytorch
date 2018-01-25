@@ -44,7 +44,10 @@ class BitextDataset(Dataset):
         #######################
         path = self.data_dict[self.txt_split][self.sl]
         fnames = sorted(path.parent.glob(path.name))
-        assert len(fnames) == 1, "Multiple source files not supported."
+        if len(fnames) == 0:
+            raise RuntimeError('{} does not exist.'.format(path))
+        elif len(fnames) > 1:
+            raise RuntimeError("Multiple source files not supported.")
 
         self.data[self.sl], self.lens[self.sl] = \
             read_sentences(fnames[0], self.src_vocab)
@@ -57,7 +60,11 @@ class BitextDataset(Dataset):
         if self.tl in self.data_dict[self.txt_split]:
             path = self.data_dict[self.txt_split][self.tl]
             fnames = sorted(path.parent.glob(path.name))
-            assert len(fnames) == 1, "Multiple target files not supported."
+            if len(fnames) == 0:
+                raise RuntimeError('{} does not exist.'.format(path))
+            elif len(fnames) > 1:
+                raise RuntimeError("Multiple source files not supported.")
+
             self.data[self.tl], self.lens[self.tl] = \
                 read_sentences(fnames[0], self.trg_vocab, bos=True)
 
