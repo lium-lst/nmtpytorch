@@ -72,18 +72,28 @@ class Vocabulary(object):
 
         return tidxs
 
-    def idxs_to_sent(self, tidxs, do_join=True):
-        """Convert from token indices to string representation."""
+    def idxs_to_sent(self, idxs):
+        """Convert integer hypothesis to string."""
         result = []
-        for tidx in tidxs:
-            if tidx == self.TOKENS["<eos>"]:
+        for idx in idxs:
+            if idx == self.TOKENS["<eos>"]:
                 break
-            result.append(self._imap.get(tidx, self.TOKENS["<unk>"]))
+            result.append(self._imap.get(idx, self.TOKENS["<unk>"]))
 
-        if do_join:
-            return " ".join(result)
-        else:
-            return result
+        return " ".join(result)
+
+    def list_of_idxs_to_sents(self, lidxs):
+        """Convert a list of integer hypotheses to list of strings."""
+        results = []
+        unk = self.TOKENS["<unk>"]
+        for idxs in lidxs:
+            r = []
+            for idx in idxs:
+                if idx == self.TOKENS["<eos>"]:
+                    break
+                r.append(self._imap.get(idx, unk))
+            results.append(" ".join(r))
+        return results
 
     def __repr__(self):
         return "Vocabulary of %d items (lang=%s)" % (self.n_tokens,
