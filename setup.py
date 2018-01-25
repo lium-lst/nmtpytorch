@@ -33,7 +33,7 @@ setup(
         'Operating System :: POSIX',
     ],
     keywords='nmt neural-mt translation deep-learning pytorch captioning',
-    install_requires=['numpy', 'torch >= 0.3.0', 'tqdm'],
+    install_requires=['numpy', 'torch >= 0.3.0', 'tqdm', 'torchvision'],
     include_package_data=True,
     exclude_package_data={'': ['.git']},
     packages=packages,
