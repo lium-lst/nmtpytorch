@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import copy
 import pathlib
 
@@ -38,6 +39,12 @@ TRAIN_DEFAULTS = {
     'n_checkpoints': 5,          # Number of checkpoints to keep
     'tensorboard_dir': '',       # Enable TB and give global log folder
 }
+
+def expand_env_vars(data):
+    """Interpolate some environment variables."""
+    data = data.replace('$HOME', os.environ['HOME'])
+    data = data.replace('$USER', os.environ['USER'])
+    return data
 
 
 def resolve_path(value):
@@ -87,11 +94,13 @@ class Options(object):
         self.overrides = defaultdict(dict)
         self.sections = []
 
+        with open(self.filename) as f:
+            data = expand_env_vars(f.read().strip())
+
         # Read the defaults first
         self.__parser.read_dict({'train': TRAIN_DEFAULTS})
 
-        if len(self.__parser.read(self.filename)) == 0:
-            raise Exception('Could not parse configuration file.')
+        self.__parser.read_string(data)
 
         if overrides is not None:
             # ex: train.batch_size:32
