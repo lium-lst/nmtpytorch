@@ -16,7 +16,7 @@ from nmtpytorch.cocoeval import Bleu, Meteor, Cider, Rouge
 
 def print_table(results, sort_by='METEOR'):
     cols = ['Bleu_1', 'Bleu_2', 'Bleu_3', 'Bleu_4',
-            'METEOR', 'METEOR (norm)', 'CIDEr', 'ROUGE_L']
+            'METEOR', 'CIDEr', 'ROUGE_L']
     for col in cols:
         print('|{:^15}|'.format(col), end='')
     print()
