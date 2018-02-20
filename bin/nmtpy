@@ -51,8 +51,8 @@ if __name__ == '__main__':
                               help='Batch size for beam-search')
     parser_trans.add_argument('-k', '--beam-size', type=int, default=6,
                               help='Beam size for beam-search')
-    parser_trans.add_argument('-m', '--max-len', type=int, default=100,
-                              help='Maximum sequence length')
+    parser_trans.add_argument('-m', '--max-len', type=int, default=200,
+                              help='Maximum seq. limit (Default: 200)')
     parser_trans.add_argument('-p', '--avoid-double', action='store_true',
                               help='Suppress previous token probs')
     parser_trans.add_argument('-u', '--avoid-unk', action='store_true',
@@ -116,6 +116,9 @@ if __name__ == '__main__':
     #################################
     log = logger.setup(opts.train, args.cmd)
 
+    # Be verbose and fire the loop!
+    opts.info(log)
+
     # Instantiate the model object
     model = getattr(models, opts.train['model_type'])(opts=opts, logger=log)
 
@@ -123,8 +126,6 @@ if __name__ == '__main__':
         np.random.seed(opts.train['seed'])
         torch.manual_seed(opts.train['seed'])
 
-    # Be verbose and fire the loop!
-    opts.info(log)
     log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
         torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
     loop = MainLoop(model, log, opts.train, history, weights, mode=args.cmd)
