@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-
 import torch.optim
 from torch.nn.utils.clip_grad import clip_grad_norm
 
