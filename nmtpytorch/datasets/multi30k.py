@@ -3,13 +3,13 @@ from collections import OrderedDict
 
 import numpy as np
 
-import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SequentialSampler
 
 from ..config import FLOAT
 from ..samplers import BucketBatchSampler
-from ..utils.data import get_collate_fn, read_sentences, CircularNDArray
+from ..utils.data import read_sentences, CircularNDArray
+from .collate import get_collate_v1
 from ..utils.nn import normalize_images
 from ..utils.misc import fopen
 
@@ -24,7 +24,7 @@ class Multi30kDataset(Dataset):
             NCHW convolutional feature file (float .npz)
         data_dict(dict): [data] dictionary of the configuration file
         vocabs(dict): dictionary mapping lang keys to Vocabulary() objects
-        topology(dict): dictionary defining to src<->trg network topology
+        topology(Topology): A ``Topology`` object from configuration
         img_norm(bool, optional): When ``img_mode==raw``, normalize raw
             images w.r.t ImageNet statistics. Default: `True`
         logger(Logger): Logger instance to allow printing information
@@ -52,9 +52,9 @@ class Multi30kDataset(Dataset):
         self.verbose = logger is not None
         self.print = print if logger is None else logger.info
 
-        self.sl = None if len(self.topo['src_langs']) == 0 else \
-            self.topo['src_langs'][0]
-        self.tl = self.topo['trg_langs'][0]
+        src_langs = self.topo.get_src_langs()
+        self.sl = None if len(src_langs) == 0 else src_langs[0]
+        self.tl = self.topo.get_trg_langs()[0]
 
         # Set vocabularies
         self.src_vocab = self.vocabs.get(self.sl, None)
@@ -131,24 +131,20 @@ class Multi30kDataset(Dataset):
     def get_iterator(self, batch_size, only_source=False):
         """Returns a DataLoader instance with or without target data."""
         if only_source:
-            # Translation mode
-            _collate_fn = get_collate_fn(self.topo['srcs'])
-
-            # Ordered Sampler
+            # Translation mode, ordered Sampler
             sampler = SequentialSampler(self)
-            data_loader = DataLoader(self, sampler=sampler,
-                                     shuffle=False, batch_size=batch_size,
-                                     collate_fn=_collate_fn)
+            data_loader = DataLoader(
+                self, sampler=sampler,
+                shuffle=False, batch_size=batch_size,
+                collate_fn=get_collate_v1(self.topo.get_src_langs()))
 
         else:
-            # Training mode
-            _collate_fn = get_collate_fn(self.data.keys())
-
-            # Sequence-length ordered sampler
+            # Training + val loss mode, Sequence-length ordered sampler
             sampler = BucketBatchSampler(self.lens[self.tl],
                                          batch_size=batch_size)
-            data_loader = DataLoader(self, batch_sampler=sampler,
-                                     collate_fn=_collate_fn)
+            data_loader = DataLoader(
+                self, batch_sampler=sampler,
+                collate_fn=get_collate_v1(self.data.keys()))
 
         return data_loader
 
@@ -159,7 +155,6 @@ class Multi30kDataset(Dataset):
         return self.size
 
     def __repr__(self):
-        direction = "{}->{}".format(",".join(self.topo['srcs']),
-                                    ",".join(self.topo['trgs']))
-        return "Multi30kDataset [{}] ({} samples, {} sents / image)".format(
-            direction, self.__len__(), self.sent_per_image)
+        return "{} [{}] ({} samples, {} sents / image)".format(
+            self.__class__.__name__, self.topo.direction,
+            self.__len__(), self.sent_per_image)
