@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from ..utils.data import sort_batch
@@ -12,7 +10,7 @@ class TextEncoder(nn.Module):
     def __init__(self, input_size, hidden_size, n_vocab, cell_type,
                  num_layers=1, bidirectional=True,
                  dropout_rnn=0, dropout_emb=0, dropout_ctx=0):
-        super(TextEncoder, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size

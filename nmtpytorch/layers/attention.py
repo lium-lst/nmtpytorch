@@ -8,7 +8,7 @@ class Attention(nn.Module):
     """Attention layer for seq2seq NMT."""
     def __init__(self, ctx_dim, hid_dim, att_bottleneck='ctx',
                  att_activ='tanh', att_type='mlp'):
-        super(Attention, self).__init__()
+        super().__init__()
 
         # Get activation function
         self.activ = getattr(F, att_activ)
