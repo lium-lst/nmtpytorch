@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,7 +7,8 @@ from ..layers.image_encoder import ImageEncoder
 from ..vocabulary import Vocabulary
 from ..utils.misc import pbar
 from ..utils.data import to_var
-from ..utils.nn import get_network_topology, set_learnable
+from ..utils.nn import set_learnable
+from ..utils.topology import Topology
 from ..layers import FF
 
 from ..datasets import Multi30kDataset
@@ -24,7 +23,9 @@ from ..datasets import Multi30kDataset
 class Attention(nn.Module):
     """Attention layer for attention."""
     def __init__(self, ctx_dim, hid_dim):
-        super(Attention, self).__init__()
+        super().__init__()
+
+        self.aux_loss = None
 
         # Visual context
         self.ctx_dim = ctx_dim
@@ -92,7 +93,7 @@ class ShowAttendAndTell(nn.Module):
 
     def __init__(self, opts, logger=None):
         """This should only be used for argument processing."""
-        super(ShowAttendAndTell, self).__init__()
+        super().__init__()
 
         self.vocabs = {}
         self.datasets = {}
@@ -106,16 +107,18 @@ class ShowAttendAndTell(nn.Module):
 
         # Get direction and parse it
         opts.model['direction'] = kwargs.pop('direction', 'image->en')
-        self.topo = get_network_topology(opts.model['direction'])
+        self.topology = Topology(opts.model['direction'])
 
-        assert len(self.topo['src_langs']) == 0, \
+        assert len(self.topology.get_src_langs()) == 0, \
             "Source languages not supported for this model."
-        assert len(self.topo['trg_langs']) == 1, \
+        assert len(self.topology.get_trg_langs()) == 1, \
             "Multiple target languages not supported."
-        self.tl = self.topo['trg_langs'][0]
+
+        self.tl = self.topology.get_trg_langs()[0]
 
         # Load vocabularies here
-        self.vocabs[self.tl] = Vocabulary(opts.vocabulary[self.tl])
+        self.vocabs[self.tl] = Vocabulary(
+            opts.vocabulary[self.tl], name=self.tl)
         self.trg_vocab = self.vocabs[self.tl]
 
         # CNN stuff
@@ -230,10 +233,6 @@ class ShowAttendAndTell(nn.Module):
         self.ff_pre_softmax = FF(self.opts.model['emb_dim'],
                                  len(self.trg_vocab), bias_zero=True)
 
-    def get_iterator(self, split, batch_size, only_source=False):
-        """Returns a DataLoader for the split."""
-        return self.datasets[split].get_iterator(batch_size, only_source)
-
     def load_data(self, split):
         """Loads the requested dataset split."""
         if split not in self.datasets:
@@ -241,19 +240,10 @@ class ShowAttendAndTell(nn.Module):
                                       img_mode=self.opts.model['img_mode'],
                                       data_dict=self.opts.data,
                                       vocabs=self.vocabs,
-                                      topology=self.topo,
+                                      topology=self.topology,
                                       logger=self.logger)
             self.datasets[split] = dataset
             self.print(dataset)
-
-    def aux_loss(self):
-        """Returns the sum of auxiliary losses."""
-        sum_loss = 0.
-        if self.opts.model['alpha_c']:
-            sum_loss += self.opts.model['alpha_c'] * \
-                ((1 - sum(self.alphas))**2).sum(0).mean()
-
-        return sum_loss
 
     def f_init(self, batch):
         # Process image
@@ -344,6 +334,10 @@ class ShowAttendAndTell(nn.Module):
             loss += torch.gather(
                 log_p, dim=1, index=caption[t + 1].unsqueeze(1)).sum()
 
+        if self.opts.model['alpha_c']:
+            self.aux_loss = self.opts.model['alpha_c'] * \
+                ((1 - sum(self.alphas))**2).sum(0).mean()
+
         # Return normalized loss
         return loss / self.n_tokens
 
@@ -360,7 +354,7 @@ class ShowAttendAndTell(nn.Module):
         return total_loss.data.cpu()[0] / n_tokens_seen
 
     def beam_search(self, data_loader, k=12, max_len=100,
-                    avoid_rep=False, avoid_unk=False):
+                    avoid_double=False, avoid_unk=False):
         """Performs beam search over split and returns the hyps."""
         results = []
         inf = 1e3
@@ -408,7 +402,7 @@ class ShowAttendAndTell(nn.Module):
                 log_p = log_p.data
 
                 # Suppress probabilities of previous tokens
-                if avoid_rep:
+                if avoid_double:
                     log_p.view(-1).index_fill_(
                         0, cur_tokens + (nk_mask * n_tokens), inf)
 
@@ -446,21 +440,13 @@ class ShowAttendAndTell(nn.Module):
             # Put an explicit <eos> to make idxs_to_sent happy
             beam[max_len - 1] = eos
 
-            # Get beam and scores to CPU
-            beam = beam.cpu().numpy()
-            nll = nll.cpu().numpy()
-
+            # Find lengths by summing tokens not in (pad,bos,eos)
+            lens = (beam.transpose(0, 2) > 2).sum(-1).t().float().clamp(min=1)
             # Normalize scores by length
-            lens, idxs = np.where(beam.reshape(max_len, -1) == eos)
-            idxs = idxs.tolist()
-            # Get sequence lengths
-            lens = [lens[idxs.index(i)] for i in range(n * k)]
-            # Avoid divide-by-zero in extreme case where hyp is only <eos>
-            lens = [len_ if len_ != 0 else 1 for len_ in lens]
-            nll /= np.array(lens).reshape(n, k)
-
+            nll /= lens.float()
+            top_hyps = nll.topk(1, sorted=False, largest=False)[1].squeeze(1)
             # Get best hyp for each sample in the batch
-            hyps = beam[:, range(n), nll.argmin(axis=1)].T
-            results.extend([self.trg_vocab.idxs_to_sent(hy) for hy in hyps])
+            hyps = beam[:, range(n), top_hyps].cpu().numpy().T
+            results.extend(self.trg_vocab.list_of_idxs_to_sents(hyps))
 
         return results
