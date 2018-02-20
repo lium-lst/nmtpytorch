@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,7 +14,7 @@ class ConditionalMMDecoder(nn.Module):
                  tied_emb=False, dec_init='zero', att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx',
                  dropout_out=0):
-        super(ConditionalMMDecoder, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -28,9 +26,6 @@ class ConditionalMMDecoder(nn.Module):
         self.att_bottleneck = att_bottleneck
         self.att_activ = att_activ
         self.dropout_out = dropout_out
-
-        # Modality order for fusion: [img, txt]
-        self.mod_order = sorted(self.ctx_size_dict.keys())
 
         # Define (context) fusion operator
         self.fusion = Fusion(
@@ -76,15 +71,15 @@ class ConditionalMMDecoder(nn.Module):
         if self.tied_emb:
             self.out2prob.weight = self.emb.weight
 
-    def f_init(self, txt_ctx, txt_ctx_mask):
+    def f_init(self, ctx, ctx_mask):
         """Returns the initial h_0 for the decoder."""
+        # S*B*H
         if self.dec_init == 'zero':
-            h_0 = torch.zeros(txt_ctx.shape[1], self.hidden_size)
+            h_0 = torch.zeros(ctx.shape[1], self.hidden_size)
             return to_var(h_0, requires_grad=False)
         elif self.dec_init == 'mean_ctx':
             # Filter out zero positions
-            return self.ff_dec_init(
-                txt_ctx.sum(0) / txt_ctx_mask.sum(0).unsqueeze(1))
+            return self.ff_dec_init(ctx.sum(0) / ctx_mask.sum(0).unsqueeze(1))
 
     def f_next(self, ctx_dict, y, h):
         # Get hidden states from the first decoder (purely cond. on LM)
@@ -95,10 +90,10 @@ class ConditionalMMDecoder(nn.Module):
         img_alpha_t, img_z_t = self.img_att(h1.unsqueeze(0), *ctx_dict['image'])
 
         # Context will double dimensionality if fusion_type is concat
-        # final_z_t should be compatible with hidden_size
-        final_z_t = self.fusion(txt_z_t, img_z_t)
+        # z_t should be compatible with hidden_size
+        z_t = self.fusion(txt_z_t, img_z_t)
 
-        h2 = self.dec1(final_z_t, h1)
+        h2 = self.dec1(z_t, h1)
 
         # This is a bottleneck to avoid going from H to V directly
         logit = self.hid2out(h2)

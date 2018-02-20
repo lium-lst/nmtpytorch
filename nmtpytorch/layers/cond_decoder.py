@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ..utils.data import to_var
-from .attention import Attention
-from .ff import FF
+from . import FF, Attention
 
 
 class ConditionalDecoder(nn.Module):
@@ -15,7 +12,7 @@ class ConditionalDecoder(nn.Module):
     def __init__(self, input_size, hidden_size, ctx_size, n_vocab,
                  tied_emb=False, dec_init='zero', att_type='bahdanau',
                  dropout_out=0):
-        super(ConditionalDecoder, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -57,19 +54,22 @@ class ConditionalDecoder(nn.Module):
         if self.tied_emb:
             self.out2prob.weight = self.emb.weight
 
-    def f_init(self, ctxs, ctx_mask):
+    def f_init(self, ctx, ctx_mask):
         """Returns the initial h_0 for the decoder."""
         # S*B*H
         if self.dec_init == 'zero':
-            h_0 = torch.zeros(ctxs.shape[1], self.hidden_size)
+            h_0 = torch.zeros(ctx.shape[1], self.hidden_size)
             return to_var(h_0, requires_grad=False)
         elif self.dec_init == 'mean_ctx':
             # Filter out zero positions
-            return self.ff_dec_init(ctxs.sum(0) / ctx_mask.sum(0).unsqueeze(1))
+            return self.ff_dec_init(ctx.sum(0) / ctx_mask.sum(0).unsqueeze(1))
 
-    def f_next(self, ctxs, ctx_mask, y, h):
+    def f_next(self, ctx_dict, y, h):
+        # Get hidden states from the first decoder (purely cond. on LM)
         h1 = self.dec0(y, h)
-        alpha_t, z_t = self.att(h1.unsqueeze(0), ctxs, ctx_mask)
+
+        # Apply attention
+        alpha_t, z_t = self.att(h1.unsqueeze(0), *ctx_dict['txt'])
         h2 = self.dec1(z_t, h1)
 
         # This is a bottleneck to avoid going from H to V directly
@@ -86,7 +86,7 @@ class ConditionalDecoder(nn.Module):
         # Return log probs and new hidden states
         return log_p, h2
 
-    def forward(self, ctxs, ctx_mask, y):
+    def forward(self, ctx_dict, y):
         """Computes the softmax outputs given source annotations `ctxs` and
         ground-truth target token indices `y`.
 
@@ -102,11 +102,11 @@ class ConditionalDecoder(nn.Module):
         y_emb = self.emb(y)
 
         # Get initial hidden state
-        h = self.f_init(ctxs, ctx_mask)
+        h = self.f_init(*ctx_dict['txt'])
 
         # -1: So that we skip the timestep where input is <eos>
         for t in range(y_emb.shape[0] - 1):
-            log_p, h = self.f_next(ctxs, ctx_mask, y_emb[t], h)
+            log_p, h = self.f_next(ctx_dict, y_emb[t], h)
             loss += torch.gather(
                 log_p, dim=1, index=y[t + 1].unsqueeze(1)).sum()
 
