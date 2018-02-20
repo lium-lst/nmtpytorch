@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import time
-import math
 
 import numpy as np
 
@@ -11,6 +10,7 @@ from .monitor import Monitor
 from .utils.misc import get_n_params
 from .utils.data import to_var
 from .utils.tensorboard import TensorBoard
+from .search import beam_search
 
 
 class MainLoop(object):
@@ -87,41 +87,49 @@ class MainLoop(object):
 
     def train_epoch(self):
         """Trains a full epoch."""
-        # Even if we resume, we'll start over a clean epoch
         self.print('Starting Epoch {}'.format(self.monitor.ectr))
-        epoch_sec = 0.0
+
         total_loss = 0.0
         n_tokens_seen = 0
 
-        # Iterate over batches
+        nn_sec = 0.0
+        eval_sec = 0.0
+        total_sec = time.time()
+
         for batch in self.train_iterator:
+            #############################
             self.monitor.uctr += 1
-            start_time = time.time()
+            nn_start = time.time()
 
             # Reset gradients
             self.optim.zero_grad()
 
             # Forward pass returns mean data loss
             loss = self.model(to_var(batch))
+            batch_loss = loss.data.cpu()[0]
 
-            # Get other losses
-            aux_loss = self.model.aux_loss()
+            # Get auxiliary loss if any
+            aux_loss = 0
+            if self.model.aux_loss is not None:
+                loss += self.model.aux_loss
+                aux_loss = self.model.aux_loss.data.cpu()[0]
 
             # Backward pass
-            (loss + aux_loss).backward()
+            loss.backward()
 
             # Update parameters (includes gradient clipping logic)
             self.optim.step()
 
             # Keep stats
-            epoch_sec += (time.time() - start_time)
-            batch_loss = loss.data.cpu()[0]
+            nn_sec += (time.time() - nn_start)
+            #############################
+
             total_loss += batch_loss * self.model.n_tokens
             n_tokens_seen += self.model.n_tokens
 
             if self.monitor.uctr % self.disp_freq == 0:
                 self.print("Epoch {} - update {:10d} => loss: {:.3f} "
-                           "(aux_loss: {:.3f})".format(self.monitor.ectr,
+                           "(aux_loss: {:.4f})".format(self.monitor.ectr,
                                                        self.monitor.uctr,
                                                        batch_loss,
                                                        aux_loss))
@@ -134,7 +142,9 @@ class MainLoop(object):
                     self.monitor.ectr >= self.eval_start and
                     self.eval_freq > 0 and
                     self.monitor.uctr % self.eval_freq == 0):
+                eval_start = time.time()
                 self.do_validation()
+                eval_sec += time.time() - eval_start
 
             if (self.checkpoint_freq and self.n_checkpoints > 0 and
                     self.monitor.uctr % self.checkpoint_freq == 0):
@@ -155,12 +165,21 @@ class MainLoop(object):
         epoch_loss = total_loss / n_tokens_seen
         self.monitor.train_loss.append(epoch_loss)
 
-        self.print(
-            "--> Epoch {} finished in {:.3f} minutes ({} sent/sec) "
-            "with mean loss {:.5f}".format(
-                self.monitor.ectr, epoch_sec / 60,
-                int(len(self.model.datasets['train']) / epoch_sec),
-                epoch_loss))
+        # All time spent for this epoch
+        total_min = (time.time() - total_sec) / 60
+        # All time spent during forward/backward/step
+        nn_min = nn_sec / 60
+        # All time spent during validation(s)
+        eval_min = eval_sec / 60
+        # Rest is iteration overhead + checkpoint saving
+        overhead_min = total_min - nn_min - eval_min
+
+        self.print("--> Epoch {} finished with mean loss {:.5f}".format(
+            self.monitor.ectr, epoch_loss))
+        self.print("--> Overhead/Training/Evaluation: {:.2f}/{:.2f}/{:.2f} "
+                   "mins (total: {:.2f} mins)   ({} sent/sec)".format(
+                       overhead_min, nn_min, eval_min, total_min,
+                       int(len(self.model.datasets['train']) / nn_sec)))
 
         # Do validation?
         if self.epoch_valid and self.monitor.ectr >= self.eval_start:
@@ -189,13 +208,18 @@ class MainLoop(object):
             self.print('Performing translation search (beam_size:{})'.format(
                 self.eval_beam))
             beam_time = time.time()
-            hyps = self.model.beam_search(self.beam_iterator, k=self.eval_beam)
-            up_time = time.time() - beam_time
-            self.print('Took {:.3f} seconds, {} sent/sec'.format(
-                up_time, math.floor(len(hyps) / up_time)))
+            hyps = beam_search(self.model, self.beam_iterator,
+                               self.model.trg_vocab, beam_size=self.eval_beam)
+            beam_time = time.time() - beam_time
 
             # Compute metrics and update results
+            score_time = time.time()
             results.extend(self.evaluator.score(hyps))
+            score_time = time.time() - score_time
+
+            self.print("Beam Search: {:.2f} sec, Scoring: {:.2f} sec "
+                       "({} sent/sec)".format(beam_time, score_time,
+                                              int(len(hyps) / beam_time)))
 
         # Log metrics to tensorboard
         self.tb.log_metrics(results, self.monitor.uctr, suffix='val_')
