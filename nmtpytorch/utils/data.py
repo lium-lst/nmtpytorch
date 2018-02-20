@@ -47,28 +47,6 @@ def to_var(input_, requires_grad=False, volatile=False):
     return input_
 
 
-def get_collate_fn(keys):
-    """Returns a special collate_fn which will view the underlying data
-    in terms of the given keys."""
-
-    def collate_fn(batch):
-        tensors = UserDict()
-        tensors.size = len(batch)
-
-        # Iterate over data sources
-        for key in keys:
-            if isinstance(batch[0][key], list):
-                # Sequence vocabulary indices
-                tensors[key] = pad_data([elem[key] for elem in batch])
-            elif isinstance(batch[0][key], np.ndarray):
-                # Image data
-                tensors[key] = torch.stack([torch.from_numpy(elem[key])
-                                            for elem in batch])
-
-        return tensors
-    return collate_fn
-
-
 class CircularNDArray(object):
     def __init__(self, data, n_tile):
         """Access to same elements over first axis using LUT."""
