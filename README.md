@@ -54,6 +54,25 @@ nmtpy train -C <config file> train.<opt>:<val> model.<opt>:<val> ...
 
 ## Release Notes
 
+### v1.2 (20/02/2018)
+
+ - You can now use `$HOME` and `$USER` in your configuration files.
+ - Fixed an overflow error that would cause NMT with more than 255 tokens to fail.
+ - METEOR worker process is now correctly killed after validations.
+ - Many runs of an experiment are now suffixed with a unique random string instead of incremental integers to avoid race conditions in cluster setups.
+ - Replaced `utils.nn.get_network_topology()` with a new `Topology` [class](nmtpytorch/utils/topology.py) that will parse the `direction` string of the model in a more smart way.
+ - If `CUDA_VISIBLE_DEVICES` is set, the `GPUManager` will always honor it.
+ - Dropped creation of temporary/advisory lock files under `/tmp` for GPU reservation.
+ - Time measurements during training are now structered into batch overhead, training and evaluation timings.
+ - **Datasets**
+   - Added `TextDataset` for standalone text file reading.
+   - Added `OneHotDataset`, a variant of `TextDataset` where the sequences are not prefixed/suffixed with `<bos>` and `<eos>` respectively.
+   - Added experimental `MultiParallelDataset` that merges an arbitrary number of parallel datasets together.
+ - **nmtpy translate**
+   - `.nodbl` and `.nounk` suffixes are now added to output files for `--avoid-double` and `--avoid-unk` arguments respectively.
+   - A model-agnostic enough `beam_search()` is now separated out into its own file `nmtpytorch/search.py`.
+   - `max_len` default is increased to 200.
+
 ### v1.1 (25/01/2018)
 
  - New experimental `Multi30kDataset` and `ImageFolderDataset` classes
@@ -233,17 +252,12 @@ steps are to:
    as an attribute of the model (i.e. `self.encoder = ...`) in order for
    PyTorch to work correctly.
  - Create and store relevant dataset objects in `load_data()`
- - Define a `get_iterator()` method to obtain a dataset-specific iterator
-   depending on train/dev and loss/beam-search variants.
  - Define `compute_loss()` which takes a data iterator and
    computes the loss over it. This method is used for dev set perplexities.
- - Define `aux_loss()` where you may want to define an additional loss term.
-   Return just `0` if you do not want to use it.
+ - Set `aux_loss` attribute for an additional loss term.
  - Define `forward()` which takes a dictionary with keys as data sources and
    returns the batch training loss. This is the method called from the `mainloop`
    during training.
- - Define `beam_search()` which takes a data iterator and generates hypotheses
-   using beam search. The default implementation in `NMT` is a batched GPU version.
 
 Feel free to copy the methods from `NMT` if you do not need to modify
 some of them.
