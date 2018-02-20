@@ -26,6 +26,14 @@ def pad_data(seqs):
     return out
 
 
+def onehot_data(idxs, n_classes):
+    """Returns a binary batch_size x n_classes one-hot tensor."""
+    out = torch.zeros(len(idxs), n_classes)
+    for row, indices in zip(out, idxs):
+        row.scatter_(0, indices, 1)
+    return out
+
+
 def to_var(input_, requires_grad=False, volatile=False):
     """Returns a torch Variable on GPU."""
     if isinstance(input_, (UserDict, dict)):
