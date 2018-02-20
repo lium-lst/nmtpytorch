@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 from collections import UserDict
-import numpy as np
 
 import torch
 from torch.autograd import Variable
 
-from ..config import INT
 from ..utils.misc import fopen, pbar
 
 
