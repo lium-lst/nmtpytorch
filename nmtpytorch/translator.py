@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
 import math
 import time
 from pathlib import Path
@@ -7,9 +6,10 @@ from pathlib import Path
 from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 
-from nmtpytorch import logger
-from nmtpytorch import models
+from . import logger
+from . import models
 from .config import Options
+from .search import beam_search
 
 
 class Translator(object):
@@ -26,8 +26,9 @@ class Translator(object):
         self.n_models = len(self.models)
 
         # Print some information
-        self.logger.info('{} model(s) - beam_size: {}, batch_size: {}'.format(
-            self.n_models, self.beam_size, self.batch_size))
+        self.logger.info('{} model(s) - beam_size: {}, batch_size: {}, '
+                         'max_len: {}'.format(
+            self.n_models, self.beam_size, self.batch_size, self.max_len))
 
         # Store each model instance
         self.instances = []
@@ -105,8 +106,10 @@ class Translator(object):
 
         self.logger.info('Starting translation')
         start = time.time()
-        hyps = instance.beam_search(loader, self.beam_size, self.max_len,
-                                    self.avoid_double, self.avoid_unk)
+        hyps = beam_search(instance, loader, instance.trg_vocab,
+                           beam_size=self.beam_size, max_len=self.max_len,
+                           avoid_double=self.avoid_double,
+                           avoid_unk=self.avoid_unk)
         up_time = time.time() - start
         self.logger.info('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
@@ -119,10 +122,16 @@ class Translator(object):
         Arguments:
             hyps(list): A list of hypotheses.
         """
+        suffix = ".beam{}".format(self.beam_size)
+        if self.avoid_double:
+            suffix += ".nodbl"
+        if self.avoid_unk:
+            suffix += ".nounk"
+
         if split == 'new':
-            output = "{}.beam{}".format(self.output, self.beam_size)
+            output = "{}{}".format(self.output, suffix)
         else:
-            output = "{}.{}.beam{}".format(self.output, split, self.beam_size)
+            output = "{}.{}{}".format(self.output, split, suffix)
 
         with open(output, 'w') as f:
             for line in hyps:
