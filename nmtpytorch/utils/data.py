@@ -71,7 +71,7 @@ class CircularNDArray(object):
         # 68 return self.data[idx % 29000]
 
 
-def read_sentences(fname, vocab, bos=False, slist_max=0, verbose=False):
+def read_sentences(fname, vocab, bos=False, eos=True, slist_max=0):
     lines = []
     lens = []
     with fopen(fname) as f:
@@ -83,7 +83,8 @@ def read_sentences(fname, vocab, bos=False, slist_max=0, verbose=False):
             assert line, "Empty line (%d) found in %s" % (idx + 1, fname)
 
             # Map and append
-            seq = vocab.sent_to_idxs(line, limit=slist_max, explicit_bos=bos)
+            seq = vocab.sent_to_idxs(line, limit=slist_max,
+                                     explicit_bos=bos, explicit_eos=eos)
             lines.append(seq)
             lens.append(len(seq))
 
