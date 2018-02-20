@@ -3,8 +3,11 @@ import os
 import bz2
 import gzip
 import lzma
+import time
+import random
 import pathlib
 import tempfile
+from hashlib import sha256
 
 import numpy as np
 import torch
@@ -205,16 +208,15 @@ def setup_experiment(opts, suffix=None):
     if suffix:
         name = "%s-%s" % (name, suffix)
 
+    save_path = pathlib.Path(opts.train['save_path'])
+
     # Main folder is conf filename without .conf suffix i.e., nmt-en-de
     opts.train['subfolder'] = pathlib.Path(opts.filename).stem
 
-    # Log file, runs start from 1, incremented if exists
-    save_path = pathlib.Path(opts.train['save_path'])
-    run_id = len(list((save_path / opts.train['subfolder']).glob(
-        '%s.*.log' % name))) + 1
-
-    # Save experiment ID
-    opts.train['exp_id'] = '%s.%d' % (name, run_id)
+    # Set random experiment ID
+    run_id = time.strftime('%Y%m%d%H%m%S') + str(random.random())
+    run_id = sha256(run_id.encode('ascii')).hexdigest()[:5]
+    opts.train['exp_id'] = '%s.%s' % (name, run_id)
 
     # Create folders
     (save_path / opts.train['subfolder']).mkdir(parents=True, exist_ok=True)
