@@ -40,6 +40,7 @@ TRAIN_DEFAULTS = {
     'tensorboard_dir': '',       # Enable TB and give global log folder
 }
 
+
 def expand_env_vars(data):
     """Interpolate some environment variables."""
     data = data.replace('$HOME', os.environ['HOME'])
