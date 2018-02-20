@@ -1,39 +1,35 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
 
-import numpy as np
-
-import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SequentialSampler
 
 from ..samplers import BucketBatchSampler
-from ..utils.data import get_collate_fn, read_sentences
+from ..utils.data import read_sentences
+from .collate import get_collate_v1
 
 
 class BitextDataset(Dataset):
     r"""A PyTorch dataset for parallel corpora."""
     def __init__(self, split, data_dict, vocabs, topology,
-                 logger=None, max_trg_len=None, drop_last=False):
+                 max_trg_len=None):
         self.data = {}
         self.lens = {}
-        self.txt_split = '%s_set' % split
+        self.split = '%s_set' % split
         self.data_dict = data_dict
         self.vocabs = vocabs
         self.topo = topology
         self.n_sentences = 0
         self.max_trg_len = max_trg_len
-        self.drop_last = drop_last
 
-        # Setup verbose logging
-        self.verbose = logger is not None
-        self.print = print if logger is None else logger.info
+        src_langs = self.topo.get_src_langs()
+        trg_langs = self.topo.get_trg_langs()
 
-        assert self.topo['n_src_langs'] == self.topo['n_trg_langs'] == 1, \
+        assert len(src_langs) == len(trg_langs) == 1, \
             "BitextDataset only supports one language at each side."
 
-        self.sl = self.topo['src_langs'][0]
-        self.tl = self.topo['trg_langs'][0]
+        self.sl = src_langs[0]
+        self.tl = trg_langs[0]
 
         # Set vocabularies
         self.src_vocab = self.vocabs[self.sl]
@@ -42,7 +38,7 @@ class BitextDataset(Dataset):
         #######################
         # Load source sentences
         #######################
-        path = self.data_dict[self.txt_split][self.sl]
+        path = self.data_dict[self.split][self.sl]
         fnames = sorted(path.parent.glob(path.name))
         if len(fnames) == 0:
             raise RuntimeError('{} does not exist.'.format(path))
@@ -57,8 +53,8 @@ class BitextDataset(Dataset):
         #######################
         # Load target sentences
         #######################
-        if self.tl in self.data_dict[self.txt_split]:
-            path = self.data_dict[self.txt_split][self.tl]
+        if self.tl in self.data_dict[self.split]:
+            path = self.data_dict[self.split][self.tl]
             fnames = sorted(path.parent.glob(path.name))
             if len(fnames) == 0:
                 raise RuntimeError('{} does not exist.'.format(path))
@@ -77,26 +73,20 @@ class BitextDataset(Dataset):
     def get_iterator(self, batch_size, only_source=False):
         """Returns a DataLoader instance with or without target data."""
         if only_source:
-            # Translation mode
-            _collate_fn = get_collate_fn(self.topo['srcs'])
-
-            # Ordered Sampler
+            # Ordered Sampler, translation mode
             sampler = SequentialSampler(self)
-            data_loader = DataLoader(self, sampler=sampler,
-                                     shuffle=False, batch_size=batch_size,
-                                     collate_fn=_collate_fn)
+            data_loader = DataLoader(
+                self, sampler=sampler, shuffle=False, batch_size=batch_size,
+                collate_fn=get_collate_v1(self.topo.get_src_langs()))
 
         else:
-            # Training mode
-            _collate_fn = get_collate_fn(self.data.keys())
-
-            # Sequence-length ordered sampler
+            # Training or val perplexity mode, sequence-length ordered sampler
             sampler = BucketBatchSampler(self.lens[self.tl],
                                          batch_size=batch_size,
-                                         max_len=self.max_trg_len,
-                                         drop_last=self.drop_last)
-            data_loader = DataLoader(self, batch_sampler=sampler,
-                                     collate_fn=_collate_fn)
+                                         max_len=self.max_trg_len)
+            data_loader = DataLoader(
+                self, batch_sampler=sampler,
+                collate_fn=get_collate_v1(self.data.keys()))
 
         return data_loader
 
@@ -107,7 +97,6 @@ class BitextDataset(Dataset):
         return self.size
 
     def __repr__(self):
-        direction = "{}->{}".format(",".join(self.topo['srcs']),
-                                    ",".join(self.topo['trgs']))
-        return "BitextDataset [{}] ({} samples)".format(
-            direction, self.__len__())
+        return " [{} {}] ({} - {} samples)".format(
+            self.__class__.__name__, self.split,
+            self.topo.direction, self.__len__())
