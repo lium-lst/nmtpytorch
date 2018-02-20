@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-from pathlib import Path
-from collections import OrderedDict, deque
+from collections import OrderedDict
 
-import numpy as np
 import torch
 
 from .utils.io import FileRotator
