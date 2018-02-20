@@ -1,1 +1,1 @@
-__all__ = ['misc', 'gpu', 'nn', 'data', 'io']
+__all__ = ['misc', 'gpu', 'nn', 'data', 'io', 'topology']
