@@ -26,9 +26,9 @@ class Translator(object):
         self.n_models = len(self.models)
 
         # Print some information
-        self.logger.info('{} model(s) - beam_size: {}, batch_size: {}, '
-                         'max_len: {}'.format(
-            self.n_models, self.beam_size, self.batch_size, self.max_len))
+        self.logger.info(
+            '{} model(s) - beam_size: {}, batch_size: {}, max_len: {}'.format(
+                self.n_models, self.beam_size, self.batch_size, self.max_len))
 
         # Store each model instance
         self.instances = []
