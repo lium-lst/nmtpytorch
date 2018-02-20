@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from ..vocabulary import Vocabulary
 from ..layers import ImageEncoder, TextEncoder, ConditionalMMDecoder
-from ..utils.nn import get_network_topology, set_learnable
+from ..utils.nn import set_learnable
+from ..utils.topology import Topology
 from ..utils.data import to_var
-from ..utils.misc import pbar
 
 from ..datasets import Multi30kDataset
 
@@ -18,7 +14,9 @@ class AttentiveMNMT(nn.Module):
     r"""A sequence-to-sequence NMT model with visual attention."""
     def __init__(self, opts, logger=None):
         """This should only be used for argument processing."""
-        super(AttentiveMNMT, self).__init__()
+        super().__init__()
+
+        self.aux_loss = None
 
         self.vocabs = {}
         self.datasets = {}
@@ -32,14 +30,14 @@ class AttentiveMNMT(nn.Module):
 
         # Get direction and parse it
         opts.model['direction'] = kwargs.pop('direction')
-        self.topo = get_network_topology(opts.model['direction'])
+        self.topology = Topology(opts.model['direction'])
 
         # Load vocabularies here
-        for lang in self.topo['src_langs'] + self.topo['trg_langs']:
-            self.vocabs[lang] = Vocabulary(opts.vocabulary[lang])
+        for name, fname in opts.vocabulary.items():
+            self.vocabs[name] = Vocabulary(fname, name=name)
 
-        self.sl = self.topo['src_langs'][0]
-        self.tl = self.topo['trg_langs'][0]
+        self.sl = self.topology.get_src_langs()[0]
+        self.tl = self.topology.get_trg_langs()[0]
 
         self.src_vocab = self.vocabs[self.sl]
         self.trg_vocab = self.vocabs[self.tl]
@@ -180,10 +178,6 @@ class AttentiveMNMT(nn.Module):
         if reset_params:
             self.reset_parameters()
 
-    def get_iterator(self, split, batch_size, only_source=False):
-        """Returns a DataLoader for the requested dataset split."""
-        return self.datasets[split].get_iterator(batch_size, only_source)
-
     def load_data(self, split):
         """Loads the requested dataset split."""
         if split not in self.datasets:
@@ -191,14 +185,10 @@ class AttentiveMNMT(nn.Module):
                                       img_mode=self.opts.model['img_mode'],
                                       data_dict=self.opts.data,
                                       vocabs=self.vocabs,
-                                      topology=self.topo,
+                                      topology=self.topology,
                                       logger=self.logger)
             self.datasets[split] = dataset
             self.print(dataset)
-
-    def aux_loss(self):
-        """Returns the sum of auxiliary losses."""
-        return 0.
 
     def compute_loss(self, data_loader):
         """Computes test set loss over the given DataLoader instance."""
@@ -256,113 +246,3 @@ class AttentiveMNMT(nn.Module):
 
         # Get final loss as a sum
         return self.dec(ctx_dict, data[self.tl]) / self.n_tokens
-
-    @staticmethod
-    def tile_ctx_dict(ctx_dict, tile):
-        # FIXME: Can be a utility method
-        return {
-            k: (v[0][:, tile], None if v[1] is None else v[1][:, tile])
-            for k, v in ctx_dict.items()
-        }
-
-    def beam_search(self, data_loader, k=12, max_len=100,
-                    avoid_rep=False, avoid_unk=False):
-        """Performs beam search over split and returns the hyps."""
-        results = []
-        inf = 1e3
-        bos = self.trg_vocab['<bos>']
-        eos = self.trg_vocab['<eos>']
-
-        for batch in pbar(data_loader, unit='batch'):
-            n = batch.size
-
-            # Mask to apply to pdxs.view(-1) to fix indices
-            nk_mask = torch.arange(n * k).long().cuda()
-            pdxs_mask = (nk_mask / k) * k
-
-            # Tile indices to use in the loop to expand first dim
-            tile = nk_mask / k
-
-            # We can fill this to represent the beams in tensor format
-            beam = torch.zeros((max_len, n, k)).long().cuda()
-
-            # Encode source sentences into ctxs (S*N*C)
-            # Encode image
-            ctx_dict = self.encode(to_var(batch, volatile=True))
-
-            # Get initial decoder state (N*H)
-            h_t = self.dec.f_init(*ctx_dict['txt'])
-
-            # Initial y_t for <bos> embs: N x emb_dim
-            y_t = self.dec.emb(to_var(
-                torch.ones(n).long() * bos, volatile=True))
-
-            log_p, h_t = self.dec.f_next(ctx_dict, y_t, h_t)
-            nll, beam[0] = log_p.data.topk(k, sorted=False, largest=False)
-
-            for t in range(1, max_len):
-                cur_tokens = beam[t - 1].view(-1)
-                fini_idxs = (cur_tokens == eos).nonzero()
-                n_fini = fini_idxs.numel()
-                if n_fini == n * k:
-                    break
-
-                # Fetch embs for the next iteration (N*K, E)
-                y_t = self.dec.emb(to_var(cur_tokens, volatile=True))
-
-                # Get log_probs and new LSTM states (log_p, N*K, V)
-                ctx_dict = self.tile_ctx_dict(ctx_dict, tile)
-                log_p, h_t = self.dec.f_next(ctx_dict, y_t, h_t[tile])
-                log_p = log_p.data
-
-                # Suppress probabilities of previous tokens
-                if avoid_rep:
-                    log_p.view(-1).index_fill_(
-                        0, cur_tokens + (nk_mask * self.n_trg_vocab), inf)
-
-                # Avoid <unk> tokens
-                if avoid_unk:
-                    log_p[:, self.trg_vocab['<unk>']] = inf
-
-                # Favor finished hyps to generate <eos> again
-                # Their nll scores will not increase further and they will
-                # always be kept in the beam.
-                if n_fini > 0:
-                    fidxs = fini_idxs[:, 0]
-                    log_p.index_fill_(0, fidxs, inf)
-                    log_p.view(-1).index_fill_(
-                        0, fidxs * self.n_trg_vocab + eos, 0)
-
-                # Expand to 3D, cross-sum scores and reduce back to 2D
-                nll = (nll.unsqueeze(2) + log_p.view(n, k, -1)).view(n, -1)
-
-                # Reduce (N, K*V) to k-best
-                nll, idxs = nll.topk(k, sorted=False, largest=False)
-
-                # previous indices into the beam and current token indices
-                pdxs = idxs / self.n_trg_vocab
-
-                # Insert current tokens
-                beam[t] = idxs % self.n_trg_vocab
-
-                # Permute all hypothesis history according to new order
-                beam[:t] = beam[:t].gather(2, pdxs.repeat(t, 1, 1))
-
-                # Compute correct previous indices
-                # Mask is needed since we're in flattened regime
-                tile = pdxs.view(-1) + pdxs_mask
-
-            # Put an explicit <eos> to make idxs_to_sent happy
-            beam[max_len - 1] = eos
-
-            # Find lengths by summing tokens not in (pad,bos,eos)
-            lens = (beam.transpose(0, 2) > 2).sum(-1).t().float().clamp(min=1)
-            # Normalize scores by length
-            nll /= lens.float()
-            top_hyps = nll.topk(1, sorted=False, largest=False)[1].squeeze(1)
-
-            # Get best hyp for each sample in the batch
-            hyps = beam[:, range(n), top_hyps].cpu().numpy().T
-            results.extend(self.trg_vocab.list_of_idxs_to_sents(hyps))
-
-        return results
