@@ -69,5 +69,8 @@ class METEORScorer(object):
             score = Metric('METEOR', 0.0)
         finally:
             # Close METEOR process
+            proc.stdin.close()
             proc.terminate()
+            proc.kill()
+            proc.wait(timeout=2)
             return score
