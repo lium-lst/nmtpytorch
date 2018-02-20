@@ -31,7 +31,7 @@ def get_vgg_names(config, batch_norm=False):
 
 resnet_layers = ['conv1', 'bn_conv1', 'conv1_relu', 'pool1',
                  'res2c_relu', 'res3d_relu', 'res4f_relu',
-                 'res5c_relu', 'pool5']
+                 'res5c_relu', 'avgpool']
 
 
 class ImageEncoder(object):
