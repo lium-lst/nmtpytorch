@@ -24,7 +24,7 @@ class Fusion(torch.nn.Module):
 
     def __init__(self, fusion_type='concat',
                  input_size=None, output_size=None):
-        super(Fusion, self).__init__()
+        super().__init__()
         self.fusion_type = fusion_type
         self.forward = getattr(self, '_{}'.format(self.fusion_type))
 

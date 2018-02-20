@@ -9,7 +9,7 @@ class LayerNorm(nn.Module):
        arXiv preprint arXiv:1607.06450 (2016).
     """
     def __init__(self, dim):
-        super(LayerNorm, self).__init__()
+        super().__init__()
 
         self.bias = nn.Parameter(torch.zeros(1, dim))
         self.gain = nn.Parameter(torch.ones(1, dim))

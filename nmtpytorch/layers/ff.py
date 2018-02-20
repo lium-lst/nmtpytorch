@@ -9,7 +9,7 @@ class FF(nn.Module):
     """A smart feedforward layer with activation support."""
     def __init__(self, in_features, out_features, bias=True,
                  bias_zero=True, activ=None):
-        super(FF, self).__init__()
+        super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.bias_zero = bias_zero
