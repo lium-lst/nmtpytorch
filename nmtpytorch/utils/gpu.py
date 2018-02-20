@@ -1,10 +1,5 @@
 import os
-import sys
-import time
-import pathlib
 import subprocess
-
-from .misc import get_temp_file, listify
 
 
 class GPUManager(object):
@@ -20,32 +15,19 @@ class GPUManager(object):
         # Boolean map
         self.free_map = ["None" in l for l in p.stdout.split('\n')
                          if "Processes" in l]
-        for i in range(len(self.free_map)):
-            if self.free_map[i]:
-                lock_path = pathlib.Path('/tmp/nmtpy.gpu%d.lock' % i)
-                if lock_path.exists():
-                    lock_str = lock_path.read_text().strip()
-                    pid = lock_str.split(':')[-1]
-                    if not (pathlib.Path('/proc') / pid).exists():
-                        lock_path.unlink()
-                    else:
-                        self.free_map[i] = False
 
         self.free_count = self.free_map.count(True)
         self.free_idxs = [i for i in range(len(self.free_map))
                           if self.free_map[i]]
 
-        self.pid = os.getpid()
-
-    def lock(self, devs):
-        for dev in listify(devs):
-            name = "nmtpy.gpu%d.lock" % (dev)
-            if self.free_map[dev]:
-                lockfile = get_temp_file(name=name)
-                lockfile.write("%s pid:%d\n" % (name, self.pid))
-                self.free_map[dev] = False
-
     def __call__(self, devs, strict=False):
+        vis_dev = os.environ.get('CUDA_VISIBLE_DEVICES', None)
+        if vis_dev is not None:
+            if vis_dev == "NoDevFiles":
+                raise RuntimeError("No GPU found.")
+            else:
+                return vis_dev
+
         self.collect_stats()
 
         if not isinstance(devs, str):
@@ -64,9 +46,6 @@ class GPUManager(object):
             devices = [int(d) for d in devs.split(',')]
             if not all(self.free_map[i] for i in devices):
                 raise Exception("Not all requested GPUs are available.")
-
-        # Finally lock devices
-        self.lock(devices)
 
         if strict:
             _devices = ",".join([str(dev) for dev in devices])
