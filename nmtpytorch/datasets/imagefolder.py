@@ -17,18 +17,22 @@ class ImageFolderDataset(data.Dataset):
     opened to avoid repetitive disk access.
 
     Arguments:
-        root (str): The root folder which contains a folder per each split.
-        split (str): A subfolder that should exist under ``root`` containing
-            images for a specific split.
+        root (str): The root folder that contains the images and index.txt
         resize (int, optional): An optional integer to be given to
             ``torchvision.transforms.Resize``. Default: ``None``.
         crop (int, optional): An optional integer to be given to
             ``torchvision.transforms.CenterCrop``. Default: ``None``.
-
+        replicate(int, optional): Replicate the image names ``replicate``
+            times in order to process the same image ``replicate`` times
+            if ``replicate`` sentences are available during training time.
+        warmup(bool, optional): If ``True``, the images will be read once
+            at the beginning to fill the cache.
     """
-    def __init__(self, root, split, resize=None, crop=None):
-        self.split = split
-        self.root = Path(root).expanduser().resolve() / self.split
+    def __init__(self, root, resize=None, crop=None,
+                 replicate=1, warmup=False):
+        self.root = Path(root).expanduser().resolve()
+        self.replicate = replicate
+
         # Image list in dataset order
         self.index = self.root / 'index.txt'
 
@@ -57,6 +61,13 @@ class ImageFolderDataset(data.Dataset):
         # Setup reader
         self.read_image = lru_cache(maxsize=self.__len__())(self._read_image)
 
+        if warmup:
+            for idx in range(self.__len__()):
+                self[idx]
+
+        # Replicate the list if requested
+        self.image_files = self.image_files * self.replicate
+
     def _read_image(self, fname):
         with open(fname, 'rb') as f:
             img = Image.open(f).convert('RGB')
@@ -69,8 +80,9 @@ class ImageFolderDataset(data.Dataset):
         return len(self.image_files)
 
     def __repr__(self):
-        s = "{}({})\n".format(self.__class__.__name__, self.root)
-        s += " split '{}' - {} images\n".format(self.split, self.__len__())
+        s = "{}(replicate={}) ({} samples)\n".format(
+            self.__class__.__name__, self.replicate, self.__len__())
+        s += " {}\n".format(self.root)
         if self.transform:
             s += ' Transforms: {}\n'.format(
                 self.transform.__repr__().replace('\n', '\n' + ' '))
