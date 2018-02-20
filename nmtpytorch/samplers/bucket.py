@@ -20,9 +20,6 @@ class BucketBatchSampler(Sampler):
         max_len (int, optional): A maximum sequence length that will be used
             to filter out very long sequences. A default of `10000` is
             assumed if ``None`` given.
-        drop_last (bool, optional): When ``True`` drops the last buckets
-            that have less than max_len elements to ensure that all batches
-            are equally sized. Defaults to ``False``.
 
     Example:
         # Generate dummy length information
@@ -37,10 +34,9 @@ class BucketBatchSampler(Sampler):
 
     """
 
-    def __init__(self, lengths, batch_size, max_len=None, drop_last=False):
+    def __init__(self, lengths, batch_size, max_len=None):
         self.batch_size = batch_size
         self.max_len = 10000 if max_len is None else max_len
-        self.drop_last = drop_last
 
         # Buckets: lengths -> list of sample indices
         self.buckets = defaultdict(list)
@@ -61,10 +57,7 @@ class BucketBatchSampler(Sampler):
 
             # How many batches will be done for this bucket?
             bucket_bs = np_bucket.size / self.batch_size
-            if self.drop_last:
-                idxs = [len_] * math.floor(bucket_bs)
-            else:
-                idxs = [len_] * math.ceil(bucket_bs)
+            idxs = [len_] * math.ceil(bucket_bs)
 
             self.buckets[len_] = np_bucket
             self.bucket_idxs.extend(idxs)
@@ -87,12 +80,7 @@ class BucketBatchSampler(Sampler):
         for len_, elems in self.buckets.items():
             bucket_offsets[len_] = 0
             perms = np.random.permutation(len(elems))
-            if self.drop_last:
-                # Drop residual samples from the bucket
-                offset = int(perms.size / self.batch_size) * self.batch_size
-                bucket_views[len_] = perms[:offset]
-            else:
-                bucket_views[len_] = perms
+            bucket_views[len_] = perms
 
         # Shuffle bucket order
         # For each bucket, slide the window to yield the next batch
