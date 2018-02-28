@@ -13,6 +13,8 @@ from ..layers import FF
 
 from ..datasets import Multi30kDataset
 
+# NOTE: This model is broken right now and it needs care :(
+
 
 # Here we use an attention mechanism which may be
 # different for general purpose attention defined in
