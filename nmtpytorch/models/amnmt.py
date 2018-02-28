@@ -130,8 +130,8 @@ class AttentiveMNMT(nn.Module):
         self.cnn, dims = cnn_encoder.get(self.opts.model['cnn_layer'])
         self.print("Feature maps @ '{}' -> {}".format(
             self.opts.model['cnn_layer'], 'x'.join(map(str, dims[1:]))))
-        self.opts.model['img_ctx_dim'] = dims[1]
-        self.img_ctx_dim = self.opts.model['img_ctx_dim']
+        # Number of channels defines the spatial vector dim for us
+        self.img_ctx_dim = dims[1]
 
         # Set requires_grad for CNN layers
         set_learnable(self.cnn,
