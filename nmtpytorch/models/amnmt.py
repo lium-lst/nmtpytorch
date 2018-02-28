@@ -175,8 +175,8 @@ class AttentiveMNMT(nn.Module):
         """Loads the requested dataset split."""
         if split not in self.datasets:
             self.datasets[split] = Multi30kRawDataset(
-                split=split,
-                data_dict=self.opts.data,
+                data_dict=self.opts.data[split + '_set'],
+                warmup=(split != 'train'),
                 vocabs=self.vocabs,
                 topology=self.topology)
             self.print(self.datasets[split])
