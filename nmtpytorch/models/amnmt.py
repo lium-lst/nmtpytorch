@@ -7,11 +7,13 @@ from ..utils.nn import set_learnable
 from ..utils.topology import Topology
 from ..utils.data import to_var
 
-from ..datasets import Multi30kDataset
+from ..datasets import Multi30kRawDataset
 
 
 class AttentiveMNMT(nn.Module):
-    r"""A sequence-to-sequence NMT model with visual attention."""
+    """An end-to-end sequence-to-sequence NMT model with visual attention over
+    convolutional features using raw JPG image files.
+    """
     def __init__(self, opts, logger=None):
         """This should only be used for argument processing."""
         super().__init__()
@@ -45,25 +47,6 @@ class AttentiveMNMT(nn.Module):
         self.n_src_vocab = len(self.src_vocab)
         self.n_trg_vocab = len(self.trg_vocab)
 
-        # CNN stuff
-        opts.model['img_mode'] = kwargs.pop('img_mode', 'raw')
-        if opts.model['img_mode'] == 'raw':
-            assert 'cnn_type' in opts.model, "cnn_type not provided"
-            assert 'cnn_layer' in opts.model, "cnn_layer not provided"
-            opts.model['cnn_trainable'] = kwargs.pop('cnn_trainable', False)
-            opts.model['cnn_pretrained'] = kwargs.pop('cnn_pretrained', True)
-            opts.model['cnn_type'] = kwargs.pop('cnn_type', 'resnet50')
-            opts.model['cnn_layer'] = kwargs.pop('cnn_layer', 'res4f_relu')
-        else:
-            # Make this fail to make it mandatory
-            assert 'img_ctx_dim' in opts.model, \
-                "You should provide img_ctx_dim for the given conv features."
-
-            opts.model['img_ctx_dim'] = kwargs.pop('img_ctx_dim')
-
-        # How to fusion multimodal contexts (sum/mul/concat)
-        opts.model['fusion_type'] = kwargs.pop('fusion_type', 'sum')
-
         opts.model['emb_dim'] = kwargs.pop('emb_dim', 256)
         opts.model['enc_dim'] = kwargs.pop('enc_dim', 512)
         opts.model['dec_dim'] = kwargs.pop('dec_dim', 1024)
@@ -90,6 +73,22 @@ class AttentiveMNMT(nn.Module):
         # Tie embeddings: False/2way/3way
         opts.model['tied_emb'] = kwargs.pop('tied_emb', False)
 
+        #########################
+        # Visual modality section
+        #########################
+        # Default: ResNet50, layer5, i.e. res5c_relu (7x7x2048)
+        opts.model['cnn_type'] = kwargs.pop('cnn_type', 'resnet50')
+        opts.model['cnn_layer'] = kwargs.pop('cnn_layer', 'res5c_relu')
+
+        # Should we initialize the CNN with its pretrained weights?
+        opts.model['cnn_pretrained'] = kwargs.pop('cnn_pretrained', True)
+
+        # Should we finetune some layers of CNN?
+        opts.model['cnn_finetune'] = kwargs.pop('cnn_finetune', "")
+
+        # How to fusion multimodal contexts (sum/mul/concat)
+        opts.model['fusion_type'] = kwargs.pop('fusion_type', 'concat')
+
         # Sanity check after consuming all arguments
         if len(kwargs) > 0:
             self.print('Unused model args: {}'.format(','.join(kwargs.keys())))
@@ -110,44 +109,38 @@ class AttentiveMNMT(nn.Module):
         self.val_refs = self.opts.data['val_set'][self.tl]
 
     def reset_parameters(self):
+        """Initializes learnable weights with kaiming_normal()."""
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
                 nn.init.kaiming_normal(param.data)
 
-    def setup_cnn(self):
-        def process_raw_image(image):
-            # Extract convolutional features
-            # Section 3.1: a = {a_1 ... a_L}, a_i \in \mathrm{R}^D
-            img_ctx = self.cnn(image).view(
-                (image.shape[0], self.opts.model['img_ctx_dim'], -1))
-            # make them (batch_size, w*h, ctx_dim)
-            img_ctx.transpose_(1, 2)
-            return img_ctx
-
-        # Get CNN encoder for the images
-        if self.opts.model['img_mode'] == 'raw':
-            self.print('Loading CNN')
-            cnn_encoder = ImageEncoder(
-                cnn_type=self.opts.model['cnn_type'],
-                pretrained=self.opts.model['cnn_pretrained'])
-            self.cnn, dims = cnn_encoder.get(self.opts.model['cnn_layer'])
-            self.opts.model['img_ctx_dim'] = dims[1]
-            self.img_ctx_dim = self.opts.model['img_ctx_dim']
-            self._process_image = process_raw_image
-
-            # Set learnable flag
-            set_learnable(self.cnn, self.opts.model['cnn_trainable'])
-        else:
-            # no-op as features are provided as inputs directly
-            self._process_image = lambda x: x
-
     def setup(self, reset_params=True):
         """Sets up NN topology by creating the layers."""
 
-        # Setup CNN
-        self.setup_cnn()
+        #####################
+        # Setup image encoder
+        #####################
+        self.print('Loading CNN')
 
-        # Create encoder
+        # Create the CNN sub-network
+        cnn_encoder = ImageEncoder(
+            cnn_type=self.opts.model['cnn_type'],
+            pretrained=self.opts.model['cnn_pretrained'])
+
+        self.cnn, dims = cnn_encoder.get(self.opts.model['cnn_layer'])
+        self.print("Feature maps @ '{}' -> {}".format(
+            self.opts.model['cnn_layer'], 'x'.join(map(str, dims[1:]))))
+        self.opts.model['img_ctx_dim'] = dims[1]
+        self.img_ctx_dim = self.opts.model['img_ctx_dim']
+
+        # Set requires_grad for CNN layers
+        set_learnable(self.cnn,
+                      value=any(self.opts.model['cnn_finetune']),
+                      layer_names=self.opts.model['cnn_finetune'])
+
+        ########################
+        # Create textual encoder
+        ########################
         self.enc = TextEncoder(input_size=self.opts.model['emb_dim'],
                                hidden_size=self.opts.model['enc_dim'],
                                n_vocab=self.n_src_vocab,
@@ -181,14 +174,12 @@ class AttentiveMNMT(nn.Module):
     def load_data(self, split):
         """Loads the requested dataset split."""
         if split not in self.datasets:
-            dataset = Multi30kDataset(split=split,
-                                      img_mode=self.opts.model['img_mode'],
-                                      data_dict=self.opts.data,
-                                      vocabs=self.vocabs,
-                                      topology=self.topology,
-                                      logger=self.logger)
-            self.datasets[split] = dataset
-            self.print(dataset)
+            self.datasets[split] = Multi30kRawDataset(
+                split=split,
+                data_dict=self.opts.data,
+                vocabs=self.vocabs,
+                topology=self.topology)
+            self.print(self.datasets[split])
 
     def compute_loss(self, data_loader):
         """Computes test set loss over the given DataLoader instance."""
@@ -202,12 +193,21 @@ class AttentiveMNMT(nn.Module):
 
         return total_loss.data.cpu()[0] / n_tokens_seen
 
+    def process_image(self, x):
+        """Extracts features as 3D tensor of shape (WH)NC."""
+        # Get features into (n,c,w*h) and then (w*h,n,c)
+        feats = self.cnn(x)
+        feats = feats.view((*feats.shape[:2], -1)).permute(2, 0, 1)
+
+        # Return along with a mask == None
+        return (feats, None)
+
     def encode(self, data):
         """Encodes all inputs and returns a dictionary.
 
         Arguments:
             data (dict): A batch of samples with keys designating the source
-                and target modalities.
+                modalities.
 
         Returns:
             dict:
@@ -217,7 +217,7 @@ class AttentiveMNMT(nn.Module):
                 if the relevant modality does not require a mask.
         """
         return {
-            'image': (self._process_image(data['image']).transpose(0, 1), None),
+            'image': self.process_image(data['image']),
             'txt': self.enc(data[self.sl]),
         }
 
