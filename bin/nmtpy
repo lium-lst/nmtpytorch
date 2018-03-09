@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
 import sys
 import platform
 import argparse
@@ -33,6 +38,8 @@ if __name__ == '__main__':
                               help="Experiment configuration file")
     parser_train.add_argument('-s', '--suffix', type=str, default="",
                               help="Optional experiment suffix.")
+    parser_train.add_argument('-S', '--short', action='store_true',
+                              help="Use short experiment id in filenames.")
     parser_train.add_argument('-p', '--pretrained', type=str, default=None,
                               help=".ckpt file for model initialization")
     parser_train.add_argument('overrides', nargs="*", default=[],
@@ -84,7 +91,7 @@ if __name__ == '__main__':
         opts = Options(args.config, args.overrides)
 
         # Setup experiment folders
-        setup_experiment(opts, args.suffix)
+        setup_experiment(opts, args.suffix, args.short)
 
         weights, history = None, None
         if args.pretrained:
@@ -128,6 +135,8 @@ if __name__ == '__main__':
 
     log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
         torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
+    if 'SLURM_JOB_ID' in os.environ:
+        log.info("SLURM Job ID: {}".format(os.environ['SLURM_JOB_ID']))
     loop = MainLoop(model, log, opts.train, history, weights, mode=args.cmd)
     loop()
     sys.exit(0)
