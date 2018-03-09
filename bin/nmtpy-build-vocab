@@ -10,11 +10,11 @@ from collections import OrderedDict
 import numpy as np
 
 from nmtpytorch.vocabulary import Vocabulary
-from nmtpytorch.utils.misc import get_language, pbar
+from nmtpytorch.utils.misc import pbar
 
 
 def freqs_to_dict(token_freqs, min_freq=0, max_items=0,
-                  store_freqs=False, exclude_markers=False):
+                  store_freqs=False, exclude_symbols=False):
     # Get list of tokens
     tokens = list(token_freqs.keys())
 
@@ -22,7 +22,7 @@ def freqs_to_dict(token_freqs, min_freq=0, max_items=0,
     freqs = np.array(list(token_freqs.values()))
 
     tokendict = OrderedDict()
-    if not exclude_markers:
+    if not exclude_symbols:
         for key, value in Vocabulary.TOKENS.items():
             tokendict[key] = value
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
     for filename in args.files:
         filename = pathlib.Path(filename).expanduser()
-        lang = get_language(filename)
+        suffix = ".vocab{}".format(filename.suffix)
         vocab_fname = filename.stem
 
         if args.single:
@@ -131,11 +131,11 @@ if __name__ == '__main__':
                 vocab_fname += "-min%d" % args.min_freq
             if args.max_items > 0:
                 vocab_fname += "-max%dtokens" % args.max_items
-            vocab_fname = str(output_dir / vocab_fname) + '.vocab.%s' % lang
+            vocab_fname = str(output_dir / vocab_fname) + suffix
             write_dict(vocab_fname, tokendict)
 
     if args.single:
         tokendict = freqs_to_dict(all_freqs, args.min_freq, args.max_items,
                                   args.store_freqs,
-                                  args.exclude_markers)
+                                  args.exclude_symbols)
         write_dict(args.single, tokendict)
