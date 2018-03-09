@@ -1,5 +1,14 @@
 ## Release Notes
 
+### v1.3 (dd/mm/2018)
+
+ - Added `Multi30kRawDataset` for training end-to-end systems from raw images as input.
+ - You can now pass `-S` to `nmtpy train` to produce shorter experiment files with not all the hyperparameters in file name.
+ - New post-processing filter option `de-spm` for Google SentencePiece (SPM) processed files.
+ - `sacrebleu` is now a dependency as it is now accepted as an early-stopping metric.
+ It only makes sense to use it with SPM processed files since they are detokenized
+ once post-processed.
+
 ### v1.2 (20/02/2018)
 
  - You can now use `$HOME` and `$USER` in your configuration files.
