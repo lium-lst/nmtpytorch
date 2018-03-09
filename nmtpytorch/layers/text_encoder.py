@@ -12,14 +12,11 @@ class TextEncoder(nn.Module):
                  dropout_rnn=0, dropout_emb=0, dropout_ctx=0):
         super().__init__()
 
-        assert self.rnn_type in ('LSTM', 'GRU'), \
-            "rnn_type should be 'lstm' or 'gru'."
-
+        self.rnn_type = rnn_type.upper()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.ctx_size = self.hidden_size * 2
         self.n_vocab = n_vocab
-        self.rnn_type = rnn_type.upper()
         self.num_layers = num_layers
         self.bidirectional = bidirectional
 
