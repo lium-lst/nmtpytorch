@@ -118,7 +118,8 @@ def get_n_params(module):
             n_param_frozen += np.cumprod(param.data.size())[-1]
 
     n_param_all = n_param_learnable + n_param_frozen
-    return readable_size(n_param_all), readable_size(n_param_learnable)
+    return "# parameters: {} ({} learnable)".format(
+        readable_size(n_param_all), readable_size(n_param_learnable))
 
 
 def get_temp_file(suffix="", name=None, delete=False):
@@ -137,14 +138,29 @@ def get_temp_file(suffix="", name=None, delete=False):
     return t
 
 
-def setup_experiment(opts, suffix=None):
+def setup_experiment(opts, suffix=None, short=False):
     """Return a representative string for the experiment."""
+
+    # subfolder is conf filename without .conf suffix
+    opts.train['subfolder'] = pathlib.Path(opts.filename).stem
+
+    # add suffix to subfolder name to keep experiment names shorter
+    if suffix:
+        opts.train['subfolder'] += "-{}".format(suffix)
+
+    # Create folders
+    folder = pathlib.Path(opts.train['save_path']) / opts.train['subfolder']
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # Set random experiment ID
+    run_id = time.strftime('%Y%m%d%H%m%S') + str(random.random())
+    run_id = sha256(run_id.encode('ascii')).hexdigest()[:5]
+
+    names = []
 
     mopts = opts.model.copy()
 
-    # Start with model name
-    names = [opts.train['model_type'].lower()]
-
+    # Start with general ones
     if 'enc_type' in mopts:
         names.append("enc%d%s%d" % (mopts.get('n_encoders', 1),
                                     mopts['enc_type'].upper(),
@@ -157,28 +173,11 @@ def setup_experiment(opts, suffix=None):
         if k.endswith("_dim"):
             names.append('%s%d' % (k.split('_')[0], mopts[k]))
 
-    if 'att_type' in mopts:
-        names.append("att_%s" % mopts['att_type'])
-
-    if 'fusion_type' in mopts:
-        names.append("ctx_%s" % mopts['fusion_type'])
-
     # Join so far
     name = '-'.join(names)
 
     # Append optimizer and learning rate
     name += '-%s_%.e' % (opts.train['optimizer'], opts.train['lr'])
-
-    # Append batch size
-    name += '-bs%d' % opts.train['batch_size']
-
-    # Validation stuff (first: early-stop metric)
-    name += '-%s' % opts.train['eval_metrics'].split(',')[0]
-
-    if opts.train['eval_freq'] > 0:
-        name += "-each%d" % opts.train['eval_freq']
-    else:
-        name += "-eachepoch"
 
     if opts.train['l2_reg'] > 0:
         name += "-l2_%.e" % opts.train['l2_reg']
@@ -190,6 +189,29 @@ def setup_experiment(opts, suffix=None):
             _, layer = dout.split('_')
             if mopts[dout] > 0:
                 name += "-do_%s_%.1f" % (layer, mopts[dout])
+
+    # If short names requested, we stop here
+    if short:
+        opts.train['exp_id'] = '%s-r%s' % (name, run_id)
+        return
+
+    # Continue with other stuff
+    if 'att_type' in mopts:
+        name += '-att_{}'.format(mopts['att_type'])
+
+    if 'fusion_type' in mopts:
+        name += '-ctx_{}'.format(mopts['fusion_type'])
+
+    # Append batch size
+    name += '-bs%d' % opts.train['batch_size']
+
+    # Validation stuff (first: early-stop metric)
+    name += '-%s' % opts.train['eval_metrics'].split(',')[0]
+
+    if opts.train['eval_freq'] > 0:
+        name += "-each%d" % opts.train['eval_freq']
+    else:
+        name += "-eachepoch"
 
     # FIXME: We can't add everything to here so maybe we
     # need to let models to append their custom fields afterwards
@@ -205,18 +227,6 @@ def setup_experiment(opts, suffix=None):
     # Append seed
     name += "-s%d" % opts.train['seed']
 
-    if suffix:
-        name = "%s-%s" % (name, suffix)
-
-    save_path = pathlib.Path(opts.train['save_path'])
-
-    # Main folder is conf filename without .conf suffix i.e., nmt-en-de
-    opts.train['subfolder'] = pathlib.Path(opts.filename).stem
-
-    # Set random experiment ID
-    run_id = time.strftime('%Y%m%d%H%m%S') + str(random.random())
-    run_id = sha256(run_id.encode('ascii')).hexdigest()[:5]
-    opts.train['exp_id'] = '%s.%s' % (name, run_id)
-
-    # Create folders
-    (save_path / opts.train['subfolder']).mkdir(parents=True, exist_ok=True)
+    # Finalize
+    opts.train['exp_id'] = '{}-{}-r{}'.format(
+        opts.train['model_type'].lower(), name, run_id)
