@@ -65,10 +65,8 @@ class MainLoop(object):
         # Move to cuda
         self.model.cuda()
 
-        # Print model topology and number of parameters
-        self.print(self.model)
-        self.print("# parameters: {} ({} learnable)".format(
-            *get_n_params(self.model)))
+        # Print number of parameters
+        self.print(get_n_params(self.model))
 
         # Reseed to retain the order of shuffle operations
         if self.seed != 0:
