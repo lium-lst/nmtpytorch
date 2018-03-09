@@ -13,6 +13,29 @@ is used to integrate pre-trained CNN models.
 `nmtpytorch` is developed and tested on Python 3.6 and will not support
 Python 2.x whatsoever.
 
+## Citation
+
+If you use **nmtpytorch**, you may want to cite the following [paper](https://ufal.mff.cuni.cz/pbml/109/art-caglayan-et-al.pdf) although it was for the older Theano version:
+```
+@article{nmtpy2017,
+  author    = {Ozan Caglayan and
+               Mercedes Garc\'{i}a-Mart\'{i}nez and
+               Adrien Bardet and
+               Walid Aransa and
+               Fethi Bougares and
+               Lo\"{i}c Barrault},
+  title     = {NMTPY: A Flexible Toolkit for Advanced Neural Machine Translation Systems},
+  journal   = {Prague Bull. Math. Linguistics},
+  volume    = {109},
+  pages     = {15--28},
+  year      = {2017},
+  url       = {https://ufal.mff.cuni.cz/pbml/109/art-caglayan-et-al.pdf},
+  doi       = {10.1515/pralin-2017-0035},
+  timestamp = {Tue, 12 Sep 2017 10:01:08 +0100}
+}
+```
+
+
 ## Installation
 
 We ship [subword-nmt](https://github.com/rsennrich/subword-nmt) and METEOR
