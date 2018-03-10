@@ -144,7 +144,7 @@ class AttentiveMNMT(nn.Module):
         self.enc = TextEncoder(input_size=self.opts.model['emb_dim'],
                                hidden_size=self.opts.model['enc_dim'],
                                n_vocab=self.n_src_vocab,
-                               cell_type=self.opts.model['enc_type'],
+                               rnn_type=self.opts.model['enc_type'],
                                dropout_emb=self.opts.model['dropout_emb'],
                                dropout_ctx=self.opts.model['dropout_ctx'],
                                dropout_rnn=self.opts.model['dropout_enc'],
