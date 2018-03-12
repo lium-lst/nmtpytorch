@@ -3,6 +3,7 @@
 ### v1.3 (dd/mm/2018)
 
  - Added `Multi30kRawDataset` for training end-to-end systems from raw images as input.
+ - Added `NumpyDataset` to read `.npy/.npz` tensor files as input features.
  - You can now pass `-S` to `nmtpy train` to produce shorter experiment files with not all the hyperparameters in file name.
  - New post-processing filter option `de-spm` for Google SentencePiece (SPM) processed files.
  - `sacrebleu` is now a dependency as it is now accepted as an early-stopping metric.

@@ -46,7 +46,8 @@ def get_collate_v2(data_sources):
                 # Hack: we inject n_classes into DataSource keys
                 # from the model itself.
                 tensors[ds] = onehot_data(batch_data, ds._n_classes)
-            elif ds._type == "ImageFolder":
+            elif ds._type in ("ImageFolder", "Numpy"):
+                # Underlying data is already converted Torch tensor
                 tensors[ds] = torch.stack(batch_data)
 
         return tensors
