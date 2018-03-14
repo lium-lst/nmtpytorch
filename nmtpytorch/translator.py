@@ -69,10 +69,14 @@ class Translator(object):
             self.logger.info('Will translate "{}"'.format(self.splits))
             self.splits = self.splits.split(',')
         elif self.source:
-            self.logger.info('Will translate "{}"'.format(self.source))
-            # Hack to make it like the given file is the split 'new'
-            self.instances[0].opts.data['new_set'] = {
-                src_lang: Path(self.source)}
+            # Split into key:value's and parse into dict
+            input_dict = {}
+            self.logger.info('Will translate input configuration:')
+            for data_source in self.source.split(','):
+                key, path = data_source.split(':', 1)
+                input_dict[key] = Path(path)
+                self.logger.info(' {}: {}'.format(key, input_dict[key]))
+            self.instances[0].opts.data['new_set'] = input_dict
             self.splits = ['new']
 
     @staticmethod

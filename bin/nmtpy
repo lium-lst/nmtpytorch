@@ -73,9 +73,9 @@ if __name__ == '__main__':
     # You can translate a set of splits defined in the .conf file
     group.add_argument('-s', '--splits', type=str,
                        help='Comma separated splits from config file')
-    # Or you can provide another input file with -S
+    # Or you can provide another input configuration with -S
     group.add_argument('-S', '--source', type=str,
-                       help='A text file to translate')
+                       help='Comma-separated key:value pairs to provide new inputs.')
     parser_trans.add_argument('-o', '--output', type=str, required=True,
                               help='Output filename prefix')
 
