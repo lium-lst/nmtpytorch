@@ -47,6 +47,9 @@ class Topology(object):
                 name, *ftype = val.strip().split(':')
                 ftype = ftype[0] if len(ftype) > 0 else "Text"
                 ds = DataSource(name, ftype)
+                if name in self.__dict__:
+                    raise RuntimeError(
+                        '"{}" already given as a data source.'.format(name))
                 setattr(self, name, ds)
                 getattr(self, key)[name] = ds
 
