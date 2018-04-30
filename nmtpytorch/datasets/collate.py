@@ -1,39 +1,16 @@
 # -*- coding: utf-8 -*-
 from collections import UserDict
 
-import numpy as np
 import torch
 
 from ..utils.data import pad_data, onehot_data
 
 
-def get_collate_v1(keys):
-    """Returns a special collate_fn which will view the underlying data
-    in terms of the given keys."""
-
-    def collate_fn(batch):
-        tensors = UserDict()
-        tensors.size = len(batch)
-
-        # Iterate over data sources
-        for key in keys:
-            if isinstance(batch[0][key], list):
-                # Sequence vocabulary indices
-                tensors[key] = pad_data([elem[key] for elem in batch])
-            elif isinstance(batch[0][key], np.ndarray):
-                # Image features data from .npy
-                tensors[key] = torch.stack([torch.from_numpy(elem[key])
-                                            for elem in batch])
-
-        return tensors
-    return collate_fn
-
-
-def get_collate_v2(data_sources):
+def get_collate(data_sources):
     """Returns a special collate_fn which will view the underlying data
     in terms of the given DataSource keys."""
 
-    def collate_fn_v2(batch):
+    def collate_fn(batch):
         tensors = UserDict()
         tensors.size = len(batch)
 
@@ -51,4 +28,4 @@ def get_collate_v2(data_sources):
                 tensors[ds] = torch.stack(batch_data)
 
         return tensors
-    return collate_fn_v2
+    return collate_fn
