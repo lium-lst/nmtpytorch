@@ -108,7 +108,7 @@ tensorboard_dir: ~/tb_dir
 
 Instead of shipping several tools for training, rescoring, translating, etc.
 here we provide a single command-line interface `nmtpy` which implements
-three subcommands `train`, `translate` and `resume`.
+three subcommands `train`, `translate` and `test`.
 
 **`nmtpy train`**
 
