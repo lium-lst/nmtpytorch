@@ -34,9 +34,10 @@ class BucketBatchSampler(Sampler):
 
     """
 
-    def __init__(self, lengths, batch_size, max_len=None):
+    def __init__(self, lengths, batch_size, max_len=None, store_indices=False):
         self.batch_size = batch_size
         self.max_len = 10000 if max_len is None else max_len
+        self.store_indices = store_indices
 
         # Buckets: lengths -> list of sample indices
         self.buckets = defaultdict(list)
@@ -75,6 +76,10 @@ class BucketBatchSampler(Sampler):
         # Random access indices
         bucket_views = {}
 
+        # If beam-search with ordered batches, original indices will be
+        # necessary.
+        self.orig_idxs = []
+
         # Create permuted access indices for each bucket
         # to avoid shuffling the lists
         for len_, elems in self.buckets.items():
@@ -95,8 +100,14 @@ class BucketBatchSampler(Sampler):
             # Increment offset
             bucket_offsets[bidx] += len(idxs)
 
+            # Get actual sample indices
+            sidxs = self.buckets[bidx][idxs]
+
+            if self.store_indices:
+                self.orig_idxs.extend(sidxs)
+
             # Return sample indices
-            yield self.buckets[bidx][idxs]
+            yield sidxs
 
     def __len__(self):
         """Returns how many batches are inside."""
