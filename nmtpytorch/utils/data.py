@@ -38,13 +38,13 @@ def to_var(input_, requires_grad=False, volatile=False):
     """Returns a torch Variable on GPU."""
     if isinstance(input_, (UserDict, dict)):
         for key in input_:
-            v = Variable(input_[key],
-                         requires_grad=requires_grad, volatile=volatile)
-            input_[key] = v.cuda()
+            input_[key] = Variable(
+                input_[key],
+                requires_grad=requires_grad, volatile=volatile).cuda()
+        return input_
     else:
-        input_ = Variable(
+        return Variable(
             input_, requires_grad=requires_grad, volatile=volatile).cuda()
-    return input_
 
 
 class CircularNDArray(object):
