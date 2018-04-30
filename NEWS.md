@@ -21,18 +21,18 @@
  - Improved seeding: seed is now printed in order to reproduce the results.
  - Added IPython notebook for attention visualization.
  - **Layers**
-  - New shallow `SimpleGRUDecoder` layer.
-  - `TextEncoder`: Ability to set `maxnorm` and `gradscale` of embeddings and work with or without sorted-length batches.
-  - `ConditionalDecoder`: Make it work with GRU/LSTM, allow setting `maxnorm/gradscale` for embeddings.
-  - `ConditionalMMDecoder`: Same as above.
+   - New shallow `SimpleGRUDecoder` layer.
+   - `TextEncoder`: Ability to set `maxnorm` and `gradscale` of embeddings and work with or without sorted-length batches.
+   - `ConditionalDecoder`: Make it work with GRU/LSTM, allow setting `maxnorm/gradscale` for embeddings.
+   - `ConditionalMMDecoder`: Same as above.
  - **nmtpy translate**
-  - `--avoid-double` and `--avoid-unk` removed for now.
-  - Added Google's length penalty normalization switch `--lp-alpha`.
-  - Added ensembling which is enabled automatically if you give more than 1 model checkpoints.
+   - `--avoid-double` and `--avoid-unk` removed for now.
+   - Added Google's length penalty normalization switch `--lp-alpha`.
+   - Added ensembling which is enabled automatically if you give more than 1 model checkpoints.
  - New machine learning metric wrappers in `utils/ml_metrics.py`:
-  - Label-ranking average precision `lrap`
-  - Coverage error
-  - Mean reciprocal rank
+   - Label-ranking average precision `lrap`
+   - Coverage error
+   - Mean reciprocal rank
 
 ### v1.2 (20/02/2018)
 
