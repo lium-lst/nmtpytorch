@@ -13,6 +13,9 @@ class Evaluator(object):
         self.scorers = OrderedDict()
         self.refs = list(refs.parent.glob(refs.name))
         self.language = get_language(self.refs[0])
+        if self.language is None:
+            # Fallback to en (this is only relevant for METEOR)
+            self.language = 'en'
 
         self.filter = lambda s: s
         if filters:
