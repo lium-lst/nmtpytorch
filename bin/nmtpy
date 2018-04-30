@@ -6,26 +6,19 @@ os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 import sys
-import platform
 import argparse
 
-import numpy as np
-import torch
-
-from nmtpytorch.config import Options
 from nmtpytorch import logger
-from nmtpytorch.utils.misc import setup_experiment, load_pt_file
+from nmtpytorch.config import Options
+from nmtpytorch.utils.misc import setup_experiment, fix_seed
 from nmtpytorch.utils.gpu import GPUManager
-from nmtpytorch.translator import Translator
-from nmtpytorch import models
-from nmtpytorch.mainloop import MainLoop
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='nmtpy',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="nmtpy trains/resumes/translates a given "
+        description="nmtpy trains/translates/tests a given "
                     "configuration/checkpoint/snapshot",
         argument_default=argparse.SUPPRESS)
 
@@ -40,17 +33,12 @@ if __name__ == '__main__':
                               help="Optional experiment suffix.")
     parser_train.add_argument('-S', '--short', action='store_true',
                               help="Use short experiment id in filenames.")
-    parser_train.add_argument('-p', '--pretrained', type=str, default=None,
-                              help=".ckpt file for model initialization")
     parser_train.add_argument('overrides', nargs="*", default=[],
                               help="(section).key:value overrides for config")
 
-    # resume command
-    parser_resume = subparsers.add_parser('resume', help='resume help')
-    parser_resume.add_argument('checkpoint', type=str,
-                               help="Checkpoint (.ckpt) file for resuming")
-
+    ###################
     # translate command
+    ###################
     parser_trans = subparsers.add_parser('translate', help='translate help')
     parser_trans.add_argument('-n', '--disable-filters', action='store_true',
                               help='Disable eval_filters given in config')
@@ -60,10 +48,8 @@ if __name__ == '__main__':
                               help='Beam size for beam-search')
     parser_trans.add_argument('-m', '--max-len', type=int, default=200,
                               help='Maximum seq. limit (Default: 200)')
-    parser_trans.add_argument('-p', '--avoid-double', action='store_true',
-                              help='Suppress previous token probs')
-    parser_trans.add_argument('-u', '--avoid-unk', action='store_true',
-                              help='Suppress <unk> generation')
+    parser_trans.add_argument('-a', '--lp-alpha', type=float, default=0.,
+                              help='Apply length-penalty (Default: 0.)')
     parser_trans.add_argument('-d', '--device-id', type=str, default='auto_1',
                               help='Select GPU device(s)')
     parser_trans.add_argument('models', type=str, nargs='+',
@@ -79,6 +65,23 @@ if __name__ == '__main__':
     parser_trans.add_argument('-o', '--output', type=str, required=True,
                               help='Output filename prefix')
 
+    ##############
+    # test command
+    ##############
+    parser_test = subparsers.add_parser('test', help='test help')
+    parser_test.add_argument('-b', '--batch-size', type=int, default=64,
+                              help='Batch size for beam-search')
+    parser_test.add_argument('-d', '--device-id', type=str, default='auto_1',
+                              help='Select GPU device(s)')
+    parser_test.add_argument('models', type=str, nargs='+',
+                              help="Saved model/checkpoint file(s)")
+
+    group = parser_test.add_mutually_exclusive_group(required=True)
+    group.add_argument('-s', '--splits', type=str,
+                       help='Comma separated splits from config file')
+    group.add_argument('-S', '--source', type=str,
+                       help='Comma-separated key:value pairs to provide new inputs.')
+
     # Parse command-line arguments first
     args = parser.parse_args()
     if args.cmd is None:
@@ -93,35 +96,45 @@ if __name__ == '__main__':
         # Setup experiment folders
         setup_experiment(opts, args.suffix, args.short)
 
-        weights, history = None, None
-        if args.pretrained:
-            weights, _, _ = load_pt_file(args.pretrained)
-            opts.train['pretrained'] = args.pretrained
-
-    elif args.cmd == 'resume':
-        # Load everything to CPU without messing with storage tags
-        weights, history, opts = load_pt_file(args.checkpoint)
-        opts = Options.from_dict(opts)
-
     # Detect device_id
-    device_id = (opts.train['device_id'] if args.cmd != 'translate' else
-                 args.device_id)
+    device_id = (opts.train['device_id'] if args.cmd not in
+                 ('test', 'translate') else args.device_id)
 
     # Reserve GPUs
     gpu_devs = GPUManager()(device_id, strict=True)
     assert len(gpu_devs) == 1, "Multi-GPU mode not implemented yet."
 
-    #######################
     # translate entry point
-    #######################
     if args.cmd == 'translate':
-        Translator(**args.__dict__)()
+        from nmtpytorch.translator import Translator
+        fix_seed(1234)
+        del args.__dict__['cmd']
+        translator = Translator(**args.__dict__)
+        translator()
+        sys.exit(0)
+    # test entry point
+    elif args.cmd == 'test':
+        from nmtpytorch.tester import Tester
+        fix_seed(1234)
+        del args.__dict__['cmd']
+        tester = Tester(**args.__dict__)
+        tester()
         sys.exit(0)
 
     #################################
     # Training / Resuming entry point
     #################################
+    import torch
+    import platform
+    from nmtpytorch import models
+    from nmtpytorch.mainloop import MainLoop
     log = logger.setup(opts.train, args.cmd)
+
+    # If given, seed that; if not generate a random seed and print it
+    if opts.train['seed'] > 0:
+        seed = fix_seed(opts.train['seed'])
+    else:
+        opts.train['seed'] = fix_seed()
 
     # Be verbose and fire the loop!
     opts.info(log)
@@ -129,14 +142,11 @@ if __name__ == '__main__':
     # Instantiate the model object
     model = getattr(models, opts.train['model_type'])(opts=opts, logger=log)
 
-    if opts.train['seed'] != 0:
-        np.random.seed(opts.train['seed'])
-        torch.manual_seed(opts.train['seed'])
-
     log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
         torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
+    log.info("Seed for further reproducibility: {}".format(opts.train['seed']))
     if 'SLURM_JOB_ID' in os.environ:
         log.info("SLURM Job ID: {}".format(os.environ['SLURM_JOB_ID']))
-    loop = MainLoop(model, log, opts.train, history, weights, mode=args.cmd)
+    loop = MainLoop(model, log, opts.train)
     loop()
     sys.exit(0)
