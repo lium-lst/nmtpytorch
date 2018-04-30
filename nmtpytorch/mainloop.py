@@ -1,27 +1,24 @@
 # -*- coding: utf-8 -*-
 import time
 
-import numpy as np
-
-from .metrics import Metric
 from .evaluator import Evaluator
 from .optimizer import Optimizer
 from .monitor import Monitor
-from .utils.misc import get_n_params
+from .utils.misc import get_module_groups
+from .utils.misc import load_pt_file, fix_seed
+from .utils.ml_metrics import Loss
 from .utils.data import to_var
 from .utils.tensorboard import TensorBoard
 from .search import beam_search
 
 
 class MainLoop(object):
-    def __init__(self, model, logger, train_opts,
-                 history=None, weights=None, mode='train'):
+    def __init__(self, model, logger, train_opts, history=None, mode='train'):
         # Get all training options into this mainloop
         self.__dict__.update(train_opts)
 
         self.print = logger.info
         self.model = model
-        self.mode = mode    # (train|resume)
         self.epoch_valid = (self.eval_freq == 0)
 
         # Load training and validation data & create iterators
@@ -43,10 +40,11 @@ class MainLoop(object):
             self.model.load_data('val')
             val_set = self.model.datasets['val']
             if 'LOSS' in self.monitor.eval_metrics:
-                self.vloss_iterator = val_set.get_iterator(self.batch_size)
-            if self.monitor.beam_metrics:
+                self.vloss_iterator = val_set.get_iterator(
+                    self.batch_size, inference=True)
+            if self.monitor.beam_metrics is not None:
                 self.beam_iterator = val_set.get_iterator(
-                    self.eval_batch_size, only_source=True)
+                    self.eval_batch_size, drop_targets=True, inference=True)
                 # Create hypothesis evaluator
                 self.evaluator = Evaluator(
                     self.model.val_refs, self.monitor.beam_metrics,
@@ -54,28 +52,42 @@ class MainLoop(object):
 
         # Setup model
         self.model.setup()
+        self.model.reset_parameters()
 
+        ################################################
+        # Initialize model weights with a pretrained one
         # This should come after model.setup()
-        if weights is not None:
-            self.print('Loading pretrained model weights')
-            # If not resuming -> pretrained weights may be partial
-            # so relax the strict condition.
-            model.load_state_dict(weights, strict=(self.mode == 'resume'))
+        ################################################
+        if train_opts['pretrained_file']:
+            # Relax the strict condition for partial initialization
+            weights, _, _ = load_pt_file(train_opts['pretrained_file'])
+            for name in get_module_groups(weights.keys()):
+                self.print(
+                    ' -> will initialize {}.* with pretrained weights.'.format(name))
+            model.load_state_dict(weights, strict=False)
+
+        ############################
+        # Freeze layers if requested
+        ############################
+        if train_opts['freeze_layers']:
+            frozen = []
+            for layer in train_opts['freeze_layers'].split(','):
+                for name, param in self.model.named_parameters():
+                    if name.startswith(layer):
+                        param.requires_grad = False
+                        frozen.append(name)
+
+            for name in get_module_groups(frozen):
+                self.print(' -> froze parameter {}.*'.format(name))
 
         # Move to cuda
         self.model.cuda()
-
-        # Print number of parameters
-        self.print(get_n_params(self.model))
-
-        # Reseed to retain the order of shuffle operations
-        if self.seed != 0:
-            np.random.seed(self.seed)
+        self.print(self.model)
 
         # Create optimizer instance
         self.optim = Optimizer(
-            self.optimizer, self.model, lr=self.lr,
-            weight_decay=self.l2_reg, gclip=self.gclip)
+            self.optimizer, self.model, lr=self.lr, momentum=self.momentum,
+            nesterov=self.nesterov, weight_decay=self.l2_reg, gclip=self.gclip)
         self.print(self.optim)
 
         # Create TensorBoard logger if possible and requested
@@ -83,15 +95,17 @@ class MainLoop(object):
                               self.exp_id, self.subfolder)
         self.print(self.tb)
 
+        # Shift-by-1 and reseed to reproduce batch orders independently
+        # from model initialization etc.
+        fix_seed(self.seed + 1)
+
     def train_epoch(self):
         """Trains a full epoch."""
         self.print('Starting Epoch {}'.format(self.monitor.ectr))
 
-        total_loss = 0.0
-        n_tokens_seen = 0
-
         nn_sec = 0.0
         eval_sec = 0.0
+        loss_meter = Loss()
         total_sec = time.time()
 
         for batch in self.train_iterator:
@@ -102,15 +116,14 @@ class MainLoop(object):
             # Reset gradients
             self.optim.zero_grad()
 
-            # Forward pass returns mean data loss
-            loss = self.model(to_var(batch))
-            batch_loss = loss.data.cpu()[0]
+            # Forward pass returns dict
+            out = self.model(to_var(batch))
+            loss_meter.update(out['loss'], out['n_items'])
 
-            # Get auxiliary loss if any
-            aux_loss = 0
-            if self.model.aux_loss is not None:
-                loss += self.model.aux_loss
-                aux_loss = self.model.aux_loss.data.cpu()[0]
+            # Normalize and sum with auxiliary multi-task losses
+            loss = out['loss'] / out['n_items']
+            if self.model.aux_loss:
+                loss += sum(list(self.model.aux_loss.values()))
 
             # Backward pass
             loss.backward()
@@ -122,18 +135,21 @@ class MainLoop(object):
             nn_sec += (time.time() - nn_start)
             #############################
 
-            total_loss += batch_loss * self.model.n_tokens
-            n_tokens_seen += self.model.n_tokens
-
             if self.monitor.uctr % self.disp_freq == 0:
-                self.print("Epoch {} - update {:10d} => loss: {:.3f} "
-                           "(aux_loss: {:.4f})".format(self.monitor.ectr,
-                                                       self.monitor.uctr,
-                                                       batch_loss,
-                                                       aux_loss))
-
                 # Send statistics
-                self.tb.log_scalar('train_LOSS', batch_loss, self.monitor.uctr)
+                self.tb.log_scalar(
+                    'train_LOSS', loss_meter.batch_loss, self.monitor.uctr)
+
+                msg = "Epoch {} - update {:10d} => loss: {:.3f}".format(
+                    self.monitor.ectr, self.monitor.uctr,
+                    loss_meter.batch_loss)
+                for key, value in self.model.aux_loss.items():
+                    val = value.data.cpu()[0]
+                    msg += ' [{}: {:.3f}]'.format(key, val)
+                    self.tb.log_scalar('train_' + key.upper(),
+                                       val, self.monitor.uctr)
+
+                self.print(msg)
 
             # Do validation?
             if (not self.epoch_valid and
@@ -159,10 +175,6 @@ class MainLoop(object):
                     self.max_iterations))
                 return False
 
-        # Compute epoch loss
-        epoch_loss = total_loss / n_tokens_seen
-        self.monitor.train_loss.append(epoch_loss)
-
         # All time spent for this epoch
         total_min = (time.time() - total_sec) / 60
         # All time spent during forward/backward/step
@@ -172,10 +184,14 @@ class MainLoop(object):
         # Rest is iteration overhead + checkpoint saving
         overhead_min = total_min - nn_min - eval_min
 
+        # Compute epoch loss
+        epoch_loss = loss_meter.get()
+        self.monitor.train_loss.append(epoch_loss)
+
         self.print("--> Epoch {} finished with mean loss {:.5f}".format(
             self.monitor.ectr, epoch_loss))
         self.print("--> Overhead/Training/Evaluation: {:.2f}/{:.2f}/{:.2f} "
-                   "mins (total: {:.2f} mins)   ({} sent/sec)".format(
+                   "mins (total: {:.2f} mins)   ({} samples/sec)".format(
                        overhead_min, nn_min, eval_min, total_min,
                        int(len(self.model.datasets['train']) / nn_sec)))
 
@@ -197,17 +213,15 @@ class MainLoop(object):
         self.monitor.vctr += 1
         self.model.train(False)
 
-        if 'LOSS' in self.monitor.eval_metrics:
-            # Compute validation loss and add it
-            val_loss = self.model.compute_loss(self.vloss_iterator)
-            results.append(Metric('LOSS', val_loss, higher_better=False))
+        # Collect simple validation stats first
+        results.extend(self.model.test_performance(self.vloss_iterator))
 
         if self.monitor.beam_metrics:
             self.print('Performing translation search (beam_size:{})'.format(
                 self.eval_beam))
             beam_time = time.time()
-            hyps = beam_search(self.model, self.beam_iterator,
-                               self.model.trg_vocab, beam_size=self.eval_beam)
+            hyps = beam_search([self.model], self.beam_iterator,
+                               beam_size=self.eval_beam)
             beam_time = time.time() - beam_time
 
             # Compute metrics and update results
