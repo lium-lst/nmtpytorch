@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import math
 import time
 from pathlib import Path
@@ -22,13 +23,11 @@ class Translator(object):
         # Store attributes directly. See bin/nmtpy for their list.
         self.__dict__.update(kwargs)
 
+        for key, value in kwargs.items():
+            self.logger.info('-- {} -> {}'.format(key, value))
+
         # How many models?
         self.n_models = len(self.models)
-
-        # Print some information
-        self.logger.info(
-            '{} model(s) - beam_size: {}, batch_size: {}, max_len: {}'.format(
-                self.n_models, self.beam_size, self.batch_size, self.max_len))
 
         # Store each model instance
         self.instances = []
@@ -40,8 +39,14 @@ class Translator(object):
             # Create model instance
             instance = getattr(models, opts.train['model_type'])(
                 opts=opts, logger=self.logger)
+
+            if not instance.supports_beam_search:
+                self.logger.error(
+                    "Model does not support beam search. Try 'nmtpy test'")
+                sys.exit(1)
+
             # Setup layers
-            instance.setup(reset_params=False)
+            instance.setup(is_train=False)
             # Load weights
             instance.load_state_dict(weights, strict=True)
             # Move to GPU
@@ -55,7 +60,6 @@ class Translator(object):
 
         # Setup post-processing filters
         eval_filters = self.instances[0].opts.train['eval_filters']
-        src_lang = self.instances[0].sl
 
         if self.disable_filters or not eval_filters:
             self.logger.info('Post-processing filters disabled.')
@@ -101,19 +105,19 @@ class Translator(object):
                 A list of optionally post-processed string hypotheses.
         """
 
-        # FIXME: Fetch first one for now
-        instance = self.instances[0]
+        # Load data
+        self.instances[0].load_data(split)
 
-        instance.load_data(split)
-        loader = instance.datasets[split].get_iterator(
-            self.batch_size, only_source=True)
+        # NOTE: Data iteration needs to be unique for ensembling
+        # otherwise it gets too complicated
+        loader = self.instances[0].datasets[split].get_iterator(
+            self.batch_size, drop_targets=True, inference=True)
 
         self.logger.info('Starting translation')
         start = time.time()
-        hyps = beam_search(instance, loader, instance.trg_vocab,
+        hyps = beam_search(self.instances, loader,
                            beam_size=self.beam_size, max_len=self.max_len,
-                           avoid_double=self.avoid_double,
-                           avoid_unk=self.avoid_unk)
+                           lp_alpha=self.lp_alpha)
         up_time = time.time() - start
         self.logger.info('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
@@ -126,11 +130,12 @@ class Translator(object):
         Arguments:
             hyps(list): A list of hypotheses.
         """
-        suffix = ".beam{}".format(self.beam_size)
-        if self.avoid_double:
-            suffix += ".nodbl"
-        if self.avoid_unk:
-            suffix += ".nounk"
+        suffix = ""
+        if self.lp_alpha > 0.:
+            suffix += ".lp_{:.1f}".format(self.lp_alpha)
+        if self.n_models > 1:
+            suffix += ".ens{}".format(self.n_models)
+        suffix += ".beam{}".format(self.beam_size)
 
         if split == 'new':
             output = "{}{}".format(self.output, suffix)
