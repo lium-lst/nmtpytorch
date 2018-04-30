@@ -30,10 +30,13 @@ class Optimizer(object):
         return list(
             filter(lambda p: p[1].requires_grad, model.named_parameters()))
 
-    def __init__(self, name, model, lr=0, weight_decay=0, gclip=0):
+    def __init__(self, name, model, lr=0, momentum=0.0,
+                 nesterov=False, weight_decay=0, gclip=0):
         self.name = name
         self.model = model
         self.lr = lr
+        self.momentum = momentum
+        self.nesterov = nesterov
         self.weight_decay = weight_decay
         self.gclip = gclip
 
@@ -41,6 +44,10 @@ class Optimizer(object):
         # If an explicit lr given, pass it to torch optimizer
         if self.lr > 0:
             self.optim_args['lr'] = self.lr
+
+        if self.name == 'sgd':
+            self.optim_args['momentum'] = self.momentum
+            self.optim_args['nesterov'] = self.nesterov
 
         # Get all parameters that require grads
         self.named_params = self.get_params(self.model)
@@ -88,6 +95,10 @@ class Optimizer(object):
         self.optim.step(closure)
 
     def __repr__(self):
-        s = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {})".format(
+        s = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {}".format(
             self.name, self.lr, self.weight_decay, self.gclip)
+        if self.name == 'sgd':
+            s += ', momentum: {}, nesterov: {}'.format(
+                self.momentum, self.nesterov)
+        s += ')'
         return s
