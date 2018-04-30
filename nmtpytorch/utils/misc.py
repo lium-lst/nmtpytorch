@@ -6,6 +6,7 @@ import lzma
 import time
 import random
 import pathlib
+import warnings
 import tempfile
 from hashlib import sha256
 
@@ -34,14 +35,24 @@ LANGUAGES = [
     'yo', 'za', 'zh', 'zu']
 
 
+def fix_seed(seed=None):
+    if seed is None:
+        seed = time.time()
+    seed = int(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    return seed
+
+
 def pbar(iterator, unit='it'):
     return tqdm(iterator, unit=unit, ncols=70, smoothing=0)
 
 
-def load_pt_file(fname):
+def load_pt_file(fname, device='cpu'):
     """Returns saved .(ck)pt file fields."""
     fname = str(pathlib.Path(fname).expanduser())
-    data = torch.load(fname, map_location=lambda storage, loc: storage)
+    data = torch.load(fname, map_location=device)
     if 'history' not in data:
         data['history'] = {}
     return data['model'], data['history'], data['opts']
@@ -49,8 +60,9 @@ def load_pt_file(fname):
 
 def get_language(fname):
     suffix = pathlib.Path(fname).suffix[1:]
-    assert suffix in LANGUAGES, \
-        "Can not detect language from {}.".format(fname)
+    if suffix not in LANGUAGES:
+        warnings.warn("Can not detect language from {}.".format(fname))
+        return None
     return suffix
 
 
@@ -104,7 +116,17 @@ def readable_size(n):
             fmt = sizes[i]
         else:
             break
-    return '%.1f%s' % (size, fmt)
+    return '%.2f%s' % (size, fmt)
+
+
+def get_module_groups(layer_names):
+    groups = set()
+    for name in layer_names:
+        if '.weight' in name:
+            groups.add(name.split('.weight')[0])
+        elif '.bias' in name:
+            groups.add(name.split('.bias')[0])
+    return sorted(list(groups))
 
 
 def get_n_params(module):
@@ -173,60 +195,54 @@ def setup_experiment(opts, suffix=None, short=False):
         if k.endswith("_dim"):
             names.append('%s%d' % (k.split('_')[0], mopts[k]))
 
-    # Join so far
-    name = '-'.join(names)
-
     # Append optimizer and learning rate
-    name += '-%s_%.e' % (opts.train['optimizer'], opts.train['lr'])
+    names.append('%s_%.e' % (opts.train['optimizer'], opts.train['lr']))
 
     if opts.train['l2_reg'] > 0:
-        name += "-l2_%.e" % opts.train['l2_reg']
+        names.append('l2_%.e' % opts.train['l2_reg'])
 
     # Dropout parameter names can be different for each model
     dropouts = sorted([opt for opt in mopts if opt.startswith('dropout')])
-    if len(dropouts) > 0:
-        for dout in dropouts:
-            _, layer = dout.split('_')
-            if mopts[dout] > 0:
-                name += "-do_%s_%.1f" % (layer, mopts[dout])
+    for dout in dropouts:
+        if mopts[dout] > 0:
+            parts = dout.split('_')
+            if len(parts) == 2:
+                names.append("do_%s_%.1f" % (parts[1], mopts[dout]))
+            else:
+                names.append("do%.1f" % mopts[dout])
 
     # If short names requested, we stop here
     if short:
+        name = "-".join(names)
         opts.train['exp_id'] = '%s-r%s' % (name, run_id)
         return
 
     # Continue with other stuff
     if 'att_type' in mopts:
-        name += '-att_{}'.format(mopts['att_type'])
+        names.append('att_{}'.format(mopts['att_type']))
 
     if 'fusion_type' in mopts:
-        name += '-ctx_{}'.format(mopts['fusion_type'])
+        names.append('ctx_{}'.format(mopts['fusion_type']))
 
     # Append batch size
-    name += '-bs%d' % opts.train['batch_size']
+    names.append('bs{}'.format(opts.train['batch_size']))
 
     # Validation stuff (first: early-stop metric)
-    name += '-%s' % opts.train['eval_metrics'].split(',')[0]
+    names.append(opts.train['eval_metrics'].split(',')[0])
 
     if opts.train['eval_freq'] > 0:
-        name += "-each%d" % opts.train['eval_freq']
+        names.append("each{}".format(opts.train['eval_freq']))
     else:
-        name += "-eachepoch"
+        names.append("eachepoch")
 
     # FIXME: We can't add everything to here so maybe we
     # need to let models to append their custom fields afterwards
     if mopts.get('tied_emb', False):
-        name += "-%stied" % mopts['tied_emb']
+        names.append("{}tied".format(mopts['tied_emb']))
 
     if mopts.get('dec_init', False):
-        name += "-init_{}".format(mopts['dec_init'].replace('_', ''))
-
-    if mopts.get('simple_output', False):
-        name += "-smpout"
-
-    # Append seed
-    name += "-s%d" % opts.train['seed']
+        names.append("di_{}".format(mopts['dec_init'].replace('_', '')))
 
     # Finalize
     opts.train['exp_id'] = '{}-{}-r{}'.format(
-        opts.train['model_type'].lower(), name, run_id)
+        opts.train['model_type'].lower(), "-".join(names), run_id)
