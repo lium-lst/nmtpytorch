@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
+from collections import defaultdict
 
 import torch
 
 from .utils.io import FileRotator
+from .metrics import beam_metrics
 
 
 class Monitor(object):
@@ -18,10 +19,10 @@ class Monitor(object):
         self.exp_id = exp_id
         self.model = model
         self.patience = patience
-        # From now on, metric names will propagate as upper-case
         self.eval_metrics = eval_metrics.upper().split(',')
         self.save_best_metrics = save_best_metrics
         self.checkpoints = FileRotator(n_checkpoints)
+        self.beam_metrics = None
 
         if history is None:
             history = {}
@@ -31,24 +32,19 @@ class Monitor(object):
         self.vctr = history.pop('vctr', 0)            # validation ctr
         self.early_bad = history.pop('early_bad', 0)  # earlystop patience
         self.train_loss = history.pop('train_loss', [])
-        self.val_scores = history.pop('val_scores', OrderedDict())
+        self.val_scores = history.pop('val_scores', defaultdict(list))
 
-        if len(self.eval_metrics) > 1:
+        if len(self.eval_metrics) > 0:
             # To keep current best metric validation id and score
             self.cur_bests = {}
 
-            # first one is early-stop metric
+            # First metric is considered to be early-stopping metric
             self.early_metric = self.eval_metrics[0]
 
-            # First metric is considered to be early-stopping metric
-            # Copy eval_metrics and remove 'loss'
-            self.beam_metrics = self.eval_metrics[:]
-            self.beam_metrics.remove('LOSS')
-
-            # Initialize with empty lists if not available
-            for metric in self.eval_metrics:
-                if metric not in self.val_scores:
-                    self.val_scores[metric] = []
+            # Get metrics requiring beam_search
+            bms = set(self.eval_metrics).intersection(beam_metrics)
+            if len(bms) > 0:
+                self.beam_metrics = list(bms)
 
     @staticmethod
     def best_score(scores):
@@ -132,7 +128,7 @@ class Monitor(object):
         # If requested, save all best metric snapshots
         if self.save_best_metrics and cur_bests:
             for (vctr, metric) in cur_bests.values():
-                if vctr == self.vctr:
+                if metric.name in self.eval_metrics and vctr == self.vctr:
                     self.save_model(metric=metric, do_symlink=True)
 
         self.print('Early stopping patience: {}'.format(
