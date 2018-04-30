@@ -70,11 +70,11 @@ class Vocabulary(object):
 
         return tidxs
 
-    def idxs_to_sent(self, idxs):
+    def idxs_to_sent(self, idxs, debug=False):
         """Convert integer hypothesis to string."""
         result = []
         for idx in idxs:
-            if idx == self.TOKENS["<eos>"]:
+            if not debug and idx == self.TOKENS["<eos>"]:
                 break
             result.append(self._imap.get(idx, self.TOKENS["<unk>"]))
 
