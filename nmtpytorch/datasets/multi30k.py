@@ -9,9 +9,22 @@ from torch.utils.data.sampler import SequentialSampler
 from ..config import FLOAT
 from ..samplers import BucketBatchSampler
 from ..utils.data import read_sentences, CircularNDArray
-from .collate import get_collate_v1
-from ..utils.nn import normalize_images
+from .collate import get_collate
 from ..utils.misc import fopen
+
+
+def normalize_images(x):
+    """Normalizes images in-place w.r.t ImageNet statistics."""
+    mean = np.array([0.485, 0.456, 0.406], dtype=FLOAT)
+    std = np.array([0.229, 0.224, 0.225], dtype=FLOAT)
+
+    # Scale range
+    x /= 255.
+
+    # Normalize
+    x -= mean[None, :, None, None]
+    x /= std[None, :, None, None]
+    return x
 
 
 class Multi30kDataset(Dataset):
@@ -128,15 +141,15 @@ class Multi30kDataset(Dataset):
         # Dataset size is determined by the largest number of samples
         self.size = max(self.n_sentences, self.n_images)
 
-    def get_iterator(self, batch_size, only_source=False):
+    def get_iterator(self, batch_size, translation=False):
         """Returns a DataLoader instance with or without target data."""
-        if only_source:
+        if translation:
             # Translation mode, ordered Sampler
             sampler = SequentialSampler(self)
             data_loader = DataLoader(
                 self, sampler=sampler,
                 shuffle=False, batch_size=batch_size,
-                collate_fn=get_collate_v1(self.topo.get_src_langs()))
+                collate_fn=get_collate(self.topo.get_src_langs()))
 
         else:
             # Training + val loss mode, Sequence-length ordered sampler
@@ -144,7 +157,7 @@ class Multi30kDataset(Dataset):
                                          batch_size=batch_size)
             data_loader = DataLoader(
                 self, batch_sampler=sampler,
-                collate_fn=get_collate_v1(self.data.keys()))
+                collate_fn=get_collate(self.data.keys()))
 
         return data_loader
 

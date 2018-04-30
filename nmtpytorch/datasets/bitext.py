@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
-
 from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.sampler import SequentialSampler
 
 from ..samplers import BucketBatchSampler
 from ..utils.data import read_sentences
-from .collate import get_collate_v1
+from .collate import get_collate
 
 
 class BitextDataset(Dataset):
     r"""A PyTorch dataset for parallel corpora."""
     def __init__(self, split, data_dict, vocabs, topology,
-                 max_trg_len=None):
+                 max_trg_len=None, trg_bos=True):
         self.data = {}
         self.lens = {}
         self.split = '%s_set' % split
@@ -21,6 +18,7 @@ class BitextDataset(Dataset):
         self.topo = topology
         self.n_sentences = 0
         self.max_trg_len = max_trg_len
+        self.trg_bos = trg_bos
 
         src_langs = self.topo.get_src_langs()
         trg_langs = self.topo.get_trg_langs()
@@ -62,7 +60,7 @@ class BitextDataset(Dataset):
                 raise RuntimeError("Multiple source files not supported.")
 
             self.data[self.tl], self.lens[self.tl] = \
-                read_sentences(fnames[0], self.trg_vocab, bos=True)
+                read_sentences(fnames[0], self.trg_vocab, bos=self.trg_bos)
 
             assert len(self.data[self.tl]) == len(self.data[self.sl]), \
                 "Number of sentences on both sides differ!"
@@ -70,33 +68,36 @@ class BitextDataset(Dataset):
         # Set keys that will be used by getitem to traverse dataset
         self.data_keys = sorted(list(self.data.keys()))
 
-    def get_iterator(self, batch_size, only_source=False):
-        """Returns a DataLoader instance with or without target data."""
-        if only_source:
-            # Ordered Sampler, translation mode
-            sampler = SequentialSampler(self)
-            data_loader = DataLoader(
-                self, sampler=sampler, shuffle=False, batch_size=batch_size,
-                collate_fn=get_collate_v1(self.topo.get_src_langs()))
+    def get_iterator(self, batch_size, drop_targets=False, inference=False):
+        """Returns a DataLoader instance with or without target data.
 
-        else:
-            # Training or val perplexity mode, sequence-length ordered sampler
-            sampler = BucketBatchSampler(self.lens[self.tl],
-                                         batch_size=batch_size,
-                                         max_len=self.max_trg_len)
-            data_loader = DataLoader(
-                self, batch_sampler=sampler,
-                collate_fn=get_collate_v1(self.data.keys()))
-
-        return data_loader
+        Arguments:
+            batch_size (int): (Maximum) number of elements in a batch.
+            drop_targets (bool, optional): If `True`, batches will not contain
+                target-side data even that's available through configuration.
+            inference (bool, optional): If `True`, batches will be sorted
+                w.r.t source lengths instead of target lengths
+                for beam-search efficiency. If `drop_targets` is `True`,
+                this is implied as well.
+        """
+        sort_key = self.sl if (inference or drop_targets) else self.tl
+        keys = self.topo.get_src_langs() if drop_targets else self.data.keys()
+        # Create sequence-length ordered sampler
+        sampler = BucketBatchSampler(
+            self.lens[sort_key],
+            batch_size=batch_size,
+            max_len=self.max_trg_len,
+            store_indices=inference)
+        return DataLoader(self, batch_sampler=sampler,
+                          collate_fn=get_collate(keys))
 
     def __getitem__(self, idx):
-        return OrderedDict([(k, self.data[k][idx]) for k in self.data_keys])
+        return {k: self.data[k][idx] for k in self.data_keys}
 
     def __len__(self):
         return self.size
 
     def __repr__(self):
-        return " [{} {}] ({} - {} samples)".format(
+        return "[{} {}] ({} - {} samples)".format(
             self.__class__.__name__, self.split,
             self.topo.direction, self.__len__())
