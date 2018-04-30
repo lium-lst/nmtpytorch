@@ -78,6 +78,6 @@ if __name__ == '__main__':
             if args.write:
                 with open("%s.score" % hypfile, 'w') as f:
                     f.write("%s\n" % result)
-            results[pathlib.Path(hypfile).name] = result
+            results[str(pathlib.Path(hypfile))] = result
 
     print_table(results)
