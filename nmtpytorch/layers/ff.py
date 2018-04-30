@@ -13,6 +13,7 @@ class FF(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.bias_zero = bias_zero
+        self.activ_type = activ if activ else 'linear'
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
 
         if bias:
@@ -42,4 +43,5 @@ class FF(nn.Module):
     def __repr__(self):
         return self.__class__.__name__ + '(' \
             + 'in_features=' + str(self.in_features) \
-            + ', out_features=' + str(self.out_features) + ')'
+            + ', out_features=' + str(self.out_features) \
+            + ', activ=' + str(self.activ_type) + ')'
