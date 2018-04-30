@@ -148,8 +148,6 @@ optional arguments:
                         Beam size for beam-search
   -m MAX_LEN, --max-len MAX_LEN
                         Maximum sequence length
-  -p, --avoid-double    Suppress previous token probs
-  -u, --avoid-unk       Suppress <unk> generation
   -d DEVICE, --device DEVICE
                         Select GPU device(s)
   -e, --ensemble        Enable ensembling for multiple models.
