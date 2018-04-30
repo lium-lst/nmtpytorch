@@ -1,40 +1,75 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-
-from ..config import FLOAT
+from torch.nn import Module
 
 
-def set_learnable(module, value=False, layer_names=''):
-    """Disables updating the weights of CNN to use it as feature extractor."""
-    # Can be empty or not
-    layer_names = tuple(layer_names.split(','))
-
-    for name, param in module.named_parameters():
-        if any(layer_names):
-            if name.startswith(layer_names):
-                param.requires_grad = value
-        else:
-            param.requires_grad = value
+def get_rnn_hidden_state(h):
+    """Returns h_t transparently regardless of RNN type."""
+    return h if not isinstance(h, tuple) else h[0]
 
 
-def tile_ctx_dict(ctx_dict, idxs):
-    """Returns dict of 3D tensors repeatedly indexed along the sample axis."""
-    # 1st: tensor, 2nd optional mask
-    return {
-        k: (tensor[:, idxs], None if mask is None else mask[:, idxs])
-        for k, (tensor, mask) in ctx_dict.items()
-    }
+# Taken from:
+# https://github.com/pytorch/pytorch/pull/5297/files
+class ModuleDict(Module):
+    r"""Holds submodules in a dict.
+    ModuleDict can be indexed like a regular Python dict, but modules it contains
+    as values are properly registered, and will be visible by all Module methods.
+    Arguments:
+        modules (dict, optional): a dict of keys : modules to add
+    Example::
+        class TwoHeadedNet(nn.Module):
+            def __init__(self):
+                super(MyModule, self).__init__()
+                self.shared_backbone = nn.Linear(10, 10)
+                self.heads = nn.ModuleDict({
+                    'task1' : nn.Linear(10, 5),
+                    'task2' : nn.Linear(10, 10),
+                })
+            def forward(self, x, task_name):
+                # takes an extra `task_name` argument to determine
+                # which head of the network to use
+                assert task_name in ['task1', 'task2']
+                x = self.shared_backbone(x)
+                x = self.heads[task_name](x)
+                return x
+    """
 
+    def __init__(self, modules=None):
+        super(ModuleDict, self).__init__()
+        if modules is not None:
+            self.update(modules)
 
-def normalize_images(x):
-    """Normalizes images in-place w.r.t ImageNet statistics."""
-    mean = np.array([0.485, 0.456, 0.406], dtype=FLOAT)
-    std = np.array([0.229, 0.224, 0.225], dtype=FLOAT)
+    def __getitem__(self, key):
+        return self._modules[key]
 
-    # Scale range
-    x /= 255.
+    def __setitem__(self, key, module):
+        return setattr(self, key, module)
 
-    # Normalize
-    x -= mean[None, :, None, None]
-    x /= std[None, :, None, None]
-    return x
+    def __len__(self):
+        return len(self._modules)
+
+    def __iter__(self):
+        return iter(self._modules)
+
+    def keys(self):
+        return self._modules.keys()
+
+    def items(self):
+        return self._modules.items()
+
+    def values(self):
+        return self._modules.values()
+
+    def get(self, key, default=None):
+        return self._modules.get(key, default)
+
+    def update(self, modules):
+        r"""Updates modules from a Python dict.
+        Arguments:
+            modules (dict): dict of modules to append
+        """
+        if not isinstance(modules, dict):
+            raise TypeError("ModuleDict.update should be called with a "
+                            "dict, but got " + type(modules).__name__)
+        for key, module in modules.items():
+            self.add_module(key, module)
+        return self
