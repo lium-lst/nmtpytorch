@@ -113,7 +113,7 @@ three subcommands `train`, `translate` and `test`.
 **`nmtpy train`**
 
 ```
-usage: nmtpy train [-h] -C CONFIG [-s SUFFIX] [overrides [overrides ...]]
+usage: nmtpy train [-h] -C CONFIG [-s SUFFIX] [-S] [overrides [overrides ...]]
 
 positional arguments:
   overrides             (section).key:value overrides for config
@@ -124,13 +124,14 @@ optional arguments:
                         Experiment configuration file
   -s SUFFIX, --suffix SUFFIX
                         Optional experiment suffix.
-
+  -S, --short           Use short experiment id in filenames.
 ```
 
 **`nmtpy translate`**
 ```
-usage: nmtpy translate [-h] [-n] -s SPLITS [-b BATCH_SIZE] [-k BEAM_SIZE]
-                       [-m MAX_LEN] [-p] [-u] [-d DEVICE] [-e]
+usage: nmtpy translate [-h] [-n] [-b BATCH_SIZE] [-k BEAM_SIZE] [-m MAX_LEN]
+                       [-a LP_ALPHA] [-d DEVICE_ID] (-s SPLITS | -S SOURCE) -o
+                       OUTPUT
                        models [models ...]
 
 positional arguments:
@@ -139,18 +140,23 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -n, --disable-filters
-                        Disable text filters given in config.
-  -s SPLITS, --splits SPLITS
-                        Comma separated splits to translate
+                        Disable eval_filters given in config
   -b BATCH_SIZE, --batch-size BATCH_SIZE
                         Batch size for beam-search
   -k BEAM_SIZE, --beam-size BEAM_SIZE
                         Beam size for beam-search
   -m MAX_LEN, --max-len MAX_LEN
-                        Maximum sequence length
-  -d DEVICE, --device DEVICE
+                        Maximum seq. limit (Default: 200)
+  -a LP_ALPHA, --lp-alpha LP_ALPHA
+                        Apply length-penalty (Default: 0.)
+  -d DEVICE_ID, --device-id DEVICE_ID
                         Select GPU device(s)
-  -e, --ensemble        Enable ensembling for multiple models.
+  -s SPLITS, --splits SPLITS
+                        Comma separated splits from config file
+  -S SOURCE, --source SOURCE
+                        Comma-separated key:value pairs to provide new inputs.
+  -o OUTPUT, --output OUTPUT
+                        Output filename prefix
 ```
 
 #### Experiment Configuration
