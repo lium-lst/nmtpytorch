@@ -7,3 +7,4 @@ from .text_encoder import TextEncoder
 from .cond_decoder import ConditionalDecoder
 from .condmm_decoder import ConditionalMMDecoder
 from .simplegru_decoder import SimpleGRUDecoder
+from .xu_decoder import XuDecoder
