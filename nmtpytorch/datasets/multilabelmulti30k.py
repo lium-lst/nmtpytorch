@@ -6,7 +6,6 @@ from . import MultiParallelDataset
 from .collate import get_collate
 
 
-
 class MultiLabelMulti30kDataset(object):
     """Returns a Dataset for multi-label Multi30k using raw JPG images.
 

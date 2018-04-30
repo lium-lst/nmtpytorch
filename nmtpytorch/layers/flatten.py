@@ -1,5 +1,6 @@
 import torch
 
+
 class Flatten(torch.nn.Module):
     """A flatten module to squeeze single dimensions."""
     def __init__(self):

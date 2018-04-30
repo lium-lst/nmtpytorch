@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..utils.data import to_var
-from ..utils.nn import get_rnn_hidden_state
 from . import FF, Attention
 
 
@@ -87,8 +86,8 @@ class SimpleGRUDecoder(nn.Module):
 
         elif self.dec_init == 'mean':
             h_0 = self.ff_dec_init(
-                ctx.sum(0).div(ctx_mask.unsqueeze(-1).sum(0)) \
-                        if ctx_mask is not None else ctx.mean(0))
+                ctx.sum(0).div(ctx_mask.unsqueeze(-1).sum(0))
+                if ctx_mask is not None else ctx.mean(0))
         elif self.dec_init == 'max':
             h_0 = self.ff_dec_init(ctx.max(0)[0])
         elif self.dec_init == 'last':

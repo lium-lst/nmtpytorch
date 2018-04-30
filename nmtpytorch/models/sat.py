@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from ..layers import ImageEncoder, XuDecoder
-from ..vocabulary import Vocabulary
-from ..utils.topology import Topology
 
 from ..datasets import Multi30kRawDataset
 

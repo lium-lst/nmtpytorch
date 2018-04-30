@@ -62,7 +62,7 @@ class Tester(object):
     def test(self, instance, split):
         instance.load_data(split)
         loader = instance.datasets[split].get_iterator(
-                self.batch_size, inference=True)
+            self.batch_size, inference=True)
 
         self.logger.info('Starting computation')
         start = time.time()

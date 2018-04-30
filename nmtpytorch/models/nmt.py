@@ -42,6 +42,7 @@ class NMT(nn.Module):
             'max_trg_len': 80,          # Reject sentences where target > 80
             'direction': None,          # Network directionality, i.e. en->de
         }
+
     def __init__(self, opts, logger=None):
         super().__init__()
         self.print = print if logger is None else logger.info

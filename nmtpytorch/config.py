@@ -16,7 +16,7 @@ TRAIN_DEFAULTS = {
     'device_id': 'auto_1',       # auto_N for automatic N gpus
                                  # 0,1,2 for manual N gpus
                                  # 0 for 0th (single) GPU
-    'seed': 0,                   # > 0: only if you want to reproduce a previous experiment!
+    'seed': 0,                   # > 0 if you want to reproduce a previous experiment
     'gclip': 5.,                 # Clip gradients above clip_c
     'l2_reg': 0.,                # L2 penalty factor
     'patience': 20,              # Early stopping patience
