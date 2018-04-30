@@ -1,115 +1,140 @@
 # -*- coding: utf-8 -*-
+import torch
 import torch.nn as nn
 
-from ..vocabulary import Vocabulary
-from ..layers import TextEncoder
-from ..layers import ConditionalDecoder
+from ..layers import TextEncoder, ConditionalDecoder
 from ..utils.data import to_var
+from ..utils.misc import get_n_params
+from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
-
+from ..utils.ml_metrics import MeanReciprocalRank, Loss
 from ..datasets import BitextDataset
+from ..metrics import Metric
 
 
 class NMT(nn.Module):
-    r"""A sequence-to-sequence NMT model.
+    supports_beam_search = True
 
-    Encoder RNN's will use CuDNN's optimized versions with packing and
-    padding. The decoder currently used is ConditionalDecoder which is a
-    Conditional GRU architecture unrolled manually.
-    """
+    def set_defaults(self):
+        self.defaults = {
+            'emb_dim': 128,             # Source and target embedding sizes
+            'emb_maxnorm': None,        # Normalize embeddings l2 norm to 1
+            'emb_gradscale': False,     # Scale embedding gradients w.r.t. batch frequency
+            'enc_dim': 256,             # Encoder hidden size
+            'enc_type': 'gru',          # Encoder type (gru|lstm)
+            'n_encoders': 1,            # Number of stacked encoders
+            'dec_dim': 256,             # Decoder hidden size
+            'dec_type': 'gru',          # Decoder type (gru|lstm)
+            'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx)
+            'trg_bos': 'emb',           # emb: Learn a <bos> and use it
+                                        # ctx: Source driven dynamic <bos>
+            'att_type': 'mlp',          # Attention type (mlp|dot)
+            'att_temp': 1.,             # Attention temperature
+            'att_activ': 'tanh',        # Attention non-linearity (all torch nonlins)
+            'att_mlp_bias': False,      # Enables bias in attention mechanism
+            'att_bottleneck': 'ctx',    # Bottleneck dimensionality (ctx|hid)
+            'att_transform_ctx': True,  # Transform annotations before attention
+            'dropout_emb': 0,           # Simple dropout to source embeddings
+            'dropout_ctx': 0,           # Simple dropout to source encodings
+            'dropout_out': 0,           # Simple dropout to decoder output
+            'dropout_enc': 0,           # Intra-encoder dropout if n_encoders > 1
+            'tied_emb': False,          # Share embeddings: (False|2way|3way)
+            'max_trg_len': 80,          # Reject sentences where target > 80
+            'direction': None,          # Network directionality, i.e. en->de
+        }
     def __init__(self, opts, logger=None):
-        """This should only be used for argument processing."""
         super().__init__()
+        self.print = print if logger is None else logger.info
 
-        self.aux_loss = None
-
-        self.vocabs = {}
-        self.datasets = {}
-        self.logger = logger
-        self.print = print if self.logger is None else self.logger.info
-
-        # Get a copy of model options coming from config
-        # Consume them with .pop(), integrating model defaults
-        # What is left inside kwargs -> Unused arguments
-        kwargs = opts.model.copy()
-
-        # Get direction and parse it
-        opts.model['direction'] = kwargs.pop('direction')
-        self.topology = Topology(opts.model['direction'])
-
-        # Load vocabularies here
-        for name, fname in opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, name=name)
-
-        self.sl = self.topology.get_src_langs()[0]
-        self.tl = self.topology.get_trg_langs()[0]
-
-        self.src_vocab = self.vocabs[self.sl]
-        self.trg_vocab = self.vocabs[self.tl]
-
-        self.n_src_vocab = len(self.src_vocab)
-        self.n_trg_vocab = len(self.trg_vocab)
-
-        opts.model['emb_dim'] = kwargs.pop('emb_dim', 256)
-        opts.model['enc_dim'] = kwargs.pop('enc_dim', 512)
-        opts.model['dec_dim'] = kwargs.pop('dec_dim', 1024)
-        opts.model['enc_type'] = kwargs.pop('enc_type', 'gru')
-        opts.model['dec_type'] = kwargs.pop('dec_type', 'gru')
-        opts.model['n_encoders'] = kwargs.pop('n_encoders', 1)
-
-        # How to initialize decoder (zero/mean_ctx)
-        opts.model['dec_init'] = kwargs.pop('dec_init', 'mean_ctx')
-        opts.model['att_type'] = kwargs.pop('att_type', 'mlp')
-
-        # Various dropouts
-        opts.model['dropout_emb'] = kwargs.pop('dropout_emb', 0.)
-        opts.model['dropout_ctx'] = kwargs.pop('dropout_ctx', 0.)
-        opts.model['dropout_out'] = kwargs.pop('dropout_out', 0.)
-        opts.model['dropout_enc'] = kwargs.pop('dropout_enc', 0.)
-
-        # Tie embeddings: False/2way/3way
-        opts.model['tied_emb'] = kwargs.pop('tied_emb', False)
-
-        # Filter out sentence pairs where target >= 80 tokens
-        opts.model['max_trg_len'] = kwargs.pop('max_trg_len', 80)
-
-        # Sanity check after consuming all arguments
-        if len(kwargs) > 0:
-            self.print('Unused model args: {}'.format(','.join(kwargs.keys())))
-
-        # Check vocabulary sizes for 3way tying
-        if opts.model['tied_emb'] == '3way':
-            assert self.n_src_vocab == self.n.trg_vocab, \
-                "The vocabulary sizes do not match for 3way tied embeddings."
-
-        # Context size is always equal to encoder hidden dim * 2 since
-        # it is the concatenation of forward and backward hidden states
-        self.ctx_size = opts.model['enc_dim'] * 2
-
-        # Set some shortcuts
+        # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
 
+        # Vocabulary objects
+        self.vocabs = {}
+
+        # Each split will have a dataset
+        self.datasets = {}
+
+        # Each auxiliary loss should be stored inside this dictionary
+        # in order to be taken into account by the mainloop for multi-tasking
+        self.aux_loss = {}
+
+        # Setup options
+        self.opts.model = self.set_model_options(opts.model)
+
+        # Parse topology & languages
+        self.topology = Topology(self.opts.model['direction'])
+
+        # Load vocabularies here
+        for name, fname in self.opts.vocabulary.items():
+            self.vocabs[name] = Vocabulary(fname, name=name)
+
+        # Inherently non multi-lingual aware
+        slangs = self.topology.get_src_langs()
+        tlangs = self.topology.get_trg_langs()
+        if slangs:
+            self.sl = slangs[0]
+            self.src_vocab = self.vocabs[self.sl]
+            self.n_src_vocab = len(self.src_vocab)
+        if tlangs:
+            self.tl = tlangs[0]
+            self.trg_vocab = self.vocabs[self.tl]
+            self.n_trg_vocab = len(self.trg_vocab)
+
+        # Textual context size is always equal to enc_dim * 2 since
+        # it is the concatenation of forward and backward hidden states
+        if 'enc_dim' in self.opts.model:
+            self.ctx_sizes = {str(self.sl): self.opts.model['enc_dim'] * 2}
+
+        # Check vocabulary sizes for 3way tying
+        if self.opts.model['tied_emb'] == '3way':
+            assert self.n_src_vocab == self.n_trg_vocab, \
+                "The vocabulary sizes do not match for 3way tied embeddings."
+
         # Need to be set for early-stop evaluation
+        # NOTE: This should come from config or elsewhere
         self.val_refs = self.opts.data['val_set'][self.tl]
+
+    def __repr__(self):
+        s = super().__repr__() + '\n'
+        for vocab in self.vocabs.values():
+            s += "{}\n".format(vocab)
+        s += "{}\n".format(get_n_params(self))
+        return s
+
+    def set_model_options(self, model_opts):
+        self.set_defaults()
+        for opt, value in model_opts.items():
+            if opt in self.defaults:
+                # Override defaults from config
+                self.defaults[opt] = value
+            else:
+                self.print('Warning: unused model option: {}'.format(opt))
+        return self.defaults
 
     def reset_parameters(self):
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
                 nn.init.kaiming_normal(param.data)
 
-    def setup(self, reset_params=True):
+    def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
-        ################
-        # Create encoder
-        ################
-        self.enc = TextEncoder(input_size=self.opts.model['emb_dim'],
-                               hidden_size=self.opts.model['enc_dim'],
-                               n_vocab=self.n_src_vocab,
-                               rnn_type=self.opts.model['enc_type'],
-                               dropout_emb=self.opts.model['dropout_emb'],
-                               dropout_ctx=self.opts.model['dropout_ctx'],
-                               dropout_rnn=self.opts.model['dropout_enc'],
-                               num_layers=self.opts.model['n_encoders'])
+        ########################
+        # Create Textual Encoder
+        ########################
+        self.enc = TextEncoder(
+            input_size=self.opts.model['emb_dim'],
+            hidden_size=self.opts.model['enc_dim'],
+            n_vocab=self.n_src_vocab,
+            rnn_type=self.opts.model['enc_type'],
+            # this is necessary for `nmtpy test/translate`
+            src_sorted_batches=not is_train,
+            dropout_emb=self.opts.model['dropout_emb'],
+            dropout_ctx=self.opts.model['dropout_ctx'],
+            dropout_rnn=self.opts.model['dropout_enc'],
+            num_layers=self.opts.model['n_encoders'],
+            emb_maxnorm=self.opts.model['emb_maxnorm'],
+            emb_gradscale=self.opts.model['emb_gradscale'])
 
         ################
         # Create Decoder
@@ -117,53 +142,46 @@ class NMT(nn.Module):
         self.dec = ConditionalDecoder(
             input_size=self.opts.model['emb_dim'],
             hidden_size=self.opts.model['dec_dim'],
-            ctx_size=self.ctx_size,
             n_vocab=self.n_trg_vocab,
+            rnn_type=self.opts.model['dec_type'],
+            ctx_size_dict=self.ctx_sizes,
+            ctx_name=str(self.sl),
             tied_emb=self.opts.model['tied_emb'],
             dec_init=self.opts.model['dec_init'],
             att_type=self.opts.model['att_type'],
-            dropout_out=self.opts.model['dropout_out'])
+            att_temp=self.opts.model['att_temp'],
+            att_activ=self.opts.model['att_activ'],
+            transform_ctx=self.opts.model['att_transform_ctx'],
+            mlp_bias=self.opts.model['att_mlp_bias'],
+            att_bottleneck=self.opts.model['att_bottleneck'],
+            dropout_out=self.opts.model['dropout_out'],
+            emb_maxnorm=self.opts.model['emb_maxnorm'],
+            emb_gradscale=self.opts.model['emb_gradscale'])
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
 
-        if reset_params:
-            self.reset_parameters()
-
     def load_data(self, split):
         """Loads the requested dataset split."""
-        if split not in self.datasets:
-            # Only for training
-            max_trg_len = None
-            if split == 'train':
-                max_trg_len = self.opts.model['max_trg_len']
-            dataset = BitextDataset(split=split,
-                                    data_dict=self.opts.data,
-                                    vocabs=self.vocabs,
-                                    topology=self.topology,
-                                    max_trg_len=max_trg_len)
-            self.datasets[split] = dataset
-            self.print(dataset)
+        dataset = BitextDataset(
+            split=split, data_dict=self.opts.data, vocabs=self.vocabs,
+            topology=self.topology, trg_bos=self.opts.model['trg_bos'] == 'emb',
+            max_trg_len=self.opts.model['max_trg_len']
+            if split == 'train' else None)
+        self.datasets[split] = dataset
+        self.print(dataset)
 
-    def compute_loss(self, data_loader):
-        """Computes test set loss over the given DataLoader instance."""
-        total_loss = 0.0
-        n_tokens_seen = 0
+    def get_bos(self, batch_size):
+        """Returns a representation for <bos> embeddings for decoding."""
+        return torch.LongTensor(batch_size).fill_(self.trg_vocab['<bos>'])
 
-        for batch in data_loader:
-            loss = self.forward(to_var(batch, volatile=True))
-            total_loss += (loss * self.n_tokens)
-            n_tokens_seen += self.n_tokens
-
-        return total_loss.data.cpu()[0] / n_tokens_seen
-
-    def encode(self, data):
+    def encode(self, batch):
         """Encodes all inputs and returns a dictionary.
 
         Arguments:
-            data (dict): A batch of samples with keys designating the source
-                and target modalities.
+            batch (dict): A batch of samples with keys designating the
+                information sources.
 
         Returns:
             dict:
@@ -172,30 +190,35 @@ class NMT(nn.Module):
                 elements are encodings and masks. The mask can be ``None``
                 if the relevant modality does not require a mask.
         """
-        return {'txt': self.enc(data[self.sl])}
+        return {str(self.sl): self.enc(batch[self.sl])}
 
-    def forward(self, data):
+    def forward(self, batch):
         """Computes the forward-pass of the network and returns batch loss.
 
         Arguments:
-            data (dict): A batch of samples with keys designating the source
+            batch (dict): A batch of samples with keys designating the source
                 and target modalities.
 
         Returns:
             Variable:
                 A scalar loss normalized w.r.t batch size and token counts.
-
-        Note:
-            This method should assign the number of target tokens for which
-            the loss is computed inside ``self.n_tokens`` in order for the
-            ``MainLoop`` to correctly compute epoch loss.
         """
+        # Get loss dict
+        result = self.dec(self.encode(batch), batch[self.tl])
+        result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
+        return result
 
-        # Get all source encodings
-        ctx_dict = self.encode(data)
+    def test_performance(self, data_loader, dump_file=None):
+        """Computes test set loss over the given DataLoader instance."""
+        loss = Loss()
+        mrr = MeanReciprocalRank(self.n_trg_vocab)
 
-        # Save number of target tokens for loss normalization
-        self.n_tokens = data[self.tl][1:].numel()
+        for batch in data_loader:
+            out = self.forward(to_var(batch, volatile=True))
+            loss.update(out['loss'], out['n_items'])
+            mrr.update(batch[self.tl][1:].data, out['logps'])
 
-        # Get final loss as a sum
-        return self.dec(ctx_dict, data[self.tl]) / self.n_tokens
+        return [
+            Metric('LOSS', loss.get(), higher_better=False),
+            Metric('MRR', mrr.normalized_mrr(), higher_better=True),
+        ]
