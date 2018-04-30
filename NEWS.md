@@ -1,6 +1,6 @@
 ## Release Notes
 
-### v1.3 (dd/mm/2018)
+### v1.3 (30/04/2018)
 
  - Added `Multi30kRawDataset` for training end-to-end systems from raw images as input.
  - Added `NumpyDataset` to read `.npy/.npz` tensor files as input features.
@@ -9,6 +9,30 @@
  - `sacrebleu` is now a dependency as it is now accepted as an early-stopping metric.
  It only makes sense to use it with SPM processed files since they are detokenized
  once post-processed.
+ - Added `sklearn` as a dependency for some metrics.
+ - Added `momentum` and `nesterov` parameters to `[train]` section for SGD.
+ - `ImageEncoder` layer is improved in many ways. Please see the code for further details.
+ - Added unmerged upstream [PR](https://github.com/pytorch/pytorch/pull/5297/files) for `ModuleDict()` support.
+ - `METEOR` will now fallback to English if language can not be detected from file suffixes.
+ - `-f` now produces a separate numpy file for token frequencies when building vocabulary files with `nmtpy-build-vocab`.
+ - Added new command `nmtpy test` for non beam-search inference modes.
+ - Removed `nmtpy resume` command and added `pretrained_file` option for `[train]` to initialize model weights from a checkpoint.
+ - Added `freeze_layers` option for `[train]` to give comma-separated list of layer name prefixes to freeze.
+ - Improved seeding: seed is now printed in order to reproduce the results.
+ - Added IPython notebook for attention visualization.
+ - **Layers**
+  - New shallow `SimpleGRUDecoder` layer.
+  - `TextEncoder`: Ability to set `maxnorm` and `gradscale` of embeddings and work with or without sorted-length batches.
+  - `ConditionalDecoder`: Make it work with GRU/LSTM, allow setting `maxnorm/gradscale` for embeddings.
+  - `ConditionalMMDecoder`: Same as above.
+ - **nmtpy translate**
+  - `--avoid-double` and `--avoid-unk` removed for now.
+  - Added Google's length penalty normalization switch `--lp-alpha`.
+  - Added ensembling which is enabled automatically if you give more than 1 model checkpoints.
+ - New machine learning metric wrappers in `utils/ml_metrics.py`:
+  - Label-ranking average precision `lrap`
+  - Coverage error
+  - Mean reciprocal rank
 
 ### v1.2 (20/02/2018)
 
