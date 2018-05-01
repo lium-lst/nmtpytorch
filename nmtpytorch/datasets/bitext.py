@@ -75,16 +75,12 @@ class BitextDataset(Dataset):
             batch_size (int): (Maximum) number of elements in a batch.
             drop_targets (bool, optional): If `True`, batches will not contain
                 target-side data even that's available through configuration.
-            inference (bool, optional): If `True`, batches will be sorted
-                w.r.t source lengths instead of target lengths
-                for beam-search efficiency. If `drop_targets` is `True`,
-                this is implied as well.
+            inference (bool, optional): Should be `True` when doing beam-search.
         """
-        sort_key = self.sl if (inference or drop_targets) else self.tl
         keys = self.topo.get_src_langs() if drop_targets else self.data.keys()
         # Create sequence-length ordered sampler
         sampler = BucketBatchSampler(
-            self.lens[sort_key],
+            self.lens[self.sl],
             batch_size=batch_size,
             max_len=self.max_trg_len,
             store_indices=inference)

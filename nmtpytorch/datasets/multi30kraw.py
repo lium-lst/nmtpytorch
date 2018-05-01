@@ -66,23 +66,22 @@ class Multi30kRawDataset(object):
             trg_datasets={v: data[k] for k, v in self.topology.trgs.items()},
         )
 
-    def get_iterator(self, batch_size, drop_targets=False, inference=False):
-        """Returns a DataLoader instance with or without target data.
+        # Sort by source-length by default
+        if self.lens[0] is not None:
+            self.lengths = self.lens[0]
+        elif self.lens[1] is not None:
+            self.lengths = self.lens[1]
+        else:
+            self.lengths = None
 
-        Arguments:
-            batch_size (int): (Maximum) number of elements in a batch.
-            drop_targets (bool, optional): If `True`, batches will not contain
-                target-side data even that's available through configuration.
-            inference (bool, optional): If `True`, batches will be sorted
-                w.r.t source lengths instead of target lengths
-                for beam-search efficiency. If `drop_targets` is `True`,
-                this is implied as well.
-        """
+    def get_iterator(self, batch_size, drop_targets=False, inference=False):
+        """Returns a DataLoader instance with or without target data. See
+        bitext.py for further documentation."""
         keys = self.dataset.sources if drop_targets else self.dataset.data_sources
-        sort_by = self.lens[0] if inference or drop_targets else self.lens[1]
-        if sort_by is not None:
+
+        if self.lengths is not None:
             sampler = BucketBatchSampler(
-                sort_by, batch_size=batch_size, store_indices=inference)
+                self.lengths, batch_size=batch_size, store_indices=inference)
         else:
             sampler = BatchSampler(
                 SequentialSampler(self.dataset),
