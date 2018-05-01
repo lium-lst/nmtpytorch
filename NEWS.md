@@ -1,5 +1,11 @@
 ## Release Notes
 
+### v1.3.1 (01/05/2018)
+
+  - Removed old `Multi30kDataset`.
+  - Sort batches by source sequence length instead of target.
+  - Fix `ShowAttendAndTell` model. It should now work.
+
 ### v1.3 (30/04/2018)
 
  - Added `Multi30kRawDataset` for training end-to-end systems from raw images as input.
