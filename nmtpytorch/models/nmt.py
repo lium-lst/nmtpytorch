@@ -128,8 +128,7 @@ class NMT(nn.Module):
             hidden_size=self.opts.model['enc_dim'],
             n_vocab=self.n_src_vocab,
             rnn_type=self.opts.model['enc_type'],
-            # this is necessary for `nmtpy test/translate`
-            src_sorted_batches=not is_train,
+            src_sorted_batches=True,
             dropout_emb=self.opts.model['dropout_emb'],
             dropout_ctx=self.opts.model['dropout_ctx'],
             dropout_rnn=self.opts.model['dropout_enc'],
