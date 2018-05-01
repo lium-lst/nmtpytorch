@@ -14,9 +14,9 @@ class Attention(nn.Module):
         self.activ = getattr(F, att_activ)
         self.ctx_dim = ctx_dim
         self.hid_dim = hid_dim
-        self.att_type = att_type
-        self.temp = temp
         self._ctx2hid = ctx2hid
+        self.temperature = temp
+        self.att_type = att_type
 
         # The common dimensionality for inner formulation
         if isinstance(att_bottleneck, int):
@@ -86,7 +86,7 @@ class Attention(nn.Module):
     def _dot_scores(self, ctx_, hid_):
         # shuffle dims to prepare for batch mat-mult
         return torch.bmm(hid_.permute(1, 0, 2), ctx_.permute(1, 2, 0)).div(
-            self.temp).squeeze(1).t()
+            self.temperature).squeeze(1).t()
 
     def _mlp_scores(self, ctx_, hid_):
-        return self.mlp(self.activ(ctx_ + hid_)).div(self.temp).squeeze(-1)
+        return self.mlp(self.activ(ctx_ + hid_)).div(self.temperature).squeeze(-1)
