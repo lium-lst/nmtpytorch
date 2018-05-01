@@ -13,7 +13,7 @@ class XuDecoder(nn.Module):
     def __init__(self, input_size, hidden_size, ctx_size_dict, ctx_name, n_vocab,
                  rnn_type, tied_emb=False, dec_init='zero', att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx',
-                 transform_ctx=True, mlp_bias=False, dropout=0,
+                 transform_ctx=True, mlp_bias=True, dropout=0,
                  emb_maxnorm=None, emb_gradscale=False, att_temp=1.0,
                  selector=False, prev2out=True, ctx2out=True):
         super().__init__()
@@ -43,25 +43,25 @@ class XuDecoder(nn.Module):
         self._init_func = getattr(self, '_rnn_init_{}'.format(dec_init))
 
         # Other arguments
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.ctx_size_dict = ctx_size_dict
-        self.ctx_name = ctx_name
         self.n_vocab = n_vocab
+        self.dropout = dropout
+        self.ctx2out = ctx2out
+        self.selector = selector
+        self.prev2out = prev2out
         self.tied_emb = tied_emb
         self.dec_init = dec_init
         self.att_type = att_type
-        self.att_bottleneck = att_bottleneck
-        self.att_activ = att_activ
-        self.att_temp = att_temp
-        self.transform_ctx = transform_ctx
+        self.ctx_name = ctx_name
         self.mlp_bias = mlp_bias
-        self.dropout = dropout
+        self.att_temp = att_temp
+        self.att_activ = att_activ
+        self.input_size = input_size
+        self.hidden_size = hidden_size
         self.emb_maxnorm = emb_maxnorm
         self.emb_gradscale = emb_gradscale
-        self.selector = selector
-        self.prev2out = prev2out
-        self.ctx2out = ctx2out
+        self.transform_ctx = transform_ctx
+        self.ctx_size_dict = ctx_size_dict
+        self.att_bottleneck = att_bottleneck
 
         # Create target embeddings
         self.emb = nn.Embedding(self.n_vocab, self.input_size,
@@ -83,19 +83,9 @@ class XuDecoder(nn.Module):
                 self.ctx_size_dict[self.ctx_name],
                 self.hidden_size * self.n_states, activ='tanh')
 
-        # Create decoder from [y_t, z_t] to dec_dim
-        self.dec0 = RNN(self.input_size + self.ctx_size_dict[self.ctx_name],
-                        self.hidden_size)
-
         # Dropout
         if self.dropout > 0:
             self.do = nn.Dropout(p=self.dropout)
-
-        # Output bottleneck: maps hidden states to target emb dim
-        self.hid2out = FF(self.hidden_size, self.input_size, activ='tanh')
-
-        # Final softmax
-        self.out2prob = FF(self.input_size, self.n_vocab)
 
         # Gating Scalar, i.e. selector
         if self.selector:
@@ -104,6 +94,17 @@ class XuDecoder(nn.Module):
         if self.ctx2out:
             self.ff_out_ctx = FF(
                 self.ctx_size_dict[self.ctx_name], self.input_size)
+
+        # Create decoder from [y_t, z_t] to dec_dim
+        self.dec0 = RNN(
+            self.input_size + self.ctx_size_dict[self.ctx_name],
+            self.hidden_size)
+
+        # Output bottleneck: maps hidden states to target emb dim
+        self.hid2out = FF(self.hidden_size, self.input_size)
+
+        # Final softmax
+        self.out2prob = FF(self.input_size, self.n_vocab)
 
         # Tie input embedding matrix and output embedding matrix
         if self.tied_emb:
@@ -123,33 +124,38 @@ class XuDecoder(nn.Module):
         return to_var(h_0, requires_grad=False)
 
     def _rnn_init_mean_ctx(self, ctx, ctx_mask):
+        mean_ctx = ctx.mean(dim=0)
         if self.dropout > 0:
-            return self.ff_dec_init(self.do(ctx.mean(0)))
-        else:
-            return self.ff_dec_init(ctx.mean(0))
+            mean_ctx = self.do(mean_ctx)
+        return self.ff_dec_init(mean_ctx)
 
     def f_init(self, ctx_dict):
-        """Returns the initial h_0 for the decoder."""
+        """Returns the initial h_0, c_0 for the decoder."""
         return self._init_func(*ctx_dict[self.ctx_name])
 
     def f_next(self, ctx_dict, y, h):
         # Unpack hidden states
-        htm1, *ctm1 = self._rnn_unpack_states(h)
+        h_c = self._rnn_unpack_states(h)
 
-        self.img_alpha_t, z_t = self.att(
-            htm1.unsqueeze(0), *ctx_dict[self.ctx_name])
+        # Apply attention
+        self.alpha_t, z_t = self.att(
+            h_c[0].unsqueeze(0), *ctx_dict[self.ctx_name])
 
         if self.selector:
-            z_t = z_t * self.ff_selector(htm1)
+            z_t *= self.ff_selector(h_c[0])
 
-        ht_ct = self.dec0(torch.cat([y, z_t], dim=1), h)
-        ht = get_rnn_hidden_state(ht_ct)
+        # Form RNN input by concatenating embedding and weighted sum
+        # Give h as dec's hidden_state
+        ht_ct = self.dec0(torch.cat([y, z_t], dim=1), h_c)
 
-        # This is a bottleneck to avoid going from H to V directly
+        # Get h_t from the combined ht_ct vector
+        h_t = get_rnn_hidden_state(ht_ct)
         if self.dropout > 0:
-            logit = self.hid2out(self.do(ht))
-        else:
-            logit = self.hid2out(ht)
+            h_t = self.do(h_t)
+
+        # This h_t, (optionally along with y and z_t)
+        # will connect to softmax() predictions.
+        logit = self.hid2out(h_t)
 
         if self.prev2out:
             logit += y
@@ -157,24 +163,18 @@ class XuDecoder(nn.Module):
         if self.ctx2out:
             logit += self.ff_out_ctx(z_t)
 
+        logit = F.tanh(logit)
+        if self.dropout > 0:
+            logit = self.do(logit)
+
         # Transform logit to T*B*V (V: vocab_size)
         # Compute log_softmax over token dim
-        log_p = F.log_softmax(self.out2prob(F.tanh(logit)), dim=-1)
+        log_p = F.log_softmax(self.out2prob(logit), dim=-1)
 
         # Return log probs and new hidden states
         return log_p, self._rnn_pack_states(ht_ct)
 
     def forward(self, ctx_dict, y):
-        """Computes the softmax outputs given source annotations `ctxs` and
-        ground-truth target token indices `y`. Only called during training.
-
-        Arguments:
-            ctxs(Variable): A variable of `S*B*ctx_dim` representing the source
-                annotations in an order compatible with ground-truth targets.
-            y(Variable): A variable of `T*B` containing ground-truth target
-                token indices for the given batch.
-        """
-
         loss = 0.0
         logps = None if self.training else torch.zeros(
             y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
