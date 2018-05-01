@@ -27,13 +27,13 @@ class ShowAttendAndTell(NMT):
             'att_type': 'mlp',          # Attention type (mlp|dot)
             'att_temp': 1.,             # Attention temperature
             'att_activ': 'tanh',        # Attention non-linearity (all torch nonlins)
-            'att_mlp_bias': False,      # Enables bias in attention mechanism
+            'att_mlp_bias': True,       # Enables bias in attention mechanism
             'att_bottleneck': 'ctx',    # Bottleneck dimensionality (ctx|hid)
             'att_transform_ctx': True,  # Transform annotations before attention
             'dropout': 0,               # Simple dropout
             'tied_emb': False,          # Share embeddings: (False|2way|3way)
-            'direction': None,          # Network directionality, i.e. en->de
-            'selector': False,          # Selector gate
+            'selector': True,           # Selector gate
+            'alpha_c': 0.0,             # Attention regularization
             'prev2out': True,           # Add prev embedding to output
             'ctx2out': True,            # Add context to output
             'cnn_type': 'resnet50',     # A variant of VGG or ResNet
@@ -43,6 +43,7 @@ class ShowAttendAndTell(NMT):
             'pool': None,               # ('Avg|Max', kernel_size, stride_size)
             'resize': 256,              # resize width, height for images
             'crop': 224,                # center crop size after resize
+            'direction': None,          # Network directionality, i.e. en->de
         }
 
     def __init__(self, opts, logger=None):
@@ -112,33 +113,3 @@ class ShowAttendAndTell(NMT):
         feats = feats.view((*feats.shape[:2], -1)).permute(2, 0, 1)
 
         return {'image': (feats, None)}
-
-    # def f_next(self, img_ctx, y_t, c_t, h_t):
-        # """Defines the inner block of recurrence."""
-        # # Apply attention
-        # alpha_t, z_t = self.ff_att(img_ctx, h_t)
-
-        # # Get next state
-        # h_t, c_t = self.decoder(dec_inp, (h_t, c_t))
-        # if self.opts.model['dropout']:
-            # h_t = self.dropout_lstm(h_t)
-
-        # # This h_t, (optionally along with embs and z_t)
-        # # will connect to softmax() predictions.
-        # logit = self.ff_out_lstm(h_t)
-
-        # if self.opts.model['prev2out']:
-            # logit += y_t
-
-        # if self.opts.model['ctx2out']:
-            # logit += self.ff_out_ctx(z_t)
-
-        # # Unnormalized vocabulary scores
-        # logit = F.tanh(logit)
-        # if self.opts.model['dropout']:
-            # logit = self.dropout_logit(logit)
-
-        # # Compute softmax
-        # log_p = F.log_softmax(self.ff_pre_softmax(logit), dim=1)
-
-        # return log_p, c_t, h_t, alpha_t
