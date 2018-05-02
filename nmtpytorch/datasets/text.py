@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import warnings
 from pathlib import Path
 
 from torch.utils.data import Dataset
@@ -28,7 +29,8 @@ class TextDataset(Dataset):
         if len(self.fnames) == 0:
             raise RuntimeError('{} does not exist.'.format(self.path))
         elif len(self.fnames) > 1:
-            raise RuntimeError("Multiple source files not supported.")
+            warnings.warn('Multiple files found, using first: {}'.format(
+                self.fnames[0]))
 
         # Read the sentences and map them to vocabulary
         self.data, self.lengths = read_sentences(
