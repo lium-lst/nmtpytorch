@@ -131,6 +131,7 @@ class XuDecoder(nn.Module):
 
     def f_init(self, ctx_dict):
         """Returns the initial h_0, c_0 for the decoder."""
+        self.alphas = []
         return self._init_func(*ctx_dict[self.ctx_name])
 
     def f_next(self, ctx_dict, y, h):
@@ -140,6 +141,8 @@ class XuDecoder(nn.Module):
         # Apply attention
         self.alpha_t, z_t = self.att(
             h_c[0].unsqueeze(0), *ctx_dict[self.ctx_name])
+        # Save reg loss terms
+        self.alphas.append(1 - self.alpha_t)
 
         if self.selector:
             z_t *= self.ff_selector(h_c[0])

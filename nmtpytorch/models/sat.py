@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import torch.nn.functional as F
 from ..layers import ImageEncoder, XuDecoder
 
 from ..datasets import Multi30kRawDataset
@@ -41,13 +42,18 @@ class ShowAttendAndTell(NMT):
             'cnn_pretrained': True,     # Should we use pretrained imagenet weights
             'cnn_finetune': None,       # Should we finetune part or all of CNN
             'pool': None,               # ('Avg|Max', kernel_size, stride_size)
+            'l2_norm': False,           # L2 normalize features
+            'l2_norm_dim': -1,          # Which dimension to L2 normalize
             'resize': 256,              # resize width, height for images
             'crop': 224,                # center crop size after resize
+            'replicate': 1,             # For multi-caption setup, replicates images N times
             'direction': None,          # Network directionality, i.e. en->de
         }
 
     def __init__(self, opts, logger=None):
         super().__init__(opts, logger)
+        if self.opts.model['alpha_c'] > 0:
+            self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
         self.print('Loading CNN')
@@ -103,6 +109,7 @@ class ShowAttendAndTell(NMT):
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
             crop=self.opts.model['crop'],
+            replicate=self.opts.model['replicate'] if split == 'train' else 1,
             vocabs=self.vocabs,
             topology=self.topology)
         self.print(self.datasets[split])
@@ -111,5 +118,18 @@ class ShowAttendAndTell(NMT):
         # Get features into (n,c,w*h) and then (w*h,n,c)
         feats = self.cnn(batch['image'])
         feats = feats.view((*feats.shape[:2], -1)).permute(2, 0, 1)
+        if self.opts.model['l2_norm']:
+            feats = F.normalize(
+                feats, dim=self.opts.model['l2_norm_dim']).detach()
 
         return {'image': (feats, None)}
+
+    def forward(self, batch):
+        result = super().forward(batch)
+
+        if self.training and self.opts.model['alpha_c'] > 0:
+            alpha_loss = (sum(self.dec.alphas)**2).sum(0).mean()
+            self.aux_loss['alpha_reg'] = alpha_loss.mul(
+                self.opts.model['alpha_c'])
+
+        return result
