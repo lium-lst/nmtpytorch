@@ -1,5 +1,9 @@
 ## Release Notes
 
+### v1.3.2 (02/05/2018)
+
+  - Updates to `ShowAttendAndTell` model.
+
 ### v1.3.1 (01/05/2018)
 
   - Removed old `Multi30kDataset`.
