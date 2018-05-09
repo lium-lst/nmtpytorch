@@ -6,10 +6,6 @@ This is the PyTorch fork of [nmtpy](https://github.com/lium-lst/nmtpy),
 a sequence-to-sequence framework which was originally a fork of
 [dl4mt-tutorial](https://github.com/nyu-dl/dl4mt-tutorial).
 
-The core parts of `nmtpytorch` depends on `numpy`, `torch` and `tqdm`.
-For multimodal architectures, you also need to install `torchvision` which
-is used to integrate pre-trained CNN models.
-
 `nmtpytorch` is developed and tested on Python 3.6 and will not support
 Python 2.x whatsoever.
 
@@ -40,6 +36,14 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 See [NEWS.md](NEWS.md).
 
 ## Installation
+
+### PyTorch
+
+Right now, `nmtpytorch` requires `PyTorch` 0.3.1. We recommend installing it
+using `pip` as it directly brings the compatible CUDA and CuDNN libraries as well.
+Check this [link](https://pytorch.org/previous-versions) for installation.
+
+### nmtpytorch
 
 We ship [subword-nmt](https://github.com/rsennrich/subword-nmt) and METEOR
 paraphrase files as submodules in order to track their updates when
