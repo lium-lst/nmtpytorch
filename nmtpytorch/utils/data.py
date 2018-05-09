@@ -47,7 +47,7 @@ def to_var(input_, requires_grad=False, volatile=False):
             input_, requires_grad=requires_grad, volatile=volatile).cuda()
 
 
-def read_sentences(fname, vocab, bos=False, eos=True, slist_max=0):
+def read_sentences(fname, vocab, bos=False, eos=True):
     lines = []
     lens = []
     with fopen(fname) as f:
@@ -59,8 +59,7 @@ def read_sentences(fname, vocab, bos=False, eos=True, slist_max=0):
             assert line, "Empty line (%d) found in %s" % (idx + 1, fname)
 
             # Map and append
-            seq = vocab.sent_to_idxs(line, limit=slist_max,
-                                     explicit_bos=bos, explicit_eos=eos)
+            seq = vocab.sent_to_idxs(line, explicit_bos=bos, explicit_eos=eos)
             lines.append(seq)
             lens.append(len(seq))
 

@@ -50,8 +50,7 @@ class Vocabulary(object):
     def __len__(self):
         return len(self._map)
 
-    def sent_to_idxs(self, line, limit=0, explicit_bos=False,
-                     explicit_eos=True):
+    def sent_to_idxs(self, line, explicit_bos=False, explicit_eos=True):
         """Convert from list of strings to list of token indices."""
         tidxs = []
 
@@ -60,10 +59,6 @@ class Vocabulary(object):
 
         for tok in line.split():
             tidxs.append(self._map.get(tok, self.TOKENS["<unk>"]))
-
-        if limit > 0:
-            tidxs = [tidx if tidx < limit else self.TOKENS["<unk>"]
-                     for tidx in tidxs]
 
         if explicit_eos:
             # Append <eos>
