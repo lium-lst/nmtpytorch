@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import logging
+
 import torch
 import torch.nn as nn
 
@@ -10,6 +12,8 @@ from ..utils.topology import Topology
 from ..utils.ml_metrics import MeanReciprocalRank, Loss
 from ..datasets import BitextDataset
 from ..metrics import Metric
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class NMT(nn.Module):
@@ -25,7 +29,9 @@ class NMT(nn.Module):
             'n_encoders': 1,            # Number of stacked encoders
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
-            'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx)
+            'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
+            'dec_init_size': None,      # If dec_init == feats, feature vector dimensionality
+                                        # NOTE: feats not used by NMT but for some derived models
             'trg_bos': 'emb',           # emb: Learn a <bos> and use it
                                         # ctx: Source driven dynamic <bos>
             'att_type': 'mlp',          # Attention type (mlp|dot)
@@ -43,9 +49,8 @@ class NMT(nn.Module):
             'direction': None,          # Network directionality, i.e. en->de
         }
 
-    def __init__(self, opts, logger=None):
+    def __init__(self, opts):
         super().__init__()
-        self.print = print if logger is None else logger.info
 
         # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
@@ -110,7 +115,7 @@ class NMT(nn.Module):
                 # Override defaults from config
                 self.defaults[opt] = value
             else:
-                self.print('Warning: unused model option: {}'.format(opt))
+                logger.info('Warning: unused model option: {}'.format(opt))
         return self.defaults
 
     def reset_parameters(self):
@@ -148,6 +153,7 @@ class NMT(nn.Module):
             ctx_name=str(self.sl),
             tied_emb=self.opts.model['tied_emb'],
             dec_init=self.opts.model['dec_init'],
+            dec_init_size=self.opts.model['dec_init_size'],
             att_type=self.opts.model['att_type'],
             att_temp=self.opts.model['att_temp'],
             att_activ=self.opts.model['att_activ'],
@@ -170,7 +176,7 @@ class NMT(nn.Module):
             max_trg_len=self.opts.model['max_trg_len']
             if split == 'train' else None)
         self.datasets[split] = dataset
-        self.print(dataset)
+        logger.info(dataset)
 
     def get_bos(self, batch_size):
         """Returns a representation for <bos> embeddings for decoding."""
