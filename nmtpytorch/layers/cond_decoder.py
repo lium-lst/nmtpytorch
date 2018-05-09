@@ -11,7 +11,8 @@ from . import FF, Attention
 class ConditionalDecoder(nn.Module):
     """A conditional decoder with attention à la dl4mt-tutorial."""
     def __init__(self, input_size, hidden_size, ctx_size_dict, ctx_name, n_vocab,
-                 rnn_type, tied_emb=False, dec_init='zero', att_type='mlp',
+                 rnn_type, tied_emb=False, dec_init='zero',
+                 dec_init_size=None, att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
                  transform_ctx=True, mlp_bias=False, dropout_out=0,
                  emb_maxnorm=None, emb_gradscale=False):
@@ -23,7 +24,7 @@ class ConditionalDecoder(nn.Module):
         # Safety checks
         assert self.rnn_type in ('GRU', 'LSTM'), \
             "rnn_type '{}' not known".format(rnn_type)
-        assert dec_init in ('zero', 'mean_ctx'), \
+        assert dec_init in ('zero', 'mean_ctx', 'feats'), \
             "dec_init '{}' not known".format(dec_init)
 
         RNN = getattr(nn, '{}Cell'.format(self.rnn_type))
@@ -49,6 +50,7 @@ class ConditionalDecoder(nn.Module):
         self.n_vocab = n_vocab
         self.tied_emb = tied_emb
         self.dec_init = dec_init
+        self.dec_init_size = dec_init_size
         self.att_type = att_type
         self.att_bottleneck = att_bottleneck
         self.att_activ = att_activ
@@ -73,10 +75,12 @@ class ConditionalDecoder(nn.Module):
                              att_bottleneck=self.att_bottleneck,
                              temp=self.att_temp)
 
-        # Decoder initializer FF (for mean_ctx)
-        if self.dec_init == 'mean_ctx':
+        # Decoder initializer FF (for 'mean_ctx' or auxiliary 'feats')
+        if self.dec_init in ('mean_ctx', 'feats'):
+            if self.dec_init == 'mean_ctx':
+                self.dec_init_size = self.ctx_size_dict[self.ctx_name]
             self.ff_dec_init = FF(
-                self.ctx_size_dict[self.ctx_name],
+                self.dec_init_size,
                 self.hidden_size * self.n_states, activ='tanh')
 
         # Create first decoder layer necessary for attention
@@ -107,19 +111,26 @@ class ConditionalDecoder(nn.Module):
         # Split h_t and c_t into two tensors and return a tuple
         return torch.split(h, self.hidden_size, dim=-1)
 
-    def _rnn_init_zero(self, ctx, ctx_mask):
+    def _rnn_init_zero(self, ctx_dict):
+        ctx, _ = ctx_dict[self.ctx_name]
         h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_states)
         return to_var(h_0, requires_grad=False)
 
-    def _rnn_init_mean_ctx(self, ctx, ctx_mask):
+    def _rnn_init_mean_ctx(self, ctx_dict):
+        ctx, ctx_mask = ctx_dict[self.ctx_name]
         if ctx_mask is None:
             return self.ff_dec_init(ctx.mean(0))
         else:
             return self.ff_dec_init(ctx.sum(0) / ctx_mask.sum(0).unsqueeze(1))
 
+    def _rnn_init_feats(self, ctx_dict):
+        ctx, _ = ctx_dict['feats']
+        return self.ff_dec_init(ctx)
+
     def f_init(self, ctx_dict):
         """Returns the initial h_0 for the decoder."""
-        return self._init_func(*ctx_dict[self.ctx_name])
+        self.alphas = []
+        return self._init_func(ctx_dict)
 
     def f_next(self, ctx_dict, y, h):
         # Get hidden states from the first decoder (purely cond. on LM)
