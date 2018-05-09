@@ -2,29 +2,28 @@
 import sys
 import math
 import time
+import logging
 from pathlib import Path
 
 from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 
-from . import logger
 from . import models
 from .config import Options
 from .search import beam_search
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class Translator(object):
     """A utility class to pack translation related features."""
 
     def __init__(self, **kwargs):
-        # Setup logger
-        self.logger = logger.setup(None, 'translate')
-
         # Store attributes directly. See bin/nmtpy for their list.
         self.__dict__.update(kwargs)
 
         for key, value in kwargs.items():
-            self.logger.info('-- {} -> {}'.format(key, value))
+            logger.info('-- {} -> {}'.format(key, value))
 
         # How many models?
         self.n_models = len(self.models)
@@ -37,11 +36,10 @@ class Translator(object):
             weights, _, opts = load_pt_file(model_file)
             opts = Options.from_dict(opts)
             # Create model instance
-            instance = getattr(models, opts.train['model_type'])(
-                opts=opts, logger=self.logger)
+            instance = getattr(models, opts.train['model_type'])(opts=opts)
 
             if not instance.supports_beam_search:
-                self.logger.error(
+                logger.error(
                     "Model does not support beam search. Try 'nmtpy test'")
                 sys.exit(1)
 
@@ -62,24 +60,24 @@ class Translator(object):
         eval_filters = self.instances[0].opts.train['eval_filters']
 
         if self.disable_filters or not eval_filters:
-            self.logger.info('Post-processing filters disabled.')
+            logger.info('Post-processing filters disabled.')
             self.filter = lambda s: s
         else:
-            self.logger.info('Post-processing filters enabled.')
+            logger.info('Post-processing filters enabled.')
             self.filter = FilterChain(eval_filters)
 
         # Can be a comma separated list of hardcoded test splits
         if self.splits:
-            self.logger.info('Will translate "{}"'.format(self.splits))
+            logger.info('Will translate "{}"'.format(self.splits))
             self.splits = self.splits.split(',')
         elif self.source:
             # Split into key:value's and parse into dict
             input_dict = {}
-            self.logger.info('Will translate input configuration:')
+            logger.info('Will translate input configuration:')
             for data_source in self.source.split(','):
                 key, path = data_source.split(':', 1)
                 input_dict[key] = Path(path)
-                self.logger.info(' {}: {}'.format(key, input_dict[key]))
+                logger.info(' {}: {}'.format(key, input_dict[key]))
             self.instances[0].opts.data['new_set'] = input_dict
             self.splits = ['new']
 
@@ -113,13 +111,13 @@ class Translator(object):
         loader = self.instances[0].datasets[split].get_iterator(
             self.batch_size, drop_targets=True, inference=True)
 
-        self.logger.info('Starting translation')
+        logger.info('Starting translation')
         start = time.time()
         hyps = beam_search(self.instances, loader,
                            beam_size=self.beam_size, max_len=self.max_len,
                            lp_alpha=self.lp_alpha)
         up_time = time.time() - start
-        self.logger.info('Took {:.3f} seconds, {} sent/sec'.format(
+        logger.info('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
 
         return self.filter(hyps)

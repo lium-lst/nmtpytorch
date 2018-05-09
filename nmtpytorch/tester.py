@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 import time
+import logging
 from pathlib import Path
 
 from .utils.misc import load_pt_file
 
-from . import logger
 from . import models
 from .config import Options
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class Tester(object):
     """Tester for models without beam-search."""
 
     def __init__(self, **kwargs):
-        # Setup logger
-        self.logger = logger.setup(None, 'translate')
-
         # Store attributes directly. See bin/nmtpy for their list.
         self.__dict__.update(kwargs)
 
@@ -27,11 +26,10 @@ class Tester(object):
 
         weights, _, opts = load_pt_file(self.model_file)
         opts = Options.from_dict(opts)
-        instance = getattr(models, opts.train['model_type'])(
-            opts=opts, logger=self.logger)
+        instance = getattr(models, opts.train['model_type'])(opts=opts)
 
         if instance.supports_beam_search:
-            self.logger.info("Model supports beam-search by the way.")
+            logger.info("Model supports beam-search by the way.")
 
         # Setup layers
         instance.setup(is_train=False)
@@ -46,16 +44,16 @@ class Tester(object):
 
         # Can be a comma separated list of hardcoded test splits
         if self.splits:
-            self.logger.info('Will process "{}"'.format(self.splits))
+            logger.info('Will process "{}"'.format(self.splits))
             self.splits = self.splits.split(',')
         elif self.source:
             # Split into key:value's and parse into dict
             input_dict = {}
-            self.logger.info('Will process input configuration:')
+            logger.info('Will process input configuration:')
             for data_source in self.source.split(','):
                 key, path = data_source.split(':', 1)
                 input_dict[key] = Path(path)
-                self.logger.info(' {}: {}'.format(key, input_dict[key]))
+                logger.info(' {}: {}'.format(key, input_dict[key]))
             self.instance.opts.data['new_set'] = input_dict
             self.splits = ['new']
 
@@ -64,13 +62,13 @@ class Tester(object):
         loader = instance.datasets[split].get_iterator(
             self.batch_size, inference=True)
 
-        self.logger.info('Starting computation')
+        logger.info('Starting computation')
         start = time.time()
         results = instance.test_performance(
             loader,
             dump_file="{}.{}".format(self.model_file, split))
         up_time = time.time() - start
-        self.logger.info('Took {:.3f} seconds'.format(up_time))
+        logger.info('Took {:.3f} seconds'.format(up_time))
         return results
 
     def __call__(self):
