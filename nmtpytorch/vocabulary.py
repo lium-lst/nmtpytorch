@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
 import pathlib
-import warnings
+import logging
 from collections import OrderedDict
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class Vocabulary(object):
@@ -26,8 +28,7 @@ class Vocabulary(object):
         # Sanity check for placeholder tokens
         for tok, idx in self.TOKENS.items():
             if self._map.get(tok, -1) != idx:
-                warnings.warn('{} not found in {}'.format(
-                    tok, self.vocab.name))
+                logger.info('{} not found in {}'.format(tok, self.vocab.name))
 
         # Set # of tokens
         self.n_tokens = len(self._map)
