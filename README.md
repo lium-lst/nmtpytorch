@@ -37,31 +37,7 @@ See [NEWS.md](NEWS.md).
 
 ## Installation
 
-### PyTorch
-
-Right now, `nmtpytorch` requires `PyTorch` 0.3.1. We recommend installing it
-using `pip` as it directly brings the compatible CUDA and CuDNN libraries as well.
-Check this [link](https://pytorch.org/previous-versions) for installation.
-
-### nmtpytorch
-
-We ship [subword-nmt](https://github.com/rsennrich/subword-nmt) and METEOR
-paraphrase files as submodules in order to track their updates when
-necessary. Besides these METEOR v1.5 JAR, `multi-bleu.perl` and COCO
-evaluation tools `cocoeval` are directly included within the source tree.
-
-Run the following command to recursively fetch the repository
-including those submodules:
-
-```
-git clone --recursive https://github.com/lium-lst/nmtpytorch.git
-```
-
-Install using `develop` mode:
-
-```
-python setup.py develop
-```
+See [INSTALL.md](INSTALL.md).
 
 ## Usage Example
 
