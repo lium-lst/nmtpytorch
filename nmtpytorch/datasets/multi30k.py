@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
+import logging
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
 from . import ImageFolderDataset, TextDataset, OneHotDataset
-from . import MultiParallelDataset
+from . import MultiParallelDataset, NumpyDataset
 from .collate import get_collate
 
 from ..samplers import BucketBatchSampler
 
+logger = logging.getLogger('nmtpytorch')
 
-class Multi30kRawDataset(object):
-    """Returns a Dataset for Multi30k using raw JPG images.
+
+class Multi30kDataset(object):
+    """Returns a Dataset for Multi30k using raw JPG images or .npy features.
 
     Arguments:
         data_dict(dict): [data] section's relevant split dictionary
@@ -47,6 +50,8 @@ class Multi30kRawDataset(object):
                 data[src] = ImageFolderDataset(
                     data_dict[src], resize=resize,
                     crop=crop, replicate=replicate, warmup=warmup)
+            elif ds._type == "Numpy":
+                data[src] = NumpyDataset(data_dict[src])
 
         for trg, ds in self.topology.trgs.copy().items():
             # Remove from topology if no data provided (possible in test time)
