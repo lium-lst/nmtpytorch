@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
+import logging
+
+import torch
 import torch.nn.functional as F
 from ..layers import ImageEncoder, XuDecoder
 
-from ..datasets import Multi30kRawDataset
+from ..datasets import Multi30kDataset
 
 from .nmt import NMT
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class ShowAttendAndTell(NMT):
@@ -50,13 +55,13 @@ class ShowAttendAndTell(NMT):
             'direction': None,          # Network directionality, i.e. en->de
         }
 
-    def __init__(self, opts, logger=None):
-        super().__init__(opts, logger)
+    def __init__(self, opts):
+        super().__init__(opts)
         if self.opts.model['alpha_c'] > 0:
             self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
-        self.print('Loading CNN')
+        logger.info('Loading CNN')
         cnn_encoder = ImageEncoder(
             cnn_type=self.opts.model['cnn_type'],
             pretrained=self.opts.model['cnn_pretrained'])
@@ -77,7 +82,7 @@ class ShowAttendAndTell(NMT):
         self.cnn = cnn_encoder.get()
 
         # Nicely printed table of summary for the CNN
-        self.print(cnn_encoder)
+        logger.info(cnn_encoder)
 
         # Create Decoder
         self.dec = XuDecoder(
@@ -104,7 +109,7 @@ class ShowAttendAndTell(NMT):
 
     def load_data(self, split):
         """Loads the requested dataset split."""
-        self.datasets[split] = Multi30kRawDataset(
+        self.datasets[split] = Multi30kDataset(
             data_dict=self.opts.data[split + '_set'],
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
@@ -112,7 +117,7 @@ class ShowAttendAndTell(NMT):
             replicate=self.opts.model['replicate'] if split == 'train' else 1,
             vocabs=self.vocabs,
             topology=self.topology)
-        self.print(self.datasets[split])
+        logger.info(self.datasets[split])
 
     def encode(self, batch):
         # Get features into (n,c,w*h) and then (w*h,n,c)
@@ -128,8 +133,8 @@ class ShowAttendAndTell(NMT):
         result = super().forward(batch)
 
         if self.training and self.opts.model['alpha_c'] > 0:
-            alpha_loss = (sum(self.dec.alphas)**2).sum(0).mean()
-            self.aux_loss['alpha_reg'] = alpha_loss.mul(
+            alpha_loss = (1 - torch.cat(self.dec.alphas).sum(0)).pow(2).sum(0)
+            self.aux_loss['alpha_reg'] = alpha_loss.mean().mul(
                 self.opts.model['alpha_c'])
 
         return result
