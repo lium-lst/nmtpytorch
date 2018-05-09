@@ -128,26 +128,28 @@ class Options(object):
 
             setattr(self, section, opts)
 
-    def info(self, logger=None):
-        """Prints a summary of all options."""
-        _print = logger.info if logger else print
+    def __repr__(self):
+        s = ""
         for section in self.sections:
             opts = getattr(self, section)
-            _print("-" * (len(section) + 2))
-            _print("[{}]".format(section))
-            _print("-" * (len(section) + 2))
+            s += "-" * (len(section) + 2)
+            s += "\n[{}]\n".format(section)
+            s += "-" * (len(section) + 2)
+            s += '\n'
             for key, value in opts.items():
                 if isinstance(value, list):
-                    _print("{:>20}:".format(key))
+                    s += "{:>20}:\n".format(key)
                     for elem in value:
-                        _print("{:>22}".format(elem))
+                        s += "{:>22}\n".format(elem)
                 elif isinstance(value, dict):
-                    _print("{:>20}:".format(key))
+                    s += "{:>20}:\n".format(key)
                     for k, v in value.items():
-                        _print("{:>22}: {}".format(k, v))
+                        s += "{:>22}:{}\n".format(k, v)
                 else:
-                    _print("{:>20}: {}".format(key, value))
-        _print("-" * 70)
+                    s += "{:>20}:{}\n".format(key, value)
+        s += "-" * 70
+        s += "\n"
+        return s
 
     def to_dict(self):
         """Serializes the instance as dict."""
