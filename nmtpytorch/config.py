@@ -58,7 +58,7 @@ def resolve_path(value):
     elif isinstance(value, dict):
         return {k: resolve_path(v) for k, v in value.items()}
     elif isinstance(value, str) and value.startswith(('~', '/', '../', './')):
-        return pathlib.Path(value).expanduser()
+        return pathlib.Path(value).expanduser().resolve()
     else:
         return value
 
