@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
+import logging
+
 import torch.nn as nn
 import torch.nn.functional as F
 
 from ..layers import ImageEncoder, TextEncoder, ConditionalMMDecoder
-from ..datasets import Multi30kRawDataset
+from ..datasets import Multi30kDataset
 from .nmt import NMT
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class AttentiveMNMT(NMT):
@@ -28,8 +32,8 @@ class AttentiveMNMT(NMT):
             'crop': 224,                # center crop size after resize
         })
 
-    def __init__(self, opts, logger=None):
-        super().__init__(opts, logger)
+    def __init__(self, opts):
+        super().__init__(opts)
 
         assert self.opts.model['cnn_layer'] not in ('avgpool', 'fc', 'pool'), \
             "{} given for 'cnn_layer' but it should be a conv layer.".format(
@@ -40,11 +44,11 @@ class AttentiveMNMT(NMT):
         for name, param in self.named_parameters():
             if (param.requires_grad and 'bias' not in name and
                     not name.startswith('cnn')):
-                self.print('  Initializing weights for {}'.format(name))
+                logger.info('  Initializing weights for {}'.format(name))
                 nn.init.kaiming_normal(param.data)
 
     def setup(self, is_train=True):
-        self.print('Loading CNN')
+        logger.info('Loading CNN')
         cnn_encoder = ImageEncoder(
             cnn_type=self.opts.model['cnn_type'],
             pretrained=self.opts.model['cnn_pretrained'])
@@ -68,7 +72,7 @@ class AttentiveMNMT(NMT):
         self.cnn = cnn_encoder.get()
 
         # Nicely printed table of summary for the CNN
-        self.print(cnn_encoder)
+        logger.info(cnn_encoder)
 
         ########################
         # Create Textual Encoder
@@ -112,14 +116,14 @@ class AttentiveMNMT(NMT):
 
     def load_data(self, split):
         """Loads the requested dataset split."""
-        self.datasets[split] = Multi30kRawDataset(
+        self.datasets[split] = Multi30kDataset(
             data_dict=self.opts.data[split + '_set'],
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
             crop=self.opts.model['crop'],
             vocabs=self.vocabs,
             topology=self.topology)
-        self.print(self.datasets[split])
+        logger.info(self.datasets[split])
 
     def encode(self, batch):
         # Get features into (n,c,w*h) and then (w*h,n,c)
