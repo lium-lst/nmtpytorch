@@ -1,8 +1,15 @@
 # -*- coding: utf-8 -*-
 import pathlib
-
 from setuptools import setup
-import nmtpytorch
+
+
+def get_nmtpytorch_version():
+    with open('nmtpytorch/__init__.py') as f:
+        s = f.read().split('\n')[0]
+        if '__version__' not in s:
+            raise RuntimeError('Can not detect version from nmtpytorch/__init__.py')
+        return eval(s.split(' ')[-1])
+
 
 # Set up packages to install
 packages = ['nmtpytorch']
@@ -15,7 +22,7 @@ packages.extend(['nmtpytorch.cocoeval.%s' % m for m in
 
 setup(
     name='nmtpytorch',
-    version=nmtpytorch.__version__,
+    version=get_nmtpytorch_version(),
     description='Neural Machine Translation Framework in PyTorch',
     url='https://github.com/lium-lst/nmtpytorch',
     author='Ozan Caglayan, LIUM LST Team',
@@ -31,8 +38,6 @@ setup(
         'Operating System :: POSIX',
     ],
     keywords='nmt neural-mt translation deep-learning pytorch captioning',
-    install_requires=['numpy', 'scikit-learn', 'torch >= 0.3.0', 'tqdm',
-                      'torchvision', 'sacrebleu >= 1.2.5'],
     include_package_data=True,
     exclude_package_data={'': ['.git']},
     packages=packages,
