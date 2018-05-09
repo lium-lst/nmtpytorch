@@ -1,0 +1,15 @@
+-e .
+
+six==1.11.0
+pyyaml==3.12
+typing==3.6.4
+protobuf>=0.3.2
+numpy==1.14.2
+scipy==1.0.1
+scikit-learn==0.19.1
+tqdm==4.23.0
+pillow==5.1.0
+sacrebleu==1.2.7
+tensorboardX==1.1
+http://download.pytorch.org/whl/cu90/torch-0.3.1-cp36-cp36m-linux_x86_64.whl
+torchvision==0.2.0
