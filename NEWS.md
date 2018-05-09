@@ -1,5 +1,18 @@
 ## Release Notes
 
+### v1.4.0 (09/05/2018)
+  - Add `environment.yml` for easy installation using `conda`. You can now
+  create a ready-to-use `conda` environment by just calling `conda env create -f environment.yml`.
+  - Make `NumpyDataset` memory efficient by keeping `float16` arrays as they are
+  until batch creation time.
+  - Rename `Multi30kRawDataset` to `Multi30kDataset` which now supports both
+  raw image files and pre-extracted visual features file stored as `.npy`.
+  - Add CNN feature extraction script under `scripts/`.
+  - Add doubly stochastic attention to `ShowAttendAndTell` and multimodal NMT.
+  - New model `MNMTDecinit` to initialize decoder with auxiliary features.
+  - New model `AMNMTFeatures` which is the attentive MMT but with features file
+  instead of end-to-end feature extraction which was memory hungry.
+
 ### v1.3.2 (02/05/2018)
 
   - Updates to `ShowAttendAndTell` model.
