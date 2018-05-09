@@ -57,7 +57,7 @@ class BitextDataset(Dataset):
             if len(fnames) == 0:
                 raise RuntimeError('{} does not exist.'.format(path))
             elif len(fnames) > 1:
-                raise RuntimeError("Multiple source files not supported.")
+                raise RuntimeError("Multiple target files not supported.")
 
             self.data[self.tl], self.lens[self.tl] = \
                 read_sentences(fnames[0], self.trg_vocab, bos=self.trg_bos)
@@ -80,12 +80,9 @@ class BitextDataset(Dataset):
         keys = self.topo.get_src_langs() if drop_targets else self.data.keys()
         # Create sequence-length ordered sampler
         sampler = BucketBatchSampler(
-            self.lens[self.sl],
-            batch_size=batch_size,
-            max_len=self.max_trg_len,
-            store_indices=inference)
-        return DataLoader(self, batch_sampler=sampler,
-                          collate_fn=get_collate(keys))
+            self.lens[self.sl], batch_size=batch_size,
+            max_len=self.max_trg_len, store_indices=inference)
+        return DataLoader(self, batch_sampler=sampler, collate_fn=get_collate(keys))
 
     def __getitem__(self, idx):
         return {k: self.data[k][idx] for k in self.data_keys}
