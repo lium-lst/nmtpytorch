@@ -3,14 +3,8 @@ from .cleanup import cleanup
 import pathlib
 import logging
 
-log = None
 
-
-def setup(opts, mode):
-    global log
-    if log:
-        return log
-
+def setup(opts=None):
     _format = '%(message)s'
 
     formatter = logging.Formatter(_format)
@@ -21,15 +15,12 @@ def setup(opts, mode):
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    if mode != 'translate':
+    if opts is not None:
         log_file = str(pathlib.Path(opts['save_path']) /
                        opts['subfolder'] / opts['exp_id']) + '.log'
-        file_mode = 'a' if mode == 'resume' else 'w'
-
-        fh = logging.FileHandler(log_file, mode=file_mode)
+        fh = logging.FileHandler(log_file, mode='w')
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
-    log = logger
-    cleanup.register_handler(log)
-    return log
+    cleanup.register_handler(logger)
+    return logger
