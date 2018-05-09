@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import time
+import logging
 
 from .evaluator import Evaluator
 from .optimizer import Optimizer
@@ -11,9 +12,11 @@ from .utils.data import to_var
 from .utils.tensorboard import TensorBoard
 from .search import beam_search
 
+logger = logging.getLogger('nmtpytorch')
+
 
 class MainLoop(object):
-    def __init__(self, model, logger, train_opts, history=None, mode='train'):
+    def __init__(self, model, train_opts, history=None, mode='train'):
         # Get all training options into this mainloop
         self.__dict__.update(train_opts)
 
