@@ -142,7 +142,7 @@ class XuDecoder(nn.Module):
         self.alpha_t, z_t = self.att(
             h_c[0].unsqueeze(0), *ctx_dict[self.ctx_name])
         # Save reg loss terms
-        self.alphas.append(1 - self.alpha_t)
+        self.alphas.append(self.alpha_t.unsqueeze(0))
 
         if self.selector:
             z_t *= self.ff_selector(h_c[0])
