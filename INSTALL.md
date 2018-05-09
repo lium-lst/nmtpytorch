@@ -17,18 +17,16 @@ some time.
 
 ## Anaconda Python (Recommended)
 
+Replace below `<VER>` with 8, 9.0 or 9.1 depending on your nVidia driver version:
+
 ```
 $ conda update --all
 $ git clone --recursive https://github.com/lium-lst/nmtpytorch.git
-$ conda env create -f nmtpytorch/environment.yml
+$ conda env create -f nmtpytorch/environment-cuda<VER>.yml
 ```
 
 This should create a `conda` environment called `nmtpy` with all of the
 dependencies installed inside.
-
-NOTE: The `environment.yml` file specifically installs `torch 0.3.1` with CUDA9.
-If you want to use CUDA8, you can modify the file to install instead the
-CUDA8 `.whl`.
 
 ## Virtualenv
 
@@ -40,12 +38,11 @@ $ source bin/activate
 (nmtpyvenv) $ pip install -e src/
 ```
 
-NOTE: This in contrary to `conda` installation, will bring CUDA8 version of
-`torch` since it's the default package in `PyPI`. I couldn't the correct way
-of writing a dependency of CUDA9 version of `torch` inside `setup.py`. So feel
-free the remove/uninstall/install `torch 0.3.1` with the CUDA version that suits you.
+NOTE: This will bring CUDA8 version of `torch` since it's the default package in `PyPI`.
+If you want CUDA9 or CUDA9.1 instead, install `torch` first inside the virtual environment
+and then call `pip install -e src/`.
 
-## Modifying the source codes
+## Modifying the Code Tree
 
 Both methods install `nmtpytorch` in the so-called **editable** mode. This
 means that the Python interpreter will see the changes that you'll made inside the cloned folder.
