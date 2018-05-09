@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-import warnings
+import logging
 from pathlib import Path
 
 from torch.utils.data import Dataset
 
 from ..utils.data import read_sentences
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class TextDataset(Dataset):
@@ -29,8 +31,7 @@ class TextDataset(Dataset):
         if len(self.fnames) == 0:
             raise RuntimeError('{} does not exist.'.format(self.path))
         elif len(self.fnames) > 1:
-            warnings.warn('Multiple files found, using first: {}'.format(
-                self.fnames[0]))
+            logger.info('Multiple files found, using first: {}'.format(self.fnames[0]))
 
         # Read the sentences and map them to vocabulary
         self.data, self.lengths = read_sentences(
