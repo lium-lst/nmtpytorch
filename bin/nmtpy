@@ -124,6 +124,7 @@ if __name__ == '__main__':
     #################################
     import torch
     import platform
+    import nmtpytorch
     from nmtpytorch import models
     from nmtpytorch.mainloop import MainLoop
     log = logger.setup(opts.train)
@@ -142,6 +143,7 @@ if __name__ == '__main__':
 
     log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
         torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
+    log.info("Nmtpytorch version: {}".format(nmtpytorch.__version__))
     log.info("Seed for further reproducibility: {}".format(opts.train['seed']))
     if 'SLURM_JOB_ID' in os.environ:
         log.info("SLURM Job ID: {}".format(os.environ['SLURM_JOB_ID']))
