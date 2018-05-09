@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import shutil
 import pathlib
 from setuptools import setup
 
@@ -18,6 +19,10 @@ packages.extend(['nmtpytorch.%s' % p for p in
                  'samplers', 'utils')])
 packages.extend(['nmtpytorch.cocoeval.%s' % m for m in
                  ('bleu', 'meteor', 'cider', 'rouge')])
+
+if shutil.which('java') is None:
+    print("*** WARNING: 'java' not found.")
+    print("*** WARNING: You need to have JRE installed for METEOR to work.")
 
 
 setup(
