@@ -6,7 +6,7 @@ import lzma
 import time
 import random
 import pathlib
-import warnings
+import logging
 import tempfile
 from hashlib import sha256
 
@@ -15,6 +15,9 @@ import torch
 from tqdm import tqdm
 
 from ..cleanup import cleanup
+
+logger = logging.getLogger('nmtpytorch')
+
 
 LANGUAGES = [
     'aa', 'ab', 'ae', 'af', 'ak', 'am', 'an', 'ar', 'as', 'av', 'ay', 'az',
@@ -61,7 +64,7 @@ def load_pt_file(fname, device='cpu'):
 def get_language(fname):
     suffix = pathlib.Path(fname).suffix[1:]
     if suffix not in LANGUAGES:
-        warnings.warn("Can not detect language from {}.".format(fname))
+        logger.info("Can not detect language from {}.".format(fname))
         return None
     return suffix
 
