@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from torch.utils.data import DataLoader
 
-from . import ImageFolderDataset, OneHotDataset
+from . import ImageFolderDataset, OneHotDataset, NumpyDataset
 from . import MultiParallelDataset
 from .collate import get_collate
 
@@ -38,6 +38,8 @@ class MultiLabelMulti30kDataset(object):
                 data[src] = ImageFolderDataset(
                     data_dict[src], resize=resize,
                     crop=crop, replicate=replicate, warmup=warmup)
+            elif ds._type == "Numpy":
+                data[src] = NumpyDataset(data_dict[src])
 
         for trg, ds in self.topology.trgs.copy().items():
             # Remove from topology if no data provided (possible in test time)
