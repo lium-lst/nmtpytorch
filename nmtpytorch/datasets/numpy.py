@@ -2,7 +2,6 @@
 from pathlib import Path
 
 import numpy as np
-import torch
 from torch.utils.data import Dataset
 
 
@@ -23,16 +22,13 @@ class NumpyDataset(Dataset):
             raise RuntimeError('{} does not exist.'.format(self.path))
 
         if self.path.suffix == '.npy':
-            data = np.load(self.path).astype('float32')
+            self.data = np.load(self.path)
         elif self.path.suffix == '.npz':
             assert key, "A key should be provided for .npz files."
-            data = np.load(self.path)[key].astype('float32')
-
-        # Convert to torch tensor
-        self.data = torch.from_numpy(data)
+            self.data = np.load(self.path)[key]
 
         # Dataset size
-        self.size = self.data.size()[0]
+        self.size = self.data.shape[0]
 
     def __getitem__(self, idx):
         return self.data[idx]
