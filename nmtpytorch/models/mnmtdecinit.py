@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import torch
-
 from ..datasets import Multi30kDataset
 from .nmt import NMT
 

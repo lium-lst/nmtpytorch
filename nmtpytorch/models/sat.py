@@ -51,7 +51,7 @@ class ShowAttendAndTell(NMT):
             'l2_norm_dim': -1,          # Which dimension to L2 normalize
             'resize': 256,              # resize width, height for images
             'crop': 224,                # center crop size after resize
-            'replicate': 1,             # For multi-caption setup, replicates images N times
+            'replicate': 1,             # number of captions/image
             'direction': None,          # Network directionality, i.e. en->de
         }
 

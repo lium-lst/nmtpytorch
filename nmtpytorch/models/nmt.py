@@ -30,8 +30,8 @@ class NMT(nn.Module):
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
             'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
-            'dec_init_size': None,      # If dec_init == feats, feature vector dimensionality
-                                        # NOTE: feats not used by NMT but for some derived models
+            'dec_init_size': None,      # feature vector dimensionality for
+                                        # dec_init == 'feats'
             'trg_bos': 'emb',           # emb: Learn a <bos> and use it
                                         # ctx: Source driven dynamic <bos>
             'att_type': 'mlp',          # Attention type (mlp|dot)
