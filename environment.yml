@@ -16,7 +16,7 @@ dependencies:
   - pillow
   - pip:
     - http://download.pytorch.org/whl/cu90/torch-0.3.1-cp36-cp36m-linux_x86_64.whl
-    - torchvision==0.2.0
+    - torchvision==0.2.1
     - sacrebleu==1.2.7
     - tensorboardX==1.1
-    - -e git+https://github.com/lium-lst/nmtpytorch.git#egg=nmtpytorch
+    - -e .

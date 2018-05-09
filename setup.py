@@ -43,6 +43,11 @@ setup(
         'Operating System :: POSIX',
     ],
     keywords='nmt neural-mt translation deep-learning pytorch captioning',
+    install_requires=[
+        'numpy', 'scikit-learn', 'tqdm', 'pillow',
+        'torch==0.3.1', 'torchvision==0.2.1',
+        'sacrebleu==1.2.7', 'tensorboardX==1.1',
+    ],
     include_package_data=True,
     exclude_package_data={'': ['.git']},
     packages=packages,
