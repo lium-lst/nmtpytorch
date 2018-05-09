@@ -59,13 +59,9 @@ class MultiParallelDataset(Dataset):
         if isinstance(srcs, bool) and srcs:
             # Add all sources
             self.data_sources.extend(self.sources)
-#         elif isinstance(srcs, list):
-            # self.data_sources.extend(srcs)
 
         if isinstance(trgs, bool) and trgs:
             self.data_sources.extend(self.targets)
-#         elif isinstance(trgs, list):
-            # self.data_sources.extend(trgs)
 
     def __getitem__(self, idx):
         # We get a sample indice from the upstream sampler
