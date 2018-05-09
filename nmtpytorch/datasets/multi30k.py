@@ -71,7 +71,7 @@ class Multi30kDataset(object):
             trg_datasets={v: data[k] for k, v in self.topology.trgs.items()},
         )
 
-        # Sort by source-length by default
+        # Sort by source-length by default
         if self.lens[0] is not None:
             self.lengths = self.lens[0]
         elif self.lens[1] is not None:
