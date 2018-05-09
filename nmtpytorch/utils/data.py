@@ -47,30 +47,6 @@ def to_var(input_, requires_grad=False, volatile=False):
             input_, requires_grad=requires_grad, volatile=volatile).cuda()
 
 
-class CircularNDArray(object):
-    def __init__(self, data, n_tile):
-        """Access to same elements over first axis using LUT."""
-        self.data = data
-
-        # Actual data items size in the first axis
-        self.n_elem = self.data.shape[0]
-
-        self._lut = tuple([k % self.n_elem for k
-                          in range(self.n_elem * n_tile)])
-
-    @property
-    def shape(self):
-        return self.data.shape
-
-    def __getitem__(self, idx):
-        # native: 28us
-        # only ~2x lower than native access (55 us)
-        return self.data[self._lut[idx]]
-        # 55 us return self.__dict__['data'][self._lut[idx]]
-        # 71us return self.data[idx % self.n_elem]
-        # 68 return self.data[idx % 29000]
-
-
 def read_sentences(fname, vocab, bos=False, eos=True, slist_max=0):
     lines = []
     lens = []
