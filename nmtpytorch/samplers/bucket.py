@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import math
+import logging
 from collections import defaultdict
 
 import numpy as np
 
 from torch.utils.data.sampler import Sampler
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class BucketBatchSampler(Sampler):
@@ -18,8 +21,7 @@ class BucketBatchSampler(Sampler):
             item in the dataset.
         batch_size (int): Size of mini-batch.
         max_len (int, optional): A maximum sequence length that will be used
-            to filter out very long sequences. A default of `10000` is
-            assumed if ``None`` given.
+            to filter out very long sequences. ``None`` means no filtering.
 
     Example:
         # Generate dummy length information
@@ -36,15 +38,25 @@ class BucketBatchSampler(Sampler):
 
     def __init__(self, lengths, batch_size, max_len=None, store_indices=False):
         self.batch_size = batch_size
-        self.max_len = 10000 if max_len is None else max_len
+        self.max_len = max_len
         self.store_indices = store_indices
+        self.n_rejects = 0
 
         # Buckets: lengths -> list of sample indices
         self.buckets = defaultdict(list)
 
         # Fill the buckets while optionally filtering out long sequences
-        for idx, len_ in enumerate(lengths):
-            if len_ <= self.max_len:
+        if self.max_len is not None:
+            for idx, len_ in enumerate(lengths):
+                if len_ <= self.max_len:
+                    self.buckets[len_].append(idx)
+                else:
+                    self.n_rejects += 1
+            logger.info('{} samples rejected because of length filtering @ {}'.format(
+                self.n_rejects, self.max_len))
+        else:
+            # No length filtering
+            for idx, len_ in enumerate(lengths):
                 self.buckets[len_].append(idx)
 
         self.bucket_names = list(self.buckets.keys())
