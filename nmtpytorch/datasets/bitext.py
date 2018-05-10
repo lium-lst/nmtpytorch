@@ -80,7 +80,8 @@ class BitextDataset(Dataset):
         keys = self.topo.get_src_langs() if drop_targets else self.data.keys()
         # Create sequence-length ordered sampler
         sampler = BucketBatchSampler(
-            self.lens[self.sl], batch_size=batch_size,
+            batch_size=batch_size, sort_lens=self.lens[self.sl],
+            filter_lens=self.lens.get(self.tl, None),
             max_len=self.max_trg_len, store_indices=inference)
         return DataLoader(self, batch_sampler=sampler, collate_fn=get_collate(keys))
 

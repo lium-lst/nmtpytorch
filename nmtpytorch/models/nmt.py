@@ -45,7 +45,7 @@ class NMT(nn.Module):
             'dropout_out': 0,           # Simple dropout to decoder output
             'dropout_enc': 0,           # Intra-encoder dropout if n_encoders > 1
             'tied_emb': False,          # Share embeddings: (False|2way|3way)
-            'max_trg_len': 80,          # Reject sentences where target > 80
+            'max_trg_len': 80,          # Reject sentences where target length > 80
             'direction': None,          # Network directionality, i.e. en->de
         }
 

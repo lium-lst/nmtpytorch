@@ -14,6 +14,8 @@ class MNMTDecinit(NMT):
     """
     def __init__(self, opts):
         super().__init__(opts)
+        # This is not used for Multi30kDataset
+        self.opts.model.pop('max_trg_len')
 
     def load_data(self, split):
         """Loads the requested dataset split."""

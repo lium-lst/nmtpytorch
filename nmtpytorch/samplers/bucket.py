@@ -17,16 +17,21 @@ class BucketBatchSampler(Sampler):
     Epoch overhead for 5M dataset with batch_size=32 is around 400ms.
 
     Arguments:
-        lengths (list): List of integer lengths corresponding to each
-            item in the dataset.
         batch_size (int): Size of mini-batch.
+        sort_lens (list): List of source or target lengths corresponding to each
+            item in the dataset.
+        filter_lens (list, optional): If ``max_len`` is not ``None``, use this list
+            of lengths to reject long sequences. Can be source or target
+            lengths independently from ``sort_lens``.
         max_len (int, optional): A maximum sequence length that will be used
             to filter out very long sequences. ``None`` means no filtering.
+        store_indices (bool, optional): If ``True``, indices that will unsort
+            the dataset will be stored. This used by beam search/inference.
 
     Example:
         # Generate dummy length information
         >> lengths = np.random.randint(1, 20, size=10000)
-        >> sampler = BucketBatchSampler(lens, batch_size=10)
+        >> sampler = BucketBatchSampler(batch_size=10, sort_lens=lengths)
         >> batch = list(sampler)[0]
         >> batch
         [7526, 8473, 9194, 1030, 1568, 4182, 3082, 827, 3688, 9336]
@@ -36,19 +41,20 @@ class BucketBatchSampler(Sampler):
 
     """
 
-    def __init__(self, lengths, batch_size, max_len=None, store_indices=False):
+    def __init__(self, batch_size, sort_lens, filter_lens=None,
+                 max_len=None, store_indices=False):
         self.batch_size = batch_size
         self.max_len = max_len
         self.store_indices = store_indices
         self.n_rejects = 0
 
-        # Buckets: lengths -> list of sample indices
+        # Buckets: sort_lens -> list of sample indices
         self.buckets = defaultdict(list)
 
         # Fill the buckets while optionally filtering out long sequences
-        if self.max_len is not None:
-            for idx, len_ in enumerate(lengths):
-                if len_ <= self.max_len:
+        if self.max_len is not None and filter_lens is not None:
+            for idx, len_ in enumerate(sort_lens):
+                if filter_lens[idx] <= self.max_len:
                     self.buckets[len_].append(idx)
                 else:
                     self.n_rejects += 1
@@ -56,7 +62,7 @@ class BucketBatchSampler(Sampler):
                 self.n_rejects, self.max_len))
         else:
             # No length filtering
-            for idx, len_ in enumerate(lengths):
+            for idx, len_ in enumerate(sort_lens):
                 self.buckets[len_].append(idx)
 
         self.bucket_names = list(self.buckets.keys())

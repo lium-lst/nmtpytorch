@@ -71,12 +71,15 @@ class Multi30kDataset(object):
             trg_datasets={v: data[k] for k, v in self.topology.trgs.items()},
         )
 
-        # Sort by source-length by default
         if self.lens[0] is not None:
+            # Sort by source-length by default
             self.lengths = self.lens[0]
         elif self.lens[1] is not None:
+            # If no source available, fallback to target lengths
+            # (For models where no textual input is available)
             self.lengths = self.lens[1]
         else:
+            # No text at all, no need to sort
             self.lengths = None
 
     def get_iterator(self, batch_size, drop_targets=False, inference=False):
@@ -86,7 +89,8 @@ class Multi30kDataset(object):
 
         if self.lengths is not None:
             sampler = BucketBatchSampler(
-                self.lengths, batch_size=batch_size, store_indices=inference)
+                batch_size=batch_size, sort_lens=self.lengths,
+                store_indices=inference)
         else:
             sampler = BatchSampler(
                 SequentialSampler(self.dataset),
