@@ -46,7 +46,7 @@ setup(
     install_requires=[
         'numpy', 'scipy', 'scikit-learn', 'tqdm', 'pillow',
         'torch==0.3.1', 'torchvision==0.2.1',
-        'sacrebleu==1.2.7', 'tensorboardX==1.1',
+        'sacrebleu>=1.2.7', 'tensorboardX==1.1',
     ],
     include_package_data=True,
     exclude_package_data={'': ['.git']},
