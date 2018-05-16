@@ -22,6 +22,7 @@ class FilterChain(object):
     """
     FILTERS = {
         'de-bpe': lambda s: s.replace("@@ ", "").replace("@@", ""),
+        'de-tag': lambda s: re.sub('<[a-zA-Z][a-zA-Z]>', '', s),
         # Decoder for Google sentenpiece
         # only for default params of spm_encode
         'de-spm': lambda s: s.replace(" ", "").replace("\u2581", " ").strip(),
