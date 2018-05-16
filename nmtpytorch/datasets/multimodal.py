@@ -12,8 +12,9 @@ from ..samplers import BucketBatchSampler
 logger = logging.getLogger('nmtpytorch')
 
 
-class Multi30kDataset(object):
-    """Returns a Dataset for Multi30k using raw JPG images or .npy features.
+class MultimodalDataset(object):
+    """Returns a Dataset for parallel multimodal using raw JPG images or .npy features
+    or any other input modalities.
 
     Arguments:
         data_dict(dict): [data] section's relevant split dictionary

@@ -4,5 +4,5 @@ from .imagefolder import ImageFolderDataset
 from .text import TextDataset
 from .multiparallel import MultiParallelDataset
 from .onehot import OneHotDataset
-from .multi30k import Multi30kDataset
+from .multimodal import MultimodalDataset
 from .multilabelmulti30k import MultiLabelMulti30kDataset

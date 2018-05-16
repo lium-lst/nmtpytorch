@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from ..datasets import Multi30kDataset
+from ..datasets import MultimodalDataset
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
@@ -14,12 +14,12 @@ class MNMTDecinit(NMT):
     """
     def __init__(self, opts):
         super().__init__(opts)
-        # This is not used for Multi30kDataset
+        # This is not used for MultimodalDataset
         self.opts.model.pop('max_trg_len')
 
     def load_data(self, split):
         """Loads the requested dataset split."""
-        self.datasets[split] = Multi30kDataset(
+        self.datasets[split] = MultimodalDataset(
             data_dict=self.opts.data[split + '_set'],
             vocabs=self.vocabs,
             topology=self.topology)

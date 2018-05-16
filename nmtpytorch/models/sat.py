@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from ..layers import ImageEncoder, XuDecoder
 
-from ..datasets import Multi30kDataset
+from ..datasets import MultimodalDataset
 
 from .nmt import NMT
 
@@ -109,7 +109,7 @@ class ShowAttendAndTell(NMT):
 
     def load_data(self, split):
         """Loads the requested dataset split."""
-        self.datasets[split] = Multi30kDataset(
+        self.datasets[split] = MultimodalDataset(
             data_dict=self.opts.data[split + '_set'],
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],

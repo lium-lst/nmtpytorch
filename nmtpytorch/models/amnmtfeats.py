@@ -4,7 +4,7 @@ import logging
 import torch
 
 from ..layers import TextEncoder, ConditionalMMDecoder
-from ..datasets import Multi30kDataset
+from ..datasets import MultimodalDataset
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
@@ -73,7 +73,7 @@ class AttentiveMNMTFeatures(NMT):
 
     def load_data(self, split):
         """Loads the requested dataset split."""
-        self.datasets[split] = Multi30kDataset(
+        self.datasets[split] = MultimodalDataset(
             data_dict=self.opts.data[split + '_set'],
             vocabs=self.vocabs,
             topology=self.topology)

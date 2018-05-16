@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..layers import ImageEncoder, TextEncoder, ConditionalMMDecoder
-from ..datasets import Multi30kDataset
+from ..datasets import MultimodalDataset
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
@@ -116,7 +116,7 @@ class AttentiveMNMT(NMT):
 
     def load_data(self, split):
         """Loads the requested dataset split."""
-        self.datasets[split] = Multi30kDataset(
+        self.datasets[split] = MultimodalDataset(
             data_dict=self.opts.data[split + '_set'],
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
