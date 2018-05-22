@@ -78,6 +78,10 @@ def flatten(l):
     return [item for sublist in l for item in sublist]
 
 
+def get_local_args(d):
+    return {k:v for k, v in d.items() if not k.startswith(('__', 'self'))}
+
+
 def ensure_dirs(dirs):
     """Create a list of directories if not exists."""
     dirs = [pathlib.Path(d) for d in listify(dirs)]
