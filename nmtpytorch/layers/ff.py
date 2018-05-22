@@ -12,11 +12,12 @@ class FF(nn.Module):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
+        self.use_bias = bias
         self.bias_zero = bias_zero
         self.activ_type = activ if activ else 'linear'
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
 
-        if bias:
+        if self.use_bias:
             self.bias = nn.Parameter(torch.Tensor(out_features))
         else:
             self.register_parameter('bias', None)
@@ -31,7 +32,7 @@ class FF(nn.Module):
     def reset_parameters(self):
         stdv = 1. / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
-        if self.bias is not None:
+        if self.use_bias:
             if self.bias_zero:
                 self.bias.data.zero_()
             else:
@@ -44,4 +45,6 @@ class FF(nn.Module):
         return self.__class__.__name__ + '(' \
             + 'in_features=' + str(self.in_features) \
             + ', out_features=' + str(self.out_features) \
-            + ', activ=' + str(self.activ_type) + ')'
+            + ', activ=' + str(self.activ_type) \
+            + ', bias=' + str(self.use_bias) \
+            + ', bias_zero=' + str(self.bias_zero) + ')'
