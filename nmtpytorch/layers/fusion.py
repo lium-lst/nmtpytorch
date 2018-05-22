@@ -22,9 +22,9 @@ class Fusion(torch.nn.Module):
             concatenation. Only necessary if ``fusion_type==concat``.
     """
 
-    def __init__(self, fusion_type='concat',
-                 input_size=None, output_size=None):
+    def __init__(self, fusion_type='concat', input_size=None, output_size=None):
         super().__init__()
+
         self.fusion_type = fusion_type
         self.forward = getattr(self, '_{}'.format(self.fusion_type))
 
