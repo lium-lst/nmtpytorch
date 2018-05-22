@@ -13,9 +13,10 @@ class Attentionv2(nn.Module):
             the attention will be applied.
         hid_dim(int): The dimensionality of decoder's hidden states that
             will be used as attention queries.
-        mid_dim(int): The common dimensionality that
+        mid_dim(int|str): The common dimensionality that
             source hidden states and decoder hidden states should be projected.
-            Common choices whould be ``ctx_dim`` or ``hid_dim``.
+            This may also be one of 'ctx' or 'hid' to select ``ctx_dim`` or
+            ``hid_dim``.
         method(str, optional): Use ``mlp`` (default) or ``dot`` attention.
         mlp_activ(str, optional): If ``method == 'mlp'``, defines which
             non-linearity to use before the transformation. Default is ``tanh``.
@@ -35,13 +36,18 @@ class Attentionv2(nn.Module):
 
         self.ctx_dim = ctx_dim
         self.hid_dim = hid_dim
-        self.mid_dim = mid_dim
         self.method = method
         self.mlp_activ = mlp_activ
         self.mlp_bias = mlp_bias
         self.temp = temp
         self.final_ctx_transform = final_ctx_transform
         self.activ = getattr(F, self.mlp_activ)
+
+        # The common dimensionality for inner formulation
+        if isinstance(mid_dim, int):
+            self.mid_dim = mid_dim
+        else:
+            self.mid_dim = getattr(self, '{}_dim'.format(mid_dim))
 
         if self.method == 'mlp':
             self.ff = nn.Linear(self.mid_dim, 1, bias=False)
