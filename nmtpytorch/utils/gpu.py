@@ -20,6 +20,19 @@ class GPUManager(object):
         self.free_idxs = [i for i in range(len(self.free_map))
                           if self.free_map[i]]
 
+    @staticmethod
+    def get_mem_usage():
+        idxs = os.environ['CUDA_VISIBLE_DEVICES']
+        p = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.used,memory.total",
+             "--format=csv,noheader", "-i", idxs],
+            stdout=subprocess.PIPE,
+            universal_newlines=True)
+        out = p.stdout.strip().replace('MiB,', '/')
+        return ', '.join(
+            ['GPU{} -> {}'.format(idx, msg) for idx, msg
+             in enumerate(out.split('\n'))])
+
     def __call__(self, devs, strict=False):
         vis_dev = os.environ.get('CUDA_VISIBLE_DEVICES', None)
         if vis_dev is not None:
