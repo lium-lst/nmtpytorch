@@ -5,7 +5,8 @@ import torch.nn.functional as F
 
 
 class Attention(nn.Module):
-    """Attention layer for seq2seq NMT."""
+    """Attention layer for seq2seq NMT.
+    NOTE: Attentionv2 is an up-to-date version of this that you should consider."""
     def __init__(self, ctx_dim, hid_dim, att_bottleneck='ctx',
                  transform_ctx=True, att_activ='tanh', att_type='mlp',
                  mlp_bias=False, temp=1., ctx2hid=True):
