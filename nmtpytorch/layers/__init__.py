@@ -1,4 +1,5 @@
 from .ff import FF
+from .decinit import DecoderInitializer
 from .fusion import Fusion
 from .flatten import Flatten
 from .attention import Attention
