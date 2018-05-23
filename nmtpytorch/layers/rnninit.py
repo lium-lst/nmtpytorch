@@ -6,42 +6,46 @@ from ..utils.data import to_var
 from . import FF
 
 
-class DecoderInitializer(nn.Module):
-    """Decoder initializer block for GRU and LSTM.
+class RNNInitializer(nn.Module):
+    """RNN initializer block for encoders and decoders.
 
     Arguments:
-        dec_type(str): GRU or LSTM.
+        rnn_type(str): GRU or LSTM.
         input_size(int): Input dimensionality of the feature vectors that'll
             be used for initialization if ``method != zero``.
-        hidden_size(int): Output dimensionality, i.e. hidden size of the decoder
+        hidden_size(int): Output dimensionality, i.e. hidden size of the RNN
             that will be initialized.
+        n_layers(int): Number of recurrent layers to be initialized.
         data_source(str): The modality name to look for in the batch dictionary.
         method(str): One of ``last_ctx|mean_ctx|feats|zero``.
         activ(str, optional): The non-linearity to be used for all initializers
             except 'zero'. Default is ``None`` i.e. no non-linearity.
     """
-    def __init__(self, dec_type, input_size, hidden_size, data_source,
+    def __init__(self, rnn_type, input_size, hidden_size, n_layers, data_source,
                  method, activ=None):
-        self.dec_type = dec_type
+        super().__init__()
+        self.rnn_type = rnn_type
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.n_layers = n_layers
         self.data_source = data_source
         self.method = method
         self.activ = activ
 
-        # Check for decoder type
-        assert self.dec_type in ('GRU', 'LSTM'), \
-            "dec_type '{}' is unknown.".format(self.dec_type)
+        # Check for RNN
+        assert self.rnn_type in ('GRU', 'LSTM'), \
+            "rnn_type '{}' is unknown.".format(self.rnn_type)
 
         assert self.method in ('mean_ctx', 'last_ctx', 'zero', 'feats'), \
-            "Decoder init method '{}' is unknown.".format(self.method)
+            "RNN init method '{}' is unknown.".format(self.method)
 
         # LSTMs have also the cell state so double the output size
-        self.n_states = 1 if self.dec_type == 'GRU' else 2
+        assert self.rnn_type == 'GRU', 'LSTM support not ready yet.'
+        self.n_states = 1 if self.rnn_type == 'GRU' else 2
 
         if self.method in ('mean_ctx', 'last_ctx', 'feats'):
             self.ff = FF(
-                self.input_size, self.hidden_size * self.n_states,
+                self.input_size, self.hidden_size * self.n_layers,
                 activ=self.activ)
 
         # Set the actual initializer depending on the method
@@ -49,10 +53,13 @@ class DecoderInitializer(nn.Module):
 
     def forward(self, ctx_dict):
         ctx, ctx_mask = ctx_dict[self.data_source]
-        return self._initializer(ctx, ctx_mask)
+        x = self._initializer(ctx, ctx_mask)
+        return torch.stack(torch.split(x, self.hidden_size, dim=-1))
 
     def _init_zero(self, ctx, mask):
-        h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_states)
+        # h_0: (n_layers, batch_size, hidden_size)
+        h_0 = torch.zeros(
+            self.n_layers, ctx.shape[1], self.hidden_size)
         return to_var(h_0, requires_grad=False)
 
     def _init_feats(self, ctx, mask):
@@ -74,7 +81,7 @@ class DecoderInitializer(nn.Module):
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
-            + 'in_features={}'.format(self.input_size) \
-            + 'out_features={}'.format(self.hidden_size) \
-            + 'activ={}'.format(self.activ) \
+            + 'in_features={}, '.format(self.input_size) \
+            + 'out_features={}, '.format(self.hidden_size) \
+            + 'activ={}, '.format(self.activ) \
             + 'method={}'.format(self.method) + ')'
