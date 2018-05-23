@@ -1,5 +1,5 @@
 from .ff import FF
-from .decinit import DecoderInitializer
+from .rnninit import RNNInitializer
 from .fusion import Fusion
 from .flatten import Flatten
 from .attention import Attention
@@ -10,3 +10,4 @@ from .cond_decoder import ConditionalDecoder
 from .condmm_decoder import ConditionalMMDecoder
 from .simplegru_decoder import SimpleGRUDecoder
 from .xu_decoder import XuDecoder
+from .gru_decoder import GRUDecoder
