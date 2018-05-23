@@ -79,7 +79,7 @@ def flatten(l):
 
 
 def get_local_args(d):
-    return {k:v for k, v in d.items() if not k.startswith(('__', 'self'))}
+    return {k: v for k, v in d.items() if not k.startswith(('__', 'self'))}
 
 
 def ensure_dirs(dirs):
