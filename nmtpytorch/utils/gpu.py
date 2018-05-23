@@ -22,16 +22,18 @@ class GPUManager(object):
 
     @staticmethod
     def get_mem_usage():
-        idxs = os.environ['CUDA_VISIBLE_DEVICES']
         p = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.used,memory.total",
-             "--format=csv,noheader", "-i", idxs],
+            ["nvidia-smi", "--query-compute-apps=pid,gpu_name,used_memory",
+             "--format=csv,noheader"],
             stdout=subprocess.PIPE,
             universal_newlines=True)
-        out = p.stdout.strip().replace('MiB,', '/')
-        return ', '.join(
-            ['GPU{} -> {}'.format(idx, msg) for idx, msg
-             in enumerate(out.split('\n'))])
+
+        for line in p.stdout.strip().split('\n'):
+            pid, gpu_name, usage = line.split(',')
+            if int(pid) == os.getpid():
+                return '{} -> {}'.format(gpu_name.strip(), usage.strip())
+
+        return 'N/A'
 
     def __call__(self, devs, strict=False):
         vis_dev = os.environ.get('CUDA_VISIBLE_DEVICES', None)
