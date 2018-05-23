@@ -18,29 +18,28 @@ class Attentionv2(nn.Module):
             This may also be one of 'ctx' or 'hid' to select ``ctx_dim`` or
             ``hid_dim``.
         method(str, optional): Use ``mlp`` (default) or ``dot`` attention.
+        concat_outputs(bool, optional): If ``True``, the final context vector
+            and the hidden states will be concatenated as in (Luong et al.)
         mlp_activ(str, optional): If ``method == 'mlp'``, defines which
             non-linearity to use before the transformation. Default is ``tanh``.
         mlp_bias(bool, optional): If ``method == 'mlp'``, defines whether
             the layer should have a bias or no. Default is ``False``.
         temp(float, optional): Sharpen the softmax distribution to narrow
             its focus. Default is ``1``, i.e. not enabled.
-        final_ctx_transform(bool, optional): If ``False``, the final weighted-sum
-            context vector of ``ctx_dim`` will not be linearly transformed
-            to ``hid_dim``.
     """
 
     def __init__(self, ctx_dim, hid_dim, mid_dim,
-                 method='mlp', mlp_activ='tanh', mlp_bias=False,
-                 temp=1., final_ctx_transform=True):
+                 method='mlp', concat_outputs=False,
+                 mlp_activ='tanh', mlp_bias=False, temp=1.):
         super().__init__()
 
         self.ctx_dim = ctx_dim
         self.hid_dim = hid_dim
         self.method = method
+        self.concat_outputs = concat_outputs
         self.mlp_activ = mlp_activ
         self.mlp_bias = mlp_bias
         self.temp = temp
-        self.final_ctx_transform = final_ctx_transform
         self.activ = getattr(F, self.mlp_activ)
 
         # The common dimensionality for inner formulation
@@ -62,12 +61,6 @@ class Attentionv2(nn.Module):
 
         # Adaptor from encoder's hidden dim to mid_dim
         self.ctx2mid = nn.Linear(self.ctx_dim, self.mid_dim, bias=False)
-
-        # (Optional) adapter from weighted-sum ctx vector to hid_dim
-        if self.final_ctx_transform:
-            self.att2hid = nn.Linear(self.ctx_dim, self.hid_dim, bias=False)
-        else:
-            self.att2hid = lambda x: x
 
     def forward(self, hid, ctx, ctx_mask=None):
         r"""Computes attention probabilities and final context using
@@ -108,7 +101,10 @@ class Attentionv2(nn.Module):
         # B*T*S x B*S*C -> B*T*C -> T*B*C
         attended_ctx = torch.bmm(alpha, ctx.transpose(0, 1)).transpose(0, 1)
 
-        return alpha.permute(1, 2, 0), self.att2hid(attended_ctx)
+        if self.concat_outputs:
+            attended_ctx = torch.cat([hid, attended_ctx], dim=-1)
+
+        return alpha.permute(1, 2, 0), attended_ctx
 
     def _dot_scores(self, ctx_, hid_):
         # shuffle dims to prepare for batch mat-mult
@@ -124,3 +120,16 @@ class Attentionv2(nn.Module):
 
         # What follows is: S*B*T
         return self.ff(self.activ(summed)).squeeze(-1).transpose(1, 2)
+
+    def __repr__(self):
+        method_string = "method={}".format(self.method)
+        if self.method == 'mlp':
+            method_string += " [bias={}, activ={}]".format(
+                self.mlp_bias, self.mlp_activ)
+
+        return self.__class__.__name__ + '(' \
+            + 'ctx_dim=' + str(self.ctx_dim) \
+            + ', hid_dim=' + str(self.hid_dim) \
+            + ', mid_dim=' + str(self.mid_dim) \
+            + ', ' + method_string \
+            + ', concat_outputs=' + str(self.concat_outputs) + ')'
