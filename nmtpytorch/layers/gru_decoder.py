@@ -136,5 +136,5 @@ class GRUDecoder(nn.Module):
 
         return {
             'loss': loss,
-            'logps': logps.data if self.training else None,
+            'logps': None if self.training else logps.data,
         }
