@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 from ..samplers import BucketBatchSampler
 from ..utils.data import read_sentences
@@ -7,7 +7,7 @@ from .collate import get_collate
 
 
 class BitextDataset(Dataset):
-    r"""A PyTorch dataset for parallel corpora."""
+    r"""A PyTorch dataset for parallel NMT corpora."""
     def __init__(self, split, data_dict, vocabs, topology,
                  max_trg_len=None, trg_bos=True):
         self.data = {}
@@ -68,8 +68,8 @@ class BitextDataset(Dataset):
         # Set keys that will be used by getitem to traverse dataset
         self.data_keys = sorted(list(self.data.keys()))
 
-    def get_iterator(self, batch_size, drop_targets=False, inference=False):
-        """Returns a DataLoader instance with or without target data.
+    def get_sampler(self, batch_size, drop_targets=False, inference=False):
+        """Returns a BatchSampler instance.
 
         Arguments:
             batch_size (int): (Maximum) number of elements in a batch.
@@ -83,7 +83,7 @@ class BitextDataset(Dataset):
             batch_size=batch_size, sort_lens=self.lens[self.sl],
             filter_lens=self.lens.get(self.tl, None),
             max_len=self.max_trg_len, store_indices=inference)
-        return DataLoader(self, batch_sampler=sampler, collate_fn=get_collate(keys))
+        return (sampler, get_collate(keys))
 
     def __getitem__(self, idx):
         return {k: self.data[k][idx] for k in self.data_keys}
