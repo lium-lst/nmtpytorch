@@ -5,6 +5,7 @@ import logging
 from .evaluator import Evaluator
 from .optimizer import Optimizer
 from .monitor import Monitor
+from .utils.gpu import GPUManager
 from .utils.misc import get_module_groups
 from .utils.misc import load_pt_file, fix_seed
 from .utils.ml_metrics import Loss
@@ -197,6 +198,7 @@ class MainLoop(object):
                    "mins (total: {:.2f} mins)   ({} samples/sec)".format(
                        overhead_min, nn_min, eval_min, total_min,
                        int(len(self.model.datasets['train']) / nn_sec)))
+        self.print("Peak memory usage: {}".format(GPUManager.get_mem_usage()))
 
         # Do validation?
         if self.epoch_valid and self.monitor.ectr >= self.eval_start:
@@ -268,6 +270,7 @@ class MainLoop(object):
             self.print('Saving final model.')
             self.monitor.save_model(suffix='final')
 
+        self.print("Peak memory usage: {}".format(GPUManager.get_mem_usage()))
         self.print('Training finished on %s' % time.strftime('%d-%m-%Y %H:%M'))
         # Close tensorboard
         self.tb.close()
