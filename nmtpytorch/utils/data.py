@@ -3,8 +3,16 @@ from collections import UserDict
 
 import torch
 from torch.autograd import Variable
+from torch.utils.data import DataLoader
 
 from ..utils.misc import fopen, pbar
+
+
+def make_dataloader(dataset, batch_size, pin_memory=False,
+                    num_workers=0):
+    sampler, collate = dataset.get_sampler(batch_size)
+    return DataLoader(dataset, batch_sampler=sampler, collate_fn=collate,
+        pin_memory=pin_memory, num_workers=num_workers)
 
 
 def sort_batch(seqbatch):
@@ -40,11 +48,11 @@ def to_var(input_, requires_grad=False, volatile=False):
         for key in input_:
             input_[key] = Variable(
                 input_[key],
-                requires_grad=requires_grad, volatile=volatile).cuda()
+                requires_grad=requires_grad, volatile=volatile).cuda(async=False)
         return input_
     else:
         return Variable(
-            input_, requires_grad=requires_grad, volatile=volatile).cuda()
+            input_, requires_grad=requires_grad, volatile=volatile).cuda(async=False)
 
 
 def read_sentences(fname, vocab, bos=False, eos=True):
