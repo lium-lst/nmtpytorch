@@ -14,8 +14,8 @@ class GRUDecoder(nn.Module):
                  n_layers_preatt=1, n_layers_postatt=1,
                  tied_emb=False, dec_init='zero', dec_init_size=None,
                  dec_init_activ='tanh', att_type='mlp', att_activ='tanh',
-                 att_bottleneck='ctx', att_temp=1.0,
-                 att_mlp_bias=False, dropout_dec=0, dropout_out=0,
+                 att_bottleneck='ctx', att_temp=1.0, att_mlp_bias=False,
+                 concat_outputs=True, dropout_dec=0, dropout_out=0,
                  emb_maxnorm=None, emb_gradscale=False):
         super().__init__()
 
@@ -48,26 +48,30 @@ class GRUDecoder(nn.Module):
             hid_dim=self.hidden_size,
             mid_dim=self.att_bottleneck,
             method=self.att_type,
-            concat_outputs=True,
+            concat_outputs=self.concat_outputs,
             mlp_bias=self.att_mlp_bias,
             mlp_activ=self.att_activ,
             temp=self.att_temp)
+
+        # Determine the output dimensionality of preattn RNN
+        preatt_out_dim = self.ctx_size_dict[self.ctx_name]
+        if self.concat_outputs:
+            preatt_out_dim += self.hidden_size
 
         if self.n_layers_postatt > 0:
             # Create second decoder block that'll process attention outputs
             # Input is the concatenation of ctx and prev hidden
             self.rnn_post = nn.GRU(
-                self.hidden_size + self.ctx_size_dict[self.ctx_name],
-                self.hidden_size, num_layers=self.n_layers_postatt,
-                dropout=self.dropout_dec)
-            hid2out_input = self.hidden_size
+                preatt_out_dim, self.hidden_size,
+                num_layers=self.n_layers_postatt, dropout=self.dropout_dec)
+            hid2out_inp_dim = self.hidden_size
         else:
-            hid2out_input = self.hidden_size + self.ctx_size_dict[self.ctx_name]
+            hid2out_inp_dim = preatt_out_dim
 
         # Output bottleneck: maps hidden states to target emb dim
         # This is necessary for tied embeddings support
         hid2out = FF(
-            hid2out_input, self.input_size, bias_zero=True, activ='tanh')
+            hid2out_inp_dim, self.input_size, bias_zero=True, activ='tanh')
 
         # Final softmax
         out2prob = FF(self.input_size, self.n_vocab)
