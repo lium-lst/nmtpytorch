@@ -42,6 +42,9 @@ class NMTv2(nn.Module):
             'att_mlp_bias': False,      # Enables bias in attention mechanism
             'att_bottleneck': 'ctx',    # Bottleneck dimensionality (ctx|hid)
             'att_transform_ctx': True,  # Transform annotations before attention
+            'concat_outputs': True,     # Whether the output of the pre-attn RNN and the
+                                        # the attended context should be concatenated or not
+                                        # Defines the input size of the post-attn RNN
             'n_layers_preatt': 1,       # Pre-attention RNN decoder count
             'n_layers_postatt': 1,      # Post-attention RNN decoder count
             'dropout_emb': 0,           # Simple dropout to source embeddings
