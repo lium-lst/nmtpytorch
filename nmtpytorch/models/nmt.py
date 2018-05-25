@@ -48,7 +48,6 @@ class NMT(nn.Module):
             'max_trg_len': 80,          # Reject sentences where target length > 80
             'direction': None,          # Network directionality, i.e. en->de
         }
-
     def __init__(self, opts):
         super().__init__()
 
@@ -93,6 +92,8 @@ class NMT(nn.Module):
             self.ctx_sizes = {str(self.sl): self.opts.model['enc_dim'] * 2}
 
         # Check vocabulary sizes for 3way tying
+        if self.opts.model['tied_emb'] not in [False, '2way', '3way']:
+            raise RuntimeError('Error: bad value for parameter tied_emb: {}'.format(self.opts.model['tied_emb']))
         if self.opts.model['tied_emb'] == '3way':
             assert self.n_src_vocab == self.n_trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
