@@ -8,9 +8,6 @@ from collections import defaultdict
 from configparser import ConfigParser, ExtendedInterpolation
 from ast import literal_eval
 
-# Default data types
-INT = 'int64'
-FLOAT = 'float32'
 
 TRAIN_DEFAULTS = {
     'device_id': 'auto_1',       # auto_N for automatic N gpus
