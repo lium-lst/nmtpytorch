@@ -68,8 +68,8 @@ class BitextDataset(Dataset):
         # Set keys that will be used by getitem to traverse dataset
         self.data_keys = sorted(list(self.data.keys()))
 
-    def get_sampler(self, batch_size, drop_targets=False, inference=False):
-        """Returns a BatchSampler instance.
+    def get_loader_args(self, batch_size, drop_targets=False, inference=False):
+        """Returns a dictionary with ``DataLoader`` arguments inside.
 
         Arguments:
             batch_size (int): (Maximum) number of elements in a batch.
@@ -83,7 +83,10 @@ class BitextDataset(Dataset):
             batch_size=batch_size, sort_lens=self.lens[self.sl],
             filter_lens=self.lens.get(self.tl, None),
             max_len=self.max_trg_len, store_indices=inference)
-        return (sampler, get_collate(keys))
+        return {
+            'batch_sampler': sampler,
+            'collate_fn': get_collate(keys),
+        }
 
     def __getitem__(self, idx):
         return {k: self.data[k][idx] for k in self.data_keys}
