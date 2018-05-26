@@ -10,9 +10,9 @@ from ..utils.misc import fopen, pbar
 
 def make_dataloader(dataset, batch_size, pin_memory=False,
                     num_workers=0, **kwargs):
-    sampler, collate = dataset.get_sampler(batch_size, **kwargs)
-    return DataLoader(dataset, batch_sampler=sampler, collate_fn=collate,
-        pin_memory=pin_memory, num_workers=num_workers)
+    dl_kwargs = dataset.get_loader_args(batch_size, **kwargs)
+    return DataLoader(
+        dataset, pin_memory=pin_memory, num_workers=num_workers, **dl_kwargs)
 
 
 def sort_batch(seqbatch):
@@ -29,8 +29,8 @@ def pad_data(seqs):
     """Pads sequences with zero for minibatch processing."""
     lengths = [len(s) for s in seqs]
     max_len = max(lengths)
-    out = torch.LongTensor([s + [0] * (max_len - len_) for
-                            s, len_ in zip(seqs, lengths)]).t()
+    out = torch.LongTensor(
+        [s + [0] * (max_len - len_) for s, len_ in zip(seqs, lengths)]).t()
     return out
 
 
