@@ -9,8 +9,8 @@ from ..utils.misc import fopen, pbar
 
 
 def make_dataloader(dataset, batch_size, pin_memory=False,
-                    num_workers=0):
-    sampler, collate = dataset.get_sampler(batch_size)
+                    num_workers=0, **kwargs):
+    sampler, collate = dataset.get_sampler(batch_size, **kwargs)
     return DataLoader(dataset, batch_sampler=sampler, collate_fn=collate,
         pin_memory=pin_memory, num_workers=num_workers)
 
