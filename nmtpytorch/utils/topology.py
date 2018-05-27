@@ -33,6 +33,7 @@ class Topology(object):
         self.direction = direction
         self.srcs = OrderedDict()
         self.trgs = OrderedDict()
+        self.all = OrderedDict()
 
         srcs, trgs = direction.split('->')
 
@@ -43,15 +44,16 @@ class Topology(object):
         }
 
         for key, values in tmp.items():
+            _dict = getattr(self, key)
             for val in values:
                 name, *ftype = val.strip().split(':')
                 ftype = ftype[0] if len(ftype) > 0 else "Text"
                 ds = DataSource(name, ftype)
-                if name in self.__dict__:
+                if name in self.all:
                     raise RuntimeError(
                         '"{}" already given as a data source.'.format(name))
-                setattr(self, name, ds)
-                getattr(self, key)[name] = ds
+                _dict[name] = ds
+                self.all[name] = ds
 
     def get_src_langs(self):
         langs = [v for v in self.srcs.values() if v._type == 'Text']
