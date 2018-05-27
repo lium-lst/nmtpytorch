@@ -4,7 +4,7 @@ from pathlib import Path
 
 from torch.utils.data import Dataset
 
-from ..utils.data import read_sentences
+from ..utils.data import read_sentences, pad_data
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -39,6 +39,10 @@ class TextDataset(Dataset):
 
         # Dataset size
         self.size = len(self.data)
+
+    @staticmethod
+    def to_torch(batch):
+        return pad_data(batch)
 
     def __getitem__(self, idx):
         return self.data[idx]
