@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import torch
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,10 @@ class NumpyDataset(Dataset):
 
         # Dataset size
         self.size = self.data.shape[0]
+
+    @staticmethod
+    def to_torch(batch):
+        return torch.from_numpy(batch.astype('float32'))
 
     def __getitem__(self, idx):
         return self.data[idx]
