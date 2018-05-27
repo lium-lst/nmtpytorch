@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from torch.utils.data import DataLoader
-
 from . import ImageFolderDataset, OneHotDataset, NumpyDataset
 from . import MultiParallelDataset
 from .collate import get_collate
@@ -55,8 +53,8 @@ class MultiLabelMulti30kDataset(object):
             trg_datasets={v: data[k] for k, v in self.topology.trgs.items()},
         )
 
-    def get_iterator(self, batch_size, drop_targets=False, inference=False):
-        """Returns a DataLoader instance with or without target data.
+    def get_loader_args(self, batch_size, drop_targets=False, inference=False):
+        """Returns a BatchSampler instance.
 
         Arguments:
             batch_size (int): (Maximum) number of elements in a batch.
@@ -66,9 +64,12 @@ class MultiLabelMulti30kDataset(object):
                 shuffled.
         """
         keys = self.dataset.sources if drop_targets else self.dataset.data_sources
-        return DataLoader(
-            self.dataset, shuffle=not inference, batch_size=batch_size,
-            collate_fn=get_collate(keys))
+        return {
+            'dataset': self.dataset,
+            'shuffle': not inference,
+            'batch_size': batch_size,
+            'collate_fn': get_collate(keys),
+        }
 
     def __repr__(self):
         return self.dataset.__repr__()
