@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
+import torch
 import torch.utils.data as data
 from torchvision import transforms
 
@@ -72,6 +73,10 @@ class ImageFolderDataset(data.Dataset):
         with open(fname, 'rb') as f:
             img = Image.open(f).convert('RGB')
             return self.transform(img)
+
+    @staticmethod
+    def to_torch(batch):
+        return torch.stack(batch.astype('float32'))
 
     def __getitem__(self, idx):
         return self.read_image(self.image_files[idx])
