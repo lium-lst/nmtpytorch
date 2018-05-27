@@ -4,7 +4,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 
-from ..utils.data import read_sentences
+from ..utils.data import read_sentences, onehot_data
 
 
 class OneHotDataset(Dataset):
@@ -36,8 +36,15 @@ class OneHotDataset(Dataset):
         # Convert indices to torch tensors
         self.data = [torch.LongTensor(elem) for elem in self.data]
 
+        # number of possible classes is the vocab size
+        self.n_classes = len(self.vocab)
+
         # Dataset size
         self.size = len(self.data)
+
+    @staticmethod
+    def to_torch(batch, **kwargs):
+        return onehot_data(batch, **kwargs)
 
     def __getitem__(self, idx):
         return self.data[idx]
