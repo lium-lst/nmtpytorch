@@ -53,7 +53,6 @@ class OneHotDataset(Dataset):
         return self.size
 
     def __repr__(self):
-        s = "{} ({} sentences)\n".format(
-            self.__class__.__name__, self.__len__())
-        s += " {}".format(self.fnames[0].name)
+        s = "{} '{}' ({} sentences)\n".format(
+            self.__class__.__name__, self.fnames[0].name, self.__len__())
         return s

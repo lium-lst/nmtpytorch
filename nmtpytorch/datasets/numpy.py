@@ -42,7 +42,6 @@ class NumpyDataset(Dataset):
         return self.size
 
     def __repr__(self):
-        s = "{} ({} samples)\n".format(
-            self.__class__.__name__, self.__len__())
-        s += " {}".format(self.path.name)
+        s = "{} '{}' ({} samples)\n".format(
+            self.__class__.__name__, self.path.name, self.__len__())
         return s
