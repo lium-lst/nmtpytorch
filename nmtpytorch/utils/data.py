@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-from collections import UserDict
-
 import torch
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
 from ..utils.misc import fopen, pbar
