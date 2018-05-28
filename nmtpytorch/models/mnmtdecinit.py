@@ -22,7 +22,8 @@ class MNMTDecinit(NMT):
         self.datasets[split] = MultimodalDataset(
             data_dict=self.opts.data[split + '_set'],
             vocabs=self.vocabs,
-            topology=self.topology)
+            topology=self.topology,
+            bucket_by=self.opts.model['bucket_by'])
         logger.info(self.datasets[split])
 
     def encode(self, batch):
