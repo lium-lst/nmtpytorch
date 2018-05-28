@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
+from .utils.data import make_dataloader
 
 from . import models
 from .config import Options
@@ -108,7 +109,8 @@ class Translator(object):
 
         # NOTE: Data iteration needs to be unique for ensembling
         # otherwise it gets too complicated
-        loader = self.instances[0].datasets[split].get_iterator(
+        loader = make_dataloader(
+            self.instances[0].datasets[split],
             self.batch_size, drop_targets=True, inference=True)
 
         logger.info('Starting translation')
