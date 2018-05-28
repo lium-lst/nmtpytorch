@@ -53,6 +53,8 @@ class ShowAttendAndTell(NMT):
             'crop': 224,                # center crop size after resize
             'replicate': 1,             # number of captions/image
             'direction': None,          # Network directionality, i.e. en->de
+            'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
+                                        # the batches will be sorted
         }
 
     def __init__(self, opts):
@@ -107,17 +109,20 @@ class ShowAttendAndTell(NMT):
             prev2out=self.opts.model['prev2out'],
             ctx2out=self.opts.model['ctx2out'])
 
-    def load_data(self, split):
+    def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
-        self.datasets[split] = MultimodalDataset(
-            data_dict=self.opts.data[split + '_set'],
+        dataset = MultimodalDataset(
+            data=self.opts.data[split + '_set'],
+            mode=mode, batch_size=batch_size,
+            vocabs=self.vocabs, topology=self.topology,
+            bucket_by=self.opts.model['bucket_by'],
+            max_len=self.opts.model.get('max_len', None),
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
-            crop=self.opts.model['crop'],
             replicate=self.opts.model['replicate'] if split == 'train' else 1,
-            vocabs=self.vocabs,
-            topology=self.topology)
-        logger.info(self.datasets[split])
+            crop=self.opts.model['crop'])
+        logger.info(dataset)
+        return dataset
 
     def encode(self, batch):
         # Get features into (n,c,w*h) and then (w*h,n,c)

@@ -114,17 +114,19 @@ class AttentiveMNMT(NMT):
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
 
-    def load_data(self, split):
+    def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
-        self.datasets[split] = MultimodalDataset(
-            data_dict=self.opts.data[split + '_set'],
-            vocabs=self.vocabs,
-            topology=self.topology,
+        dataset = MultimodalDataset(
+            data=self.opts.data[split + '_set'],
+            mode=mode, batch_size=batch_size,
+            vocabs=self.vocabs, topology=self.topology,
             bucket_by=self.opts.model['bucket_by'],
+            max_len=self.opts.model.get('max_len', None),
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
             crop=self.opts.model['crop'])
-        logger.info(self.datasets[split])
+        logger.info(dataset)
+        return dataset
 
     def encode(self, batch):
         # Get features into (n,c,w*h) and then (w*h,n,c)

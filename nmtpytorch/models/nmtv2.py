@@ -179,15 +179,16 @@ class NMTv2(nn.Module):
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
 
-    def load_data(self, split):
+    def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
         dataset = BitextDataset(
-            split=split, data_dict=self.opts.data, vocabs=self.vocabs,
-            topology=self.topology, trg_bos=self.opts.model['trg_bos'] == 'emb',
-            max_trg_len=self.opts.model['max_trg_len']
-            if split == 'train' else None)
-        self.datasets[split] = dataset
+            data=self.opts.data['{}_set'.format(split)],
+            mode=mode, batch_size=batch_size,
+            vocabs=self.vocabs, topology=self.topology,
+            max_trg_len=self.opts.model['max_trg_len'],
+            trg_bos=self.opts.model['trg_bos'] == 'emb')
         logger.info(dataset)
+        return dataset
 
     def get_bos(self, batch_size):
         """Returns a representation for <bos> embeddings for decoding."""
