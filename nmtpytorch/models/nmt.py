@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 
 from ..layers import TextEncoder, ConditionalDecoder
-from ..utils.data import to_var
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
@@ -220,7 +219,8 @@ class NMT(nn.Module):
         mrr = MeanReciprocalRank(self.n_trg_vocab)
 
         for batch in data_loader:
-            out = self.forward(to_var(batch, volatile=True))
+            batch.to_gpu(volatile=True)
+            out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
             mrr.update(batch[self.tl][1:].data, out['logps'])
 
