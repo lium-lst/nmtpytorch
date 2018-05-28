@@ -5,11 +5,11 @@ from torch.utils.data import DataLoader
 from ..utils.misc import fopen, pbar
 
 
-def make_dataloader(dataset, batch_size, pin_memory=False,
-                    num_workers=0, **kwargs):
-    dl_kwargs = dataset.get_loader_args(batch_size, **kwargs)
+def make_dataloader(dataset, pin_memory=False, num_workers=0):
     return DataLoader(
-        dataset, pin_memory=pin_memory, num_workers=num_workers, **dl_kwargs)
+        dataset, batch_sampler=dataset.sampler,
+        collate_fn=dataset.collate_fn,
+        pin_memory=pin_memory, num_workers=num_workers)
 
 
 def sort_batch(seqbatch):
