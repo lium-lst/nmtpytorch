@@ -28,8 +28,6 @@ class ShowAttendAndTell(NMT):
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
             'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx)
-            'trg_bos': 'emb',           # emb: Learn a <bos> and use it
-                                        # ctx: Source driven dynamic <bos>
             'att_type': 'mlp',          # Attention type (mlp|dot)
             'att_temp': 1.,             # Attention temperature
             'att_activ': 'tanh',        # Attention non-linearity (all torch nonlins)

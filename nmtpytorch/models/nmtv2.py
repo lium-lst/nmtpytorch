@@ -9,7 +9,7 @@ from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from ..utils.ml_metrics import MeanReciprocalRank, Loss
-from ..datasets import BitextDataset
+from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
 logger = logging.getLogger('nmtpytorch')
@@ -33,8 +33,6 @@ class NMTv2(nn.Module):
             'dec_init_activ': 'tanh',   # The non-linearity for *_ctx and feats inits
             'dec_init_size': None,      # feature vector dimensionality for
                                         # dec_init == 'feats'
-            'trg_bos': 'emb',           # emb: Learn a <bos> and use it
-                                        # ctx: Source driven dynamic <bos>
             'att_type': 'mlp',          # Attention type (mlp|dot)
             'att_temp': 1.,             # Attention temperature
             'att_activ': 'tanh',        # Attention non-linearity (all torch nonlins)
@@ -52,8 +50,8 @@ class NMTv2(nn.Module):
             'dropout_enc': 0,           # Intra-encoder dropout if n_encoders > 1
             'dropout_dec': 0,           # Intra-decoder dropout if n_layers_* > 1
             'tied_emb': False,          # Share embeddings: (False|2way|3way)
-            'max_trg_len': 80,          # Reject sentences where target length > 80
             'direction': None,          # Network directionality, i.e. en->de
+            'max_len': 80,              # Reject sentences where 'bucket_by' length > 80
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
                                         # the batches will be sorted
         }
@@ -181,12 +179,12 @@ class NMTv2(nn.Module):
 
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
-        dataset = BitextDataset(
+        dataset = MultimodalDataset(
             data=self.opts.data['{}_set'.format(split)],
             mode=mode, batch_size=batch_size,
             vocabs=self.vocabs, topology=self.topology,
-            max_trg_len=self.opts.model['max_trg_len'],
-            trg_bos=self.opts.model['trg_bos'] == 'emb')
+            bucket_by=self.opts.model['bucket_by'],
+            max_len=self.opts.model['max_len'])
         logger.info(dataset)
         return dataset
 
