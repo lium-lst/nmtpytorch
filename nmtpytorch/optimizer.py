@@ -75,8 +75,7 @@ class Optimizer(object):
         assert n_params == 0, "Not all params are passed to the optimizer."
 
         # Create the actual optimizer
-        self.optim = self.methods[self.name](self.param_groups,
-                                             **self.optim_args)
+        self.optim = self.methods[self.name](self.param_groups, **self.optim_args)
 
         # Get final lr that will be used
         self.lr = self.optim.defaults['lr']
@@ -84,14 +83,14 @@ class Optimizer(object):
         # Assign shortcuts
         self.zero_grad = self.optim.zero_grad
 
-        # Skip useless if evaluation logic if gradient_clip not requested
         if self.gclip == 0:
             self.step = self.optim.step
+        else:
+            self.step = self._step
 
-    def step(self, closure=None):
+    def _step(self, closure=None):
         """Gradient clipping aware step()."""
-        if self.gclip > 0:
-            clip_grad_norm(self.params, self.gclip)
+        clip_grad_norm(self.params, self.gclip)
         self.optim.step(closure)
 
     def __repr__(self):
