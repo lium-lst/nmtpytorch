@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from torch.utils.data import Dataset
 
-from ..utils.topology import DataSource
-
 
 class MultiParallelDataset(Dataset):
     r"""A PyTorch dataset to fusion an arbitrary number of parallel data sources.
@@ -24,12 +22,10 @@ class MultiParallelDataset(Dataset):
             trg_datasets = {}
 
         for key, dataset in src_datasets.items():
-            assert isinstance(key, DataSource)
             self.sources.append(key)
             self.data[key] = dataset
 
         for key, dataset in trg_datasets.items():
-            assert isinstance(key, DataSource)
             self.targets.append(key)
             self.data[key] = dataset
 
