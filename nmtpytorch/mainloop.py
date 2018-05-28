@@ -9,7 +9,7 @@ from .utils.gpu import GPUManager
 from .utils.misc import get_module_groups
 from .utils.misc import load_pt_file, fix_seed
 from .utils.ml_metrics import Loss
-from .utils.data import to_var
+from .utils.data import make_dataloader
 from .utils.tensorboard import TensorBoard
 from .search import beam_search
 
@@ -28,8 +28,9 @@ class MainLoop(object):
         # Load training and validation data & create iterators
         self.print('Loading dataset(s)')
         self.model.load_data('train')
-        self.train_iterator = self.model.datasets['train'].get_iterator(
-            self.batch_size)
+        self.train_iterator = make_dataloader(
+            self.model.datasets['train'], self.batch_size,
+            self.pin_memory, self.num_workers)
 
         # Create monitor for validation, evaluation, checkpointing stuff
         self.monitor = Monitor(self.save_path / self.subfolder, self.exp_id,
@@ -44,11 +45,12 @@ class MainLoop(object):
             self.model.load_data('val')
             val_set = self.model.datasets['val']
             if 'LOSS' in self.monitor.eval_metrics:
-                self.vloss_iterator = val_set.get_iterator(
-                    self.batch_size, inference=True)
+                self.vloss_iterator = make_dataloader(
+                    val_set, self.batch_size, inference=True)
             if self.monitor.beam_metrics is not None:
-                self.beam_iterator = val_set.get_iterator(
-                    self.eval_batch_size, drop_targets=True, inference=True)
+                self.beam_iterator = make_dataloader(
+                    val_set, self.eval_batch_size,
+                    drop_targets=True, inference=True)
                 # Create hypothesis evaluator
                 self.evaluator = Evaluator(
                     self.model.val_refs, self.monitor.beam_metrics,
@@ -121,7 +123,8 @@ class MainLoop(object):
             self.optim.zero_grad()
 
             # Forward pass returns dict
-            out = self.model(to_var(batch))
+            batch.to_gpu()
+            out = self.model(batch)
             loss_meter.update(out['loss'], out['n_items'])
 
             # Normalize and sum with auxiliary multi-task losses
