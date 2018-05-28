@@ -33,7 +33,7 @@ class NumpyDataset(Dataset):
 
     @staticmethod
     def to_torch(batch):
-        return torch.from_numpy(batch.astype('float32'))
+        return torch.from_numpy(np.array(batch, dtype='float32'))
 
     def __getitem__(self, idx):
         return self.data[idx]
