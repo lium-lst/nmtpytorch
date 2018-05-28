@@ -20,9 +20,6 @@ class BucketBatchSampler(Sampler):
         batch_size (int): Size of mini-batch.
         sort_lens (list): List of source or target lengths corresponding to each
             item in the dataset.
-        filter_lens (list, optional): If ``max_len`` is not ``None``, use this list
-            of lengths to reject long sequences. Can be source or target
-            lengths independently from ``sort_lens``.
         max_len (int, optional): A maximum sequence length that will be used
             to filter out very long sequences. ``None`` means no filtering.
         store_indices (bool, optional): If ``True``, indices that will unsort
@@ -41,7 +38,7 @@ class BucketBatchSampler(Sampler):
 
     """
 
-    def __init__(self, batch_size, sort_lens, filter_lens=None,
+    def __init__(self, batch_size, sort_lens,
                  max_len=None, store_indices=False):
         self.batch_size = batch_size
         self.max_len = max_len
@@ -52,9 +49,9 @@ class BucketBatchSampler(Sampler):
         self.buckets = defaultdict(list)
 
         # Fill the buckets while optionally filtering out long sequences
-        if self.max_len is not None and filter_lens is not None:
+        if self.max_len is not None:
             for idx, len_ in enumerate(sort_lens):
-                if filter_lens[idx] <= self.max_len:
+                if len_ <= self.max_len:
                     self.buckets[len_].append(idx)
                 else:
                     self.n_rejects += 1
