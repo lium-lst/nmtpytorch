@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 from .utils.misc import load_pt_file
+from .utils.data import make_dataloader
 
 from . import models
 from .config import Options
@@ -59,8 +60,8 @@ class Tester(object):
 
     def test(self, instance, split):
         instance.load_data(split)
-        loader = instance.datasets[split].get_iterator(
-            self.batch_size, inference=True)
+        loader = make_dataloader(
+            instance.datasets[split], self.batch_size, inference=True)
 
         logger.info('Starting computation')
         start = time.time()
