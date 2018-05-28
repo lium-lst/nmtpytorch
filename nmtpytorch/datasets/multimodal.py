@@ -11,39 +11,57 @@ logger = logging.getLogger('nmtpytorch')
 
 
 class MultimodalDataset(Dataset):
-    """Returns a Dataset for parallel multimodal corpus.
+    """Returns a Dataset for parallel multimodal corpora
 
     Arguments:
-        data_dict(dict): [data] section's relevant split dictionary
-        vocabs(dict): dictionary mapping lang keys to Vocabulary() objects
+        data(dict): [data] section's relevant split dictionary
+        mode(str): One of train/eval/beam.
+        batch_size(int): Batch size.
+        vocabs(dict): dictionary mapping keys to Vocabulary() objects
         topology(Topology): A topology object.
         bucket_by(str): String identifier of the modality which will define how
             the batches will be bucketed, i.e. sort key.
+        max_len(int, optional): Maximum sequence length for ``bucket_by``
+            modality to reject batches with long sequences.
         kwargs (dict): Argument dictionary for the ImageFolder dataset.
     """
-    def __init__(self, data_dict, vocabs, topology, bucket_by, **kwargs):
+    def __init__(self, data, mode, batch_size, vocabs, topology,
+                 bucket_by, max_len=None, **kwargs):
         self.datasets = {}
+        self.mode = mode
         self.vocabs = vocabs
+        self.batch_size = batch_size
         self.topology = topology
+        self.bucket_by = bucket_by
+
+        # Disable filtering if not training
+        self.max_len = max_len if self.mode == 'train' else None
 
         # For old models to work, set it to the first source
-        if bucket_by is None:
-            bucket_by = self.topology.get_src_langs()[0]
+        if self.bucket_by is None:
+            if len(self.topology.get_src_langs()) > 0:
+                self.bucket_by = self.topology.get_src_langs()[0]
+            elif self.mode != 'beam' and len(self.topology.get_trg_langs()) > 0:
+                self.bucket_by = self.topology.get_trg_langs()[0]
 
         for key, ds in self.topology.all.items():
-            if key == bucket_by:
+            if self.mode == 'beam' and ds.trg:
+                # Skip target streams
+                continue
+
+            if key == self.bucket_by:
                 self.bucket_by = ds
 
             if ds._type == "Text":
                 # Prepend <bos> if datasource is on target side
-                self.datasets[ds] = TextDataset(data_dict[key], vocabs[key],
-                                                bos=ds.trg)
+                self.datasets[ds] = TextDataset(
+                    data[key], vocabs[key], bos=ds.trg)
             elif ds._type == "OneHot":
-                self.datasets[ds] = OneHotDataset(data_dict[key], vocabs[key])
+                self.datasets[ds] = OneHotDataset(data[key], vocabs[key])
             elif ds._type == "ImageFolder":
-                self.datasets[ds] = ImageFolderDataset(data_dict[key], **kwargs)
+                self.datasets[ds] = ImageFolderDataset(data[key], **kwargs)
             elif ds._type == "Numpy":
-                self.datasets[ds] = NumpyDataset(data_dict[key])
+                self.datasets[ds] = NumpyDataset(data[key])
 
         # Detect dataset sizes
         sizes = set()
@@ -60,25 +78,20 @@ class MultimodalDataset(Dataset):
         self.n_sources = len([k for k in self.keys if k.src])
         self.n_targets = len([k for k in self.keys if k.trg])
 
-    def get_loader_args(self, batch_size, drop_targets=False, inference=False):
-        """Returns a BatchSampler instance."""
-        if drop_targets and self.bucket_by.trg:
-            sampler = BatchSampler(
-                SequentialSampler(self),
-                batch_size=batch_size, drop_last=False)
+        self.collate_fn = get_collate(self.keys)
+        if self.bucket_by is not None:
+            self.sort_lens = self.datasets[self.bucket_by].lengths
+            self.sampler = BucketBatchSampler(
+                batch_size=self.batch_size,
+                sort_lens=self.sort_lens,
+                max_len=self.max_len,
+                store_indices=self.mode == 'beam')
         else:
-            sampler = BucketBatchSampler(
-                batch_size=batch_size,
-                sort_lens=self.datasets[self.bucket_by].lengths,
-                store_indices=inference)
-
-        # Reject target datasets if requested
-        keys = list(filter(lambda k: not drop_targets or k.src, self.keys))
-
-        return {
-            'batch_sampler': sampler,
-            'collate_fn': get_collate(keys),
-        }
+            # No modality to sort batches, return sequential data
+            # Used for beam-search in image->text tasks
+            self.sampler = BatchSampler(
+                SequentialSampler(self),
+                batch_size=self.batch_size, drop_last=False)
 
     def __getitem__(self, idx):
         return {k: self.datasets[k][idx] for k in self.keys}
