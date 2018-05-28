@@ -29,10 +29,6 @@ class BitextDataset(Dataset):
         self.sl = src_langs[0]
         self.tl = trg_langs[0]
 
-        # Set vocabularies
-        self.src_vocab = self.vocabs[self.sl]
-        self.trg_vocab = self.vocabs[self.tl]
-
         #######################
         # Load source sentences
         #######################
@@ -44,7 +40,7 @@ class BitextDataset(Dataset):
             raise RuntimeError("Multiple source files not supported.")
 
         self.data[self.sl], self.lens[self.sl] = \
-            read_sentences(fnames[0], self.src_vocab)
+            read_sentences(fnames[0], self.vocabs[self.sl])
 
         self.size = len(self.data[self.sl])
 
@@ -60,7 +56,7 @@ class BitextDataset(Dataset):
                 raise RuntimeError("Multiple target files not supported.")
 
             self.data[self.tl], self.lens[self.tl] = \
-                read_sentences(fnames[0], self.trg_vocab, bos=self.trg_bos)
+                read_sentences(fnames[0], self.vocabs[self.tl], bos=self.trg_bos)
 
             assert len(self.data[self.tl]) == len(self.data[self.sl]), \
                 "Number of sentences on both sides differ!"
