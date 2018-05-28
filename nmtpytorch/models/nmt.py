@@ -46,6 +46,8 @@ class NMT(nn.Module):
             'tied_emb': False,          # Share embeddings: (False|2way|3way)
             'max_trg_len': 80,          # Reject sentences where target length > 80
             'direction': None,          # Network directionality, i.e. en->de
+            'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
+                                        # the batches will be sorted
         }
 
     def __init__(self, opts):
@@ -85,6 +87,9 @@ class NMT(nn.Module):
             self.tl = tlangs[0]
             self.trg_vocab = self.vocabs[self.tl]
             self.n_trg_vocab = len(self.trg_vocab)
+            # Need to be set for early-stop evaluation
+            # NOTE: This should come from config or elsewhere
+            self.val_refs = self.opts.data['val_set'][self.tl]
 
         # Textual context size is always equal to enc_dim * 2 since
         # it is the concatenation of forward and backward hidden states
@@ -96,9 +101,6 @@ class NMT(nn.Module):
             assert self.n_src_vocab == self.n_trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
 
-        # Need to be set for early-stop evaluation
-        # NOTE: This should come from config or elsewhere
-        self.val_refs = self.opts.data['val_set'][self.tl]
 
     def __repr__(self):
         s = super().__repr__() + '\n'
