@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import torch
+from torch.autograd import Variable
+
 from .utils.misc import pbar
-from .utils.data import to_var
 
 
 def tile_ctx_dict(ctx_dict, idxs):
@@ -19,8 +20,7 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
     Arguments:
         models (list of Model): Model instance(s) derived from `nn.Module`
             defining a set of methods. See `models/nmt.py`.
-        data_loader (DataLoader): A ``DataLoader`` instance returned by the
-            ``get_iterator()`` method of model's dataset.
+        data_loader (DataLoader): A ``DataLoader`` instance.
         beam_size (int, optional): The size of the beam. (Default: 12)
         max_len (int, optional): Maximum target length to stop beam-search
             if <eos> is still not generated. (Default: 200)
@@ -47,9 +47,9 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
     mask = torch.arange(max_batch_size * k).long().cuda()
     nll_storage = torch.zeros(max_batch_size).cuda()
 
-    for batch_dict in pbar(data_loader, unit='batch'):
+    for batch in pbar(data_loader, unit='batch'):
         # Send to GPU
-        batch = to_var(batch_dict, volatile=True)
+        batch.to_gpu(volatile=True)
 
         # Always use the initial storage
         beam = beam_storage.narrow(1, 0, batch.size).zero_()
@@ -76,8 +76,8 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
 
         for t in range(max_len):
             # Fetch embs for the next iteration (N*K, E)
-            # y_ts = [m.dec.emb(to_var(idxs, volatile=True)) for m in models]
-            y_t = to_var(idxs, volatile=True)
+            # y_ts = [m.dec.emb(Variable(idxs, volatile=True).cuda()) for m in models]
+            y_t = Variable(idxs, volatile=True).cuda()
 
             # Select correct positions from source context
             ctx_dicts = [tile_ctx_dict(cd, tile) for cd in ctx_dicts]
