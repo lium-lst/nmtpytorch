@@ -57,9 +57,6 @@ class NMT(nn.Module):
         # Vocabulary objects
         self.vocabs = {}
 
-        # Each split will have a dataset
-        self.datasets = {}
-
         # Each auxiliary loss should be stored inside this dictionary
         # in order to be taken into account by the mainloop for multi-tasking
         self.aux_loss = {}
