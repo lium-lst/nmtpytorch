@@ -17,8 +17,7 @@ class DataSource(UserString):
         self.to_torch = klass.to_torch
 
     def __repr__(self):
-        return "DataSource(name={}, type={}, src={}, trg={})".format(
-            self.data, self._type, self.src, self.trg)
+        return "DataSource('{}')".format(self.data)
 
 
 class Topology(object):
@@ -35,6 +34,7 @@ class Topology(object):
             if type is omitted, the default is Text.
 
         Example:
+            de:Text (no target side)
             de:Text -> en:Text
             de:Text -> en:Text, en_pos:OneHot
             de:Text, image:ImageFolder -> en:Text
@@ -45,13 +45,15 @@ class Topology(object):
         self.trgs = OrderedDict()
         self.all = OrderedDict()
 
-        srcs, trgs = direction.split('->')
+        parts = direction.strip().split('->')
+        if len(parts) == 1:
+            srcs, trgs = parts[0].strip().split(','), []
+        else:
+            srcs = parts[0].strip().split(',') if parts[0].strip() else []
+            trgs = parts[1].strip().split(',') if parts[1].strip() else []
 
         # Temporary dict to parse sources and targets in a single loop
-        tmp = {
-            'srcs': srcs.strip().split(','),
-            'trgs': trgs.strip().split(','),
-        }
+        tmp = {'srcs': srcs, 'trgs': trgs}
 
         for key, values in tmp.items():
             _dict = getattr(self, key)
