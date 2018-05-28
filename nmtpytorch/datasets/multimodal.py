@@ -1,107 +1,99 @@
 # -*- coding: utf-8 -*-
 import logging
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
-from . import ImageFolderDataset, TextDataset, OneHotDataset
-from . import MultiParallelDataset, NumpyDataset
+from . import ImageFolderDataset, TextDataset, OneHotDataset, NumpyDataset
 from .collate import get_collate
-
 from ..samplers import BucketBatchSampler
 
 logger = logging.getLogger('nmtpytorch')
 
 
-class MultimodalDataset(object):
-    """Returns a Dataset for parallel multimodal using raw JPG images or .npy features
-    or any other input modalities.
+class MultimodalDataset(Dataset):
+    """Returns a Dataset for parallel multimodal corpus.
 
     Arguments:
         data_dict(dict): [data] section's relevant split dictionary
         vocabs(dict): dictionary mapping lang keys to Vocabulary() objects
         topology(Topology): A topology object.
-        warmup(bool, optional): If ``True``, raw images will be processed
-            and cached once.
-        resize (int, optional): An optional integer to be given to
-            ``torchvision.transforms.Resize``. Default: ``256``.
-        crop (int, optional): An optional integer to be given to
-            ``torchvision.transforms.CenterCrop``. Default: ``224``.
-        replicate(int, optional): Replicate the images ``replicate``
-            times in order to process the same image that many times
-            if ``replicate`` sentences are available during training time.
+        bucket_by(str): String identifier of the modality which will define how
+            the batches will be bucketed, i.e. sort key.
+        kwargs (dict): Argument dictionary for the ImageFolder dataset.
     """
-    def __init__(self, data_dict, vocabs, topology,
-                 warmup=False, resize=256, crop=224, replicate=1):
-
+    def __init__(self, data_dict, vocabs, topology, bucket_by, **kwargs):
+        self.datasets = {}
+        self.vocabs = vocabs
         self.topology = topology
-        # FIXME: wont work for multi-language
-        self.lens = [None, None]
-        data = {}
 
-        for src, ds in self.topology.srcs.copy().items():
-            # Remove from topology if no data provided (possible in test time)
-            if src not in data_dict:
-                del self.topology.srcs[src]
-                continue
-            if ds._type.startswith(("Text", "OneHot")):
-                Dataset = globals()['{}Dataset'.format(ds._type)]
-                data[src] = Dataset(data_dict[src], vocabs[src])
-                self.lens[0] = data[src].lengths
-            elif ds._type == "ImageFolder":
-                data[src] = ImageFolderDataset(
-                    data_dict[src], resize=resize,
-                    crop=crop, replicate=replicate, warmup=warmup)
-            elif ds._type == "Numpy":
-                data[src] = NumpyDataset(data_dict[src])
+        for key, ds in self.topology.all.items():
+            if key == bucket_by:
+                self.bucket_by = ds
 
-        for trg, ds in self.topology.trgs.copy().items():
-            # Remove from topology if no data provided (possible in test time)
-            if trg not in data_dict:
-                del self.topology.trgs[trg]
-                continue
-            path = data_dict[trg]
             if ds._type == "Text":
-                data[trg] = TextDataset(path, vocabs[trg], bos=True)
-                self.lens[1] = data[trg].lengths
+                # Prepend <bos> if datasource is on target side
+                self.datasets[ds] = TextDataset(data_dict[key], vocabs[key],
+                                                bos=ds.trg)
             elif ds._type == "OneHot":
-                data[trg] = OneHotDataset(path, vocabs[trg])
+                self.datasets[ds] = OneHotDataset(data_dict[key], vocabs[key])
+            elif ds._type == "ImageFolder":
+                self.datasets[ds] = ImageFolderDataset(data_dict[key], **kwargs)
+            elif ds._type == "Numpy":
+                self.datasets[ds] = NumpyDataset(data_dict[key])
 
-        # The keys (DataSource()) convey information about data sources
-        self.dataset = MultiParallelDataset(
-            src_datasets={v: data[k] for k, v in self.topology.srcs.items()},
-            trg_datasets={v: data[k] for k, v in self.topology.trgs.items()},
-        )
+        # Detect dataset sizes
+        sizes = set()
+        for dataset in self.datasets.values():
+            sizes.add(len(dataset))
+        assert len(sizes) == 1, "Non-parallel datasets are not supported."
 
-        if self.lens[0] is not None:
-            # Sort by source-length by default
-            self.lengths = self.lens[0]
-        elif self.lens[1] is not None:
-            # If no source available, fallback to target lengths
-            # (For models where no textual input is available)
-            self.lengths = self.lens[1]
-        else:
-            # No text at all, no need to sort
-            self.lengths = None
+        # Set dataset size
+        self.size = list(sizes)[0]
 
-    def get_iterator(self, batch_size, drop_targets=False, inference=False):
-        """Returns a DataLoader instance with or without target data. See
-        bitext.py for further documentation."""
-        keys = self.dataset.sources if drop_targets else self.dataset.data_sources
+        # Set list of available datasets
+        self.keys = list(self.datasets.keys())
 
-        if self.lengths is not None:
-            sampler = BucketBatchSampler(
-                batch_size=batch_size, sort_lens=self.lengths,
-                store_indices=inference)
-        else:
+        self.n_sources = len([k for k in self.keys if k.src])
+        self.n_targets = len([k for k in self.keys if k.trg])
+
+    def get_loader_args(self, batch_size, drop_targets=False, inference=False):
+        """Returns a BatchSampler instance."""
+        if drop_targets and self.bucket_by.trg:
             sampler = BatchSampler(
-                SequentialSampler(self.dataset),
+                SequentialSampler(self),
                 batch_size=batch_size, drop_last=False)
+        else:
+            sampler = BucketBatchSampler(
+                batch_size=batch_size,
+                sort_lens=self.datasets[self.bucket_by].lengths,
+                store_indices=inference)
 
-        return DataLoader(self.dataset, batch_sampler=sampler,
-                          collate_fn=get_collate(keys))
+        # Reject target datasets if requested
+        keys = list(filter(lambda k: not drop_targets or k.src, self.keys))
 
-    def __repr__(self):
-        return self.dataset.__repr__()
+        return {
+            'batch_sampler': sampler,
+            'collate_fn': get_collate(keys),
+        }
+
+    def __getitem__(self, idx):
+        return {k: self.datasets[k][idx] for k in self.keys}
 
     def __len__(self):
-        return len(self.dataset)
+        return self.size
+
+    def __repr__(self):
+        s = "{} - ({} sources / {} targets)\n".format(
+            self.__class__.__name__, self.n_sources, self.n_targets)
+        s += "Batches sorted by '{}' lengths\n".format(self.bucket_by)
+        if self.n_sources > 0:
+            s += "  Sources:\n"
+            for name in filter(lambda k: k.src, self.keys):
+                dstr = self.datasets[name].__repr__()
+                s += '    --> ' + dstr
+        if self.n_targets > 0:
+            s += "  Targets:\n"
+            for name in filter(lambda k: k.trg, self.keys):
+                dstr = self.datasets[name].__repr__()
+                s += '    --> ' + dstr
+        return s
