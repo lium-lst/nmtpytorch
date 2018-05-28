@@ -27,7 +27,6 @@ class MainLoop(object):
 
         # Load training and validation data & create iterators
         self.print('Loading dataset(s)')
-        self.model.load_data('train')
         self.train_iterator = make_dataloader(
             self.model.load_data('train', self.batch_size),
             self.pin_memory, self.num_workers)
@@ -198,7 +197,7 @@ class MainLoop(object):
         self.print("--> Overhead/Training/Evaluation: {:.2f}/{:.2f}/{:.2f} "
                    "mins (total: {:.2f} mins)   ({} samples/sec)".format(
                        overhead_min, nn_min, eval_min, total_min,
-                       int(len(self.model.datasets['train']) / nn_sec)))
+                       int(len(self.train_iterator.dataset) / nn_sec)))
         self.print("Peak memory usage: {}".format(GPUManager.get_mem_usage()))
 
         # Do validation?
