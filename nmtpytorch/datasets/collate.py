@@ -2,10 +2,9 @@ from torch.autograd import Variable
 
 
 class Batch(object):
-    def __init__(self, data_dict, batch_size):
-        self.data = data_dict
-        self.keys = list(self.data.keys())
+    def __init__(self, batch_size, data_dict):
         self.size = batch_size
+        self.data = data_dict
         self.device = None
 
     def to_gpu(self, volatile=False):
@@ -25,7 +24,7 @@ class Batch(object):
 
     def __repr__(self):
         s = "Batch(size={}, device={})\n".format(self.size, self.device)
-        for key in self.keys:
+        for key in self.data:
             s += "  {:10s} -> {}\n".format(str(key), self.data[key].shape)
         return s
 
@@ -35,13 +34,9 @@ def get_collate(data_sources):
     in terms of the given DataSource keys."""
 
     def collate_fn(batch):
-        batch_dict = {}
-
-        # Iterate over keys which are DataSource objects
-        for ds in data_sources:
-            batch_data = [elem[ds] for elem in batch]
-            batch_dict[ds] = ds.to_torch(batch_data)
-
-        return Batch(batch_dict, len(batch))
+        return Batch(
+            len(batch),
+            {ds: ds.to_torch([elem[ds] for elem in batch]) for ds in data_sources},
+        )
 
     return collate_fn
