@@ -2,8 +2,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
-from ..utils.data import to_var
 from ..utils.nn import get_rnn_hidden_state
 from . import FF, Attention
 
@@ -114,7 +114,7 @@ class ConditionalDecoder(nn.Module):
     def _rnn_init_zero(self, ctx_dict):
         ctx, _ = ctx_dict[self.ctx_name]
         h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_states)
-        return to_var(h_0, requires_grad=False)
+        return Variable(h_0).cuda()
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         ctx, ctx_mask = ctx_dict[self.ctx_name]

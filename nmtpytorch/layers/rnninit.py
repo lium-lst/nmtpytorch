@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
-from ..utils.data import to_var
 from . import FF
 
 
@@ -60,7 +60,7 @@ class RNNInitializer(nn.Module):
         # h_0: (n_layers, batch_size, hidden_size)
         h_0 = torch.zeros(
             self.n_layers, ctx.shape[1], self.hidden_size)
-        return to_var(h_0, requires_grad=False)
+        return Variable(h_0).cuda()
 
     def _init_feats(self, ctx, mask):
         return self.ff(ctx)

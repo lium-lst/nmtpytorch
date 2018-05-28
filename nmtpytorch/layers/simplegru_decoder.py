@@ -2,8 +2,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
-from ..utils.data import to_var
 from . import FF, Attention
 
 
@@ -82,7 +82,7 @@ class SimpleGRUDecoder(nn.Module):
 
         if self.dec_init == 'zero':
             h_0 = torch.zeros(ctx.shape[1], self.hidden_size)
-            return to_var(h_0, requires_grad=False)
+            return Variable(h_0).cuda()
 
         elif self.dec_init == 'mean':
             h_0 = self.ff_dec_init(
