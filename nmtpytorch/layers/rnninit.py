@@ -58,8 +58,7 @@ class RNNInitializer(nn.Module):
 
     def _init_zero(self, ctx, mask):
         # h_0: (n_layers, batch_size, hidden_size)
-        h_0 = torch.zeros(
-            self.n_layers, ctx.shape[1], self.hidden_size)
+        h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_layers)
         return Variable(h_0).cuda()
 
     def _init_feats(self, ctx, mask):
