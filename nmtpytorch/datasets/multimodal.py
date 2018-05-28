@@ -26,6 +26,10 @@ class MultimodalDataset(Dataset):
         self.vocabs = vocabs
         self.topology = topology
 
+        # For old models to work, set it to the first source
+        if bucket_by is None:
+            bucket_by = self.topology.get_src_langs()[0]
+
         for key, ds in self.topology.all.items():
             if key == bucket_by:
                 self.bucket_by = ds
