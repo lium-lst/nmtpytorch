@@ -59,9 +59,8 @@ class Tester(object):
             self.splits = ['new']
 
     def test(self, instance, split):
-        instance.load_data(split)
-        loader = make_dataloader(
-            instance.datasets[split], self.batch_size, inference=True)
+        dataset = instance.load_data(split, self.batch_size, mode='eval')
+        loader = make_dataloader(dataset)
 
         logger.info('Starting computation')
         start = time.time()

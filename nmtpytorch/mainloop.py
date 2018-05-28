@@ -29,7 +29,7 @@ class MainLoop(object):
         self.print('Loading dataset(s)')
         self.model.load_data('train')
         self.train_iterator = make_dataloader(
-            self.model.datasets['train'], self.batch_size,
+            self.model.load_data('train', self.batch_size),
             self.pin_memory, self.num_workers)
 
         # Create monitor for validation, evaluation, checkpointing stuff
@@ -42,15 +42,13 @@ class MainLoop(object):
 
         # If a validation set exists
         if 'val_set' in self.model.opts.data and self.eval_freq >= 0:
-            self.model.load_data('val')
-            val_set = self.model.datasets['val']
             if 'LOSS' in self.monitor.eval_metrics:
                 self.vloss_iterator = make_dataloader(
-                    val_set, self.batch_size, inference=True)
+                    self.model.load_data('val', self.batch_size, mode='eval'))
+
             if self.monitor.beam_metrics is not None:
                 self.beam_iterator = make_dataloader(
-                    val_set, self.eval_batch_size,
-                    drop_targets=True, inference=True)
+                    self.model.load_data('val', self.eval_batch_size, mode='beam'))
                 # Create hypothesis evaluator
                 self.evaluator = Evaluator(
                     self.model.val_refs, self.monitor.beam_metrics,

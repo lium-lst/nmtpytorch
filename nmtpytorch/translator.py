@@ -105,13 +105,12 @@ class Translator(object):
         """
 
         # Load data
-        self.instances[0].load_data(split)
+        dataset = self.instances[0].load_data(
+            split, self.batch_size, mode='beam')
 
         # NOTE: Data iteration needs to be unique for ensembling
         # otherwise it gets too complicated
-        loader = make_dataloader(
-            self.instances[0].datasets[split],
-            self.batch_size, drop_targets=True, inference=True)
+        loader = make_dataloader(dataset)
 
         logger.info('Starting translation')
         start = time.time()
