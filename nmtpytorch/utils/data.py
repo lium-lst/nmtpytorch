@@ -42,19 +42,6 @@ def onehot_data(idxs, n_classes):
     return out
 
 
-def to_var(input_, requires_grad=False, volatile=False):
-    """Returns a torch Variable on GPU."""
-    if isinstance(input_, (UserDict, dict)):
-        for key in input_:
-            input_[key] = Variable(
-                input_[key],
-                requires_grad=requires_grad, volatile=volatile).cuda(async=False)
-        return input_
-    else:
-        return Variable(
-            input_, requires_grad=requires_grad, volatile=volatile).cuda(async=False)
-
-
 def read_sentences(fname, vocab, bos=False, eos=True):
     lines = []
     lens = []
