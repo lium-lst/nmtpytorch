@@ -54,6 +54,8 @@ class NMTv2(nn.Module):
             'tied_emb': False,          # Share embeddings: (False|2way|3way)
             'max_trg_len': 80,          # Reject sentences where target length > 80
             'direction': None,          # Network directionality, i.e. en->de
+            'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
+                                        # the batches will be sorted
         }
 
     def __init__(self, opts):

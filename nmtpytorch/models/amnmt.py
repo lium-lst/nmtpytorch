@@ -118,11 +118,12 @@ class AttentiveMNMT(NMT):
         """Loads the requested dataset split."""
         self.datasets[split] = MultimodalDataset(
             data_dict=self.opts.data[split + '_set'],
+            vocabs=self.vocabs,
+            topology=self.topology,
+            bucket_by=self.opts.model['bucket_by'],
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
-            crop=self.opts.model['crop'],
-            vocabs=self.vocabs,
-            topology=self.topology)
+            crop=self.opts.model['crop'])
         logger.info(self.datasets[split])
 
     def encode(self, batch):
