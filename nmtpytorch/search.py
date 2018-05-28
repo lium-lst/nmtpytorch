@@ -67,8 +67,7 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
         ctx_dicts = [m.encode(batch) for m in models]
 
         # Get initial decoder state (N*H)
-        h_ts = [m.dec.f_init(ctx_dict) for m, ctx_dict in
-                zip(models, ctx_dicts)]
+        h_ts = [m.dec.f_init(ctx_dict) for m, ctx_dict in zip(models, ctx_dicts)]
 
         # Start with <bos> tokens
         # FIXME: idxs should not change except for informed <bos> embeddings
@@ -83,8 +82,8 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
             ctx_dicts = [tile_ctx_dict(cd, tile) for cd in ctx_dicts]
 
             # Get log probabilities and next state
-            # log_p: batch_size x vocab_size ( t = 0 )
-            #        batch_size*beam_size x vocab_size ( t > 0)
+            # log_p: batch_size x vocab_size (t = 0)
+            #        batch_size*beam_size x vocab_size (t > 0)
             log_ps, h_ts = zip(
                 *[m.dec.f_next(cd, m.dec.emb(y_t), h_t[tile]) for
                     m, cd, h_t in zip(models, ctx_dicts, h_ts)])
