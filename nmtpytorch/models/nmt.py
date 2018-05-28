@@ -101,7 +101,6 @@ class NMT(nn.Module):
             assert self.n_src_vocab == self.n_trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
 
-
     def __repr__(self):
         s = super().__repr__() + '\n'
         for vocab in self.vocabs.values():
