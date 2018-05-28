@@ -75,7 +75,7 @@ class ImageFolderDataset(data.Dataset):
 
     @staticmethod
     def to_torch(batch):
-        return torch.stack(batch.astype('float32'))
+        return torch.stack(batch)
 
     def __getitem__(self, idx):
         return self.read_image(self.image_files[idx])
