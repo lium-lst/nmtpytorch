@@ -14,6 +14,9 @@ from ..metrics import Metric
 
 logger = logging.getLogger('nmtpytorch')
 
+# NOTE
+# This is not working right now, please do not use it.
+
 
 class NMTv2(nn.Module):
     """An improved NMT that uses CuDNN RNN primitives in the stacked decoder."""
