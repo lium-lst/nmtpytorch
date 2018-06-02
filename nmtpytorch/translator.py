@@ -36,6 +36,12 @@ class Translator(object):
         for model_file in self.models:
             weights, _, opts = load_pt_file(model_file)
             opts = Options.from_dict(opts)
+
+            if 'att_temp' not in opts.model:
+                logger.info("INFO: Model does not support 'att_temp'")
+            else:
+                opts.model['att_temp'] = self.att_temp
+
             # Create model instance
             instance = getattr(models, opts.train['model_type'])(opts=opts)
 
@@ -105,8 +111,7 @@ class Translator(object):
         """
 
         # Load data
-        dataset = self.instances[0].load_data(
-            split, self.batch_size, mode='beam')
+        dataset = self.instances[0].load_data(split, self.batch_size, mode='beam')
 
         # NOTE: Data iteration needs to be unique for ensembling
         # otherwise it gets too complicated
