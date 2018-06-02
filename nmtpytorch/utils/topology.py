@@ -68,6 +68,10 @@ class Topology(object):
                 _dict[name] = ds
                 self.all[name] = ds
 
+        # Assign shortcuts
+        self.first_src = list(self.srcs.keys())[0]
+        self.first_trg = list(self.trgs.keys())[0]
+
     def get_src_langs(self):
         langs = [v for v in self.srcs.values() if v._type == 'Text']
         return langs
