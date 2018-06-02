@@ -32,6 +32,7 @@ TRAIN_DEFAULTS = {
     'eval_beam': 6,              # Validation beam size
     'eval_batch_size': 16,       # batch_size for GPU beam-search
     'eval_freq': 3000,           # 0 means 'End of epochs'
+    'eval_max_len': 200,         # max seq len to stop during beam search
     'eval_start': 1,             # Epoch which validation will start
     'eval_zero': False,          # Evaluate once before starting training
                                  # Useful when using pretrained_file
