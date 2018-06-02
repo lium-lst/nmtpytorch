@@ -23,10 +23,13 @@ class MultimodalDataset(Dataset):
             the batches will be bucketed, i.e. sort key.
         max_len(int, optional): Maximum sequence length for ``bucket_by``
             modality to reject batches with long sequences.
+        bucket_order (str, optional): ``ascending`` or ``descending`` to
+            perform length-based curriculum learning. Default is ``None``
+            which shuffles bucket order.
         kwargs (dict): Argument dictionary for the ImageFolder dataset.
     """
     def __init__(self, data, mode, batch_size, vocabs, topology,
-                 bucket_by, max_len=None, **kwargs):
+                 bucket_by, max_len=None, bucket_order=None, **kwargs):
         self.datasets = {}
         self.mode = mode
         self.vocabs = vocabs
@@ -36,6 +39,7 @@ class MultimodalDataset(Dataset):
 
         # Disable filtering if not training
         self.max_len = max_len if self.mode == 'train' else None
+        self.bucket_order = bucket_order if self.mode == 'train' else None
 
         # For old models to work, set it to the first source
         if self.bucket_by is None:
@@ -85,7 +89,8 @@ class MultimodalDataset(Dataset):
                 batch_size=self.batch_size,
                 sort_lens=self.sort_lens,
                 max_len=self.max_len,
-                store_indices=self.mode == 'beam')
+                store_indices=self.mode == 'beam',
+                order=self.bucket_order)
         else:
             # No modality to sort batches, return sequential data
             # Used for beam-search in image->text tasks
