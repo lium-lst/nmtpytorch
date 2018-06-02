@@ -24,6 +24,9 @@ class BucketBatchSampler(Sampler):
             to filter out very long sequences. ``None`` means no filtering.
         store_indices (bool, optional): If ``True``, indices that will unsort
             the dataset will be stored. This used by beam search/inference.
+        order (str, optional): Default is ``None``, i.e. buckets are shuffled.
+            If ``ascending`` or ``descending``, will iterate w.r.t bucket
+            lengths to implement length-based curriculum learning.
 
     Example:
         # Generate dummy length information
@@ -39,11 +42,15 @@ class BucketBatchSampler(Sampler):
     """
 
     def __init__(self, batch_size, sort_lens,
-                 max_len=None, store_indices=False):
+                 max_len=None, store_indices=False, order=None):
         self.batch_size = batch_size
         self.max_len = max_len
         self.store_indices = store_indices
         self.n_rejects = 0
+        self.order = order
+
+        assert self.order in (None, 'ascending', 'descending'), \
+            "order should be None, 'ascending' or 'descending'"
 
         # Buckets: sort_lens -> list of sample indices
         self.buckets = defaultdict(list)
@@ -102,9 +109,17 @@ class BucketBatchSampler(Sampler):
             perms = np.random.permutation(len(elems))
             bucket_views[len_] = perms
 
-        # Shuffle bucket order
+        if self.order is None:
+            # Shuffle bucket order
+            shuf_idxs = np.random.permutation(self.bucket_idxs)
+        elif self.order == "ascending":
+            # Start from shortest sequences and increase
+            shuf_idxs = np.sort(self.bucket_idxs)
+        elif self.order == "descending":
+            # Start from longest sequences and decrease
+            shuf_idxs = -np.sort(-self.bucket_idxs)
+
         # For each bucket, slide the window to yield the next batch
-        shuf_idxs = np.random.permutation(self.bucket_idxs)
         for bidx in shuf_idxs:
             # Get offset pointer for this bucket: 0 initially
             offset = bucket_offsets[bidx]
