@@ -5,8 +5,7 @@ import torch.nn.functional as F
 
 
 class Attention(nn.Module):
-    """Attention layer for seq2seq NMT.
-    NOTE: Attentionv2 is an up-to-date version of this that you should consider."""
+    """Attention layer for seq2seq NMT."""
     def __init__(self, ctx_dim, hid_dim, att_bottleneck='ctx',
                  transform_ctx=True, att_activ='tanh', att_type='mlp',
                  mlp_bias=False, temp=1., ctx2hid=True):
@@ -26,7 +25,7 @@ class Attention(nn.Module):
             self.mid_dim = getattr(self, '{}_dim'.format(att_bottleneck))
 
         if self.att_type == 'mlp':
-            self.mlp = nn.Linear(self.mid_dim, 1, bias=mlp_bias)
+            self.mlp = nn.Linear(self.mid_dim, 1, bias=False)
             self._scores = self._mlp_scores
         elif self.att_type == 'dot':
             self._scores = self._dot_scores
@@ -47,6 +46,12 @@ class Attention(nn.Module):
             self.ctx2hid = nn.Linear(self.ctx_dim, self.hid_dim, bias=False)
         else:
             self.ctx2hid = lambda x: x
+
+        if mlp_bias:
+            self.bias = nn.Parameter(torch.Tensor(self.mid_dim))
+            self.bias.data.zero_()
+        else:
+            self.register_parameter('bias', None)
 
     def forward(self, hid, ctx, ctx_mask=None):
         r"""Computes attention probabilities and final context using
@@ -90,4 +95,7 @@ class Attention(nn.Module):
             self.temperature).squeeze(1).t()
 
     def _mlp_scores(self, ctx_, hid_):
-        return self.mlp(self.activ(ctx_ + hid_)).div(self.temperature).squeeze(-1)
+        inner_sum = ctx_ + hid_
+        if self.bias is not None:
+            inner_sum += self.bias
+        return self.mlp(self.activ(inner_sum)).div(self.temperature).squeeze(-1)
