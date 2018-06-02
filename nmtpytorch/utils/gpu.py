@@ -21,7 +21,7 @@ class GPUManager(object):
                           if self.free_map[i]]
 
     @staticmethod
-    def get_mem_usage():
+    def get_mem_usage(name=True):
         p = subprocess.run(
             ["nvidia-smi", "--query-compute-apps=pid,gpu_name,used_memory",
              "--format=csv,noheader"],
@@ -31,7 +31,10 @@ class GPUManager(object):
         for line in p.stdout.strip().split('\n'):
             pid, gpu_name, usage = line.split(',')
             if int(pid) == os.getpid():
-                return '{} -> {}'.format(gpu_name.strip(), usage.strip())
+                if name:
+                    return '{} -> {}'.format(gpu_name.strip(), usage.strip())
+                else:
+                    return usage.strip()
 
         return 'N/A'
 
