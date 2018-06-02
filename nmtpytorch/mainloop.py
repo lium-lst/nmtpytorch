@@ -102,57 +102,65 @@ class MainLoop(object):
         # from model initialization etc.
         fix_seed(self.seed + 1)
 
+        # Print memory usage before training
+        self.print("Memory usage before training: {}".format(
+            GPUManager.get_mem_usage()))
+
+    def train_batch(self, batch):
+        """Trains a batch."""
+        nn_start = time.time()
+
+        # Forward pass returns dict
+        batch.to_gpu()
+
+        # Reset gradients
+        self.optim.zero_grad()
+
+        out = self.model(batch)
+        self.loss_meter.update(out['loss'], out['n_items'])
+
+        # Normalize and sum with auxiliary multi-task losses
+        loss = out['loss'] / out['n_items']
+        if self.model.aux_loss:
+            loss += sum(list(self.model.aux_loss.values()))
+
+        # Backward pass
+        loss.backward()
+
+        # Update parameters (includes gradient clipping logic)
+        self.optim.step()
+
+        return time.time() - nn_start
+
     def train_epoch(self):
         """Trains a full epoch."""
         self.print('Starting Epoch {}'.format(self.monitor.ectr))
 
         nn_sec = 0.0
         eval_sec = 0.0
-        loss_meter = Loss()
         total_sec = time.time()
+        self.loss_meter = Loss()
 
         for batch in self.train_iterator:
-            #############################
             self.monitor.uctr += 1
-            nn_start = time.time()
-
-            # Reset gradients
-            self.optim.zero_grad()
-
-            # Forward pass returns dict
-            batch.to_gpu()
-            out = self.model(batch)
-            loss_meter.update(out['loss'], out['n_items'])
-
-            # Normalize and sum with auxiliary multi-task losses
-            loss = out['loss'] / out['n_items']
-            if self.model.aux_loss:
-                loss += sum(list(self.model.aux_loss.values()))
-
-            # Backward pass
-            loss.backward()
-
-            # Update parameters (includes gradient clipping logic)
-            self.optim.step()
 
             # Keep stats
-            nn_sec += (time.time() - nn_start)
-            #############################
+            nn_sec += self.train_batch(batch)
 
             if self.monitor.uctr % self.disp_freq == 0:
                 # Send statistics
                 self.tb.log_scalar(
-                    'train_LOSS', loss_meter.batch_loss, self.monitor.uctr)
+                    'train_LOSS', self.loss_meter.batch_loss, self.monitor.uctr)
 
                 msg = "Epoch {} - update {:10d} => loss: {:.3f}".format(
                     self.monitor.ectr, self.monitor.uctr,
-                    loss_meter.batch_loss)
+                    self.loss_meter.batch_loss)
                 for key, value in self.model.aux_loss.items():
                     val = value.data.cpu()[0]
                     msg += ' [{}: {:.3f}]'.format(key, val)
                     self.tb.log_scalar('train_' + key.upper(),
                                        val, self.monitor.uctr)
-
+                msg += ' (used GPU: {})'.format(GPUManager.get_mem_usage(False))
                 self.print(msg)
 
             # Do validation?
@@ -189,7 +197,7 @@ class MainLoop(object):
         overhead_min = total_min - nn_min - eval_min
 
         # Compute epoch loss
-        epoch_loss = loss_meter.get()
+        epoch_loss = self.loss_meter.get()
         self.monitor.train_loss.append(epoch_loss)
 
         self.print("--> Epoch {} finished with mean loss {:.5f}".format(
@@ -198,7 +206,6 @@ class MainLoop(object):
                    "mins (total: {:.2f} mins)   ({} samples/sec)".format(
                        overhead_min, nn_min, eval_min, total_min,
                        int(len(self.train_iterator.dataset) / nn_sec)))
-        self.print("Peak memory usage: {}".format(GPUManager.get_mem_usage()))
 
         # Do validation?
         if self.epoch_valid and self.monitor.ectr >= self.eval_start:
@@ -219,6 +226,7 @@ class MainLoop(object):
         self.model.train(False)
 
         # Collect simple validation stats first
+        self.print('Computing evaluation loss...')
         results.extend(self.model.test_performance(self.vloss_iterator))
 
         if self.monitor.beam_metrics:
@@ -226,7 +234,8 @@ class MainLoop(object):
                 self.eval_beam))
             beam_time = time.time()
             hyps = beam_search([self.model], self.beam_iterator,
-                               beam_size=self.eval_beam)
+                               beam_size=self.eval_beam,
+                               max_len=self.eval_max_len)
             beam_time = time.time() - beam_time
 
             # Compute metrics and update results
@@ -270,7 +279,6 @@ class MainLoop(object):
             self.print('Saving final model.')
             self.monitor.save_model(suffix='final')
 
-        self.print("Peak memory usage: {}".format(GPUManager.get_mem_usage()))
         self.print('Training finished on %s' % time.strftime('%d-%m-%Y %H:%M'))
         # Close tensorboard
         self.tb.close()
