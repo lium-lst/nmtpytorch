@@ -47,9 +47,11 @@ if __name__ == '__main__':
     parser_trans.add_argument('-k', '--beam-size', type=int, default=6,
                               help='Beam size for beam-search')
     parser_trans.add_argument('-m', '--max-len', type=int, default=200,
-                              help='Maximum seq. limit (Default: 200)')
+                              help='Maximum sequence length to produce (Default: 200)')
     parser_trans.add_argument('-a', '--lp-alpha', type=float, default=0.,
                               help='Apply length-penalty (Default: 0.)')
+    parser_trans.add_argument('-t', '--att-temp', type=float, default=1.,
+                              help='Temperature for attention (Default: 1.)')
     parser_trans.add_argument('-d', '--device-id', type=str, default='auto_1',
                               help='Select GPU device(s)')
     parser_trans.add_argument('models', type=str, nargs='+',
