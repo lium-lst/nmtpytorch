@@ -21,6 +21,11 @@ TRAIN_DEFAULTS = {
     'patience': 20,              # Early stopping patience
     'optimizer': 'adam',         # adadelta, sgd, rmsprop, adam
     'lr': 0.0004,                # 0 -> Use default lr from Pytorch
+    'lr_decay': False,           # Can only be 'plateau' for now
+    'lr_decay_revert': False,    # Return back to the prev best weights after decay
+    'lr_decay_factor': 0.1,      # Check torch.optim.lr_scheduler
+    'lr_decay_patience': 10,     #
+    'lr_decay_min': 0.000001,    #
     'momentum': 0.0,             # momentum for SGD
     'nesterov': False,           # Enable Nesterov for SGD
     'disp_freq': 30,             # Training display frequency (/batch)
