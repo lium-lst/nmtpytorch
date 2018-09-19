@@ -10,8 +10,7 @@ following packages:
 
 We directly carry METEOR v1.5, `multi-bleu.perl` and COCO
 evaluation tools `cocoeval` within the source tree. Moreover, we ship
-[subword-nmt](https://github.com/rsennrich/subword-nmt) and
-METEOR paraphrase files as GIT submodules in order to track their updates when
+METEOR paraphrase files as a GIT submodule in order to track their updates when
 necessary. Since paraphrase files are large, cloning the repository may take
 some time.
 

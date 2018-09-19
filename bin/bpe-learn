@@ -1,4 +1,0 @@
-#!/bin/bash
-CMD="import pkg_resources; print(pkg_resources.resource_filename('nmtpytorch', 'lib/subword_nmt/learn_bpe.py'))"
-SCRIPT=`/usr/bin/env python -c "$CMD"`
-exec $SCRIPT $@
