@@ -4,10 +4,20 @@ from collections import defaultdict
 import torch
 
 from .utils.io import FileRotator
-from .metrics import beam_metrics
+from .utils.misc import load_pt_file
+from .metrics import beam_metrics, metric_info
 
 
 class Monitor(object):
+    """Class that tracks training progress. The following informations are
+    kept as object attributes:
+        self.ectr:       # of epochs done so far
+        self.uctr:       # of updates, i.e. mini-batches done so far
+        self.vctr:       # of evaluations done on val_set so far
+        self.early_bad:  # of consecutive evaluations where the model did not improve
+        self.train_loss: List of training losses
+        self.val_scores: Dict of lists keeping tracking of validation metrics
+    """
     # Variables to save
     VARS = ['uctr', 'ectr', 'vctr', 'early_bad', 'train_loss', 'val_scores']
 
@@ -27,10 +37,10 @@ class Monitor(object):
         if history is None:
             history = {}
 
-        self.uctr = history.pop('uctr', 0)            # update ctr
-        self.ectr = history.pop('ectr', 1)            # epoch ctr
-        self.vctr = history.pop('vctr', 0)            # validation ctr
-        self.early_bad = history.pop('early_bad', 0)  # earlystop patience
+        self.uctr = history.pop('uctr', 0)
+        self.ectr = history.pop('ectr', 1)
+        self.vctr = history.pop('vctr', 0)
+        self.early_bad = history.pop('early_bad', 0)
         self.train_loss = history.pop('train_loss', [])
         self.val_scores = history.pop('val_scores', defaultdict(list))
 
@@ -40,6 +50,9 @@ class Monitor(object):
 
             # First metric is considered to be early-stopping metric
             self.early_metric = self.eval_metrics[0]
+
+            # Will be used by optimizer
+            self.lr_decay_mode = metric_info[self.early_metric]
 
             # Get metrics requiring beam_search
             bms = set(self.eval_metrics).intersection(beam_metrics)
@@ -64,19 +77,17 @@ class Monitor(object):
             self.print('--> Best {} so far: {:.2f} @ validation {}'.format(
                 name, score.score, vctr))
 
-    def _save(self, fname):
-        """Saves the current model on disk."""
-        torch.save(
-            {
-                'opts': self.model.opts.to_dict(),
-                'model': self.model.state_dict(),
-                'history': self.state_dict(),
-            }, fname)
-
     def save_checkpoint(self):
         """Saves a checkpoint by keeping track of file rotation."""
         self.checkpoints.push(
             self.save_model(suffix='update{}'.format(self.uctr)))
+
+    def reload_previous_best(self):
+        """Reloads the parameters from the previous best checkpoint."""
+        fname = self.save_path / "{}.best.{}.ckpt".format(
+            self.exp_id, self.early_metric.lower())
+        weights, _, _ = load_pt_file(fname)
+        self.model.load_state_dict(weights, strict=True)
 
     def save_model(self, metric=None, suffix='', do_symlink=False):
         """Saves a checkpoint with arbitrary suffix(es) appended."""
@@ -91,7 +102,12 @@ class Monitor(object):
         fname = self.save_path / (fname + ".ckpt")
 
         # Save the file
-        self._save(fname)
+        torch.save(
+            {
+                'opts': self.model.opts.to_dict(),
+                'model': self.model.state_dict(),
+                'history': self.state_dict(),
+            }, fname)
 
         # Also create a symbolic link to the above checkpoint for the metric
         if metric and do_symlink:
@@ -112,6 +128,9 @@ class Monitor(object):
             self.val_scores[metric.name].append(metric)
             self.cur_bests[metric.name] = self.best_score(
                 self.val_scores[metric.name])
+
+    def get_last_eval_score(self):
+        return self.cur_bests[self.early_metric][-1].score
 
     def save_models(self):
         cur_bests = self.cur_bests.copy()
