@@ -19,5 +19,6 @@ dependencies:
     - torchvision==0.2.1
     - sacrebleu>=1.2.9
     - tensorboardX==1.1
+    - editdistance==0.4
     - ipdb
     - -e .
