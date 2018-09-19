@@ -151,19 +151,16 @@ def get_n_params(module):
         readable_size(n_param_all), readable_size(n_param_learnable))
 
 
-def get_temp_file(suffix="", name=None, delete=False):
-    """Creates a temporary file under /tmp."""
-    if name:
-        name = str(pathlib.Path('/tmp') / name)
-        t = open(name, "w")
-        cleanup.register_tmp_file(name)
-    else:
-        _suffix = "_nmtpytorch_%d" % os.getpid()
-        if suffix != "":
-            _suffix += suffix
-        t = tempfile.NamedTemporaryFile(mode='w', suffix=_suffix,
-                                        delete=delete)
-        cleanup.register_tmp_file(t.name)
+def get_temp_file(delete=False):
+    """Creates a temporary file under a folder."""
+    root = pathlib.Path(os.environ.get('NMTPY_TMP', '/tmp'))
+    if not root.exists():
+        root.mkdir(parents=True, exist_ok=True)
+
+    prefix = str(root / "nmtpytorch_{}".format(os.getpid()))
+    t = tempfile.NamedTemporaryFile(
+        mode='w', prefix=prefix, delete=delete)
+    cleanup.register_tmp_file(t.name)
     return t
 
 
