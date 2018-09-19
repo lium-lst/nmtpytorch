@@ -72,13 +72,23 @@ class Topology(object):
         self.first_src = list(self.srcs.keys())[0]
         self.first_trg = list(self.trgs.keys())[0]
 
+    def is_included_in(self, t):
+        """Return True if this topology is included in t, otherwise False."""
+        if t is None:
+            return False
+        return (self.srcs.keys() <= t.srcs.keys()) and (self.trgs.keys() <= t.trgs.keys())
+
+    def get_srcs(self, _type):
+        return [v for v in self.srcs.values() if v._type == _type]
+
+    def get_trgs(self, _type):
+        return [v for v in self.trgs.values() if v._type == _type]
+
     def get_src_langs(self):
-        langs = [v for v in self.srcs.values() if v._type == 'Text']
-        return langs
+        return self.get_srcs('Text')
 
     def get_trg_langs(self):
-        langs = [v for v in self.trgs.values() if v._type == 'Text']
-        return langs
+        return self.get_trgs('Text')
 
     def __getitem__(self, key):
         return self.all[key]
