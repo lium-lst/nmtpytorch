@@ -15,8 +15,6 @@ class TextEncoder(nn.Module):
         rnn_type (str): RNN Type, i.e. GRU or LSTM.
         num_layers (int, optional): Number of stacked RNNs (Default: 1).
         bidirectional (bool, optional): If `False`, the RNN is unidirectional.
-        src_sorted_batches (bool, optional): If `True`, assumes that
-            batches are organized to contain only same-length source sequences.
         dropout_rnn (float, optional): Inter-layer dropout rate only
             applicable if `num_layers > 1`. (Default: 0.)
         dropout_emb(float, optional): Dropout rate for embeddings (Default: 0.)
@@ -29,9 +27,7 @@ class TextEncoder(nn.Module):
 
     Input:
         x (Variable): A variable of shape (n_timesteps, n_samples)
-            including the integer token indices for the given batch. If
-            `src_sorted_batches` is `True`, the batch should contain only
-            items with equal lengths!
+            including the integer token indices for the given batch.
 
     Output:
         hs (Variable): A variable of shape (n_timesteps, n_samples, hidden)
@@ -40,10 +36,10 @@ class TextEncoder(nn.Module):
             to contain both directional states.
         mask (Variable): A binary mask of shape (n_timesteps, n_samples)
             that may further be used in attention and/or decoder. `None`
-            is returned if `src_sorted_batches == True`.
+            is returned if batch contains only sentences with same lengths.
     """
     def __init__(self, input_size, hidden_size, n_vocab, rnn_type,
-                 num_layers=1, bidirectional=True, src_sorted_batches=False,
+                 num_layers=1, bidirectional=True,
                  dropout_rnn=0, dropout_emb=0, dropout_ctx=0,
                  emb_maxnorm=None, emb_gradscale=False):
         super().__init__()
@@ -51,11 +47,9 @@ class TextEncoder(nn.Module):
         self.rnn_type = rnn_type.upper()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.ctx_size = self.hidden_size * 2
         self.n_vocab = n_vocab
         self.num_layers = num_layers
         self.bidirectional = bidirectional
-        self.src_sorted_batches = src_sorted_batches
         self.emb_maxnorm = emb_maxnorm
         self.emb_gradscale = emb_gradscale
 
@@ -65,6 +59,11 @@ class TextEncoder(nn.Module):
         # Our other custom dropouts after embeddings and annotations
         self.dropout_emb = dropout_emb
         self.dropout_ctx = dropout_ctx
+
+        self.ctx_size = self.hidden_size
+        # Doubles its size because of concatenation
+        if self.bidirectional:
+            self.ctx_size *= 2
 
         if self.dropout_emb > 0:
             self.do_emb = nn.Dropout(self.dropout_emb)
@@ -83,14 +82,11 @@ class TextEncoder(nn.Module):
                        dropout=self.dropout_rnn,
                        bidirectional=self.bidirectional)
 
-        self.setup_forward()
-
-    def setup_forward(self):
-        """Sets up the correct forward() based on batch order."""
-        if self.src_sorted_batches:
-            self.forward = self.forward_same_len_batches
+    def forward(self, x):
+        if  (x == 0).nonzero().size():
+            return self.forward_mixed_len_batches(x)
         else:
-            self.forward = self.forward_mixed_len_batches
+            return self.forward_same_len_batches(x)
 
     def forward_same_len_batches(self, x):
         # Fetch embeddings
