@@ -26,7 +26,7 @@ class MNMTDecinit(NMT):
         logger.info(dataset)
         return dataset
 
-    def encode(self, batch):
+    def encode(self, batch, **kwargs):
         return {
             'feats': (batch['feats'], None),
             str(self.sl): self.enc(batch[self.sl]),
