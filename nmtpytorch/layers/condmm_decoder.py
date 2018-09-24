@@ -2,18 +2,26 @@
 import torch.nn.functional as F
 
 from ..utils.nn import get_rnn_hidden_state
-from . import Fusion, Attention
+from . import Fusion
 from . import ConditionalDecoder
+from .attention import Attention, HierarchicalAttention
 
 
 class ConditionalMMDecoder(ConditionalDecoder):
     """A conditional multimodal decoder with multimodal attention."""
-    def __init__(self, fusion_type='concat', **kwargs):
+    def __init__(self, fusion_type='concat', aux_ctx_name='image', **kwargs):
         super().__init__(**kwargs)
+        self.aux_ctx_name = aux_ctx_name
 
         # Define (context) fusion operator
-        self.fusion = Fusion(
-            fusion_type, 2 * self.hidden_size, self.hidden_size)
+        self.fusion_type = fusion_type
+        if fusion_type == "hierarchical":
+            self.fusion = HierarchicalAttention(
+                [self.hidden_size, self.hidden_size],
+                self.hidden_size, self.hidden_size)
+        else:
+            self.fusion = Fusion(
+                fusion_type, 2 * self.hidden_size, self.hidden_size)
 
         # Rename textual attention layer
         self.txt_att = self.att
@@ -21,7 +29,7 @@ class ConditionalMMDecoder(ConditionalDecoder):
 
         # Visual attention over convolutional feature maps
         self.img_att = Attention(
-            self.ctx_size_dict['image'], self.hidden_size,
+            self.ctx_size_dict[self.aux_ctx_name], self.hidden_size,
             transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
             att_type=self.att_type,
             att_activ=self.att_activ,
@@ -36,13 +44,16 @@ class ConditionalMMDecoder(ConditionalDecoder):
         self.txt_alpha_t, txt_z_t = self.txt_att(
             h1.unsqueeze(0), *ctx_dict[self.ctx_name])
         self.img_alpha_t, img_z_t = self.img_att(
-            h1.unsqueeze(0), *ctx_dict['image'])
+            h1.unsqueeze(0), *ctx_dict[self.aux_ctx_name])
         # Save for reg loss terms
         self.alphas.append(self.img_alpha_t.unsqueeze(0))
 
         # Context will double dimensionality if fusion_type is concat
         # z_t should be compatible with hidden_size
-        z_t = self.fusion(txt_z_t, img_z_t)
+        if self.fusion_type == "hierarchical":
+            self.h_att, z_t = self.fusion([txt_z_t, img_z_t], h1.unsqueeze(0))
+        else:
+            z_t = self.fusion(txt_z_t, img_z_t)
 
         # Run second decoder (h1 is compatible now as it was returned by GRU)
         h2_c2 = self.dec1(z_t, h1_c1)
