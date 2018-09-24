@@ -6,7 +6,17 @@ import torch.nn.functional as F
 
 
 class FF(nn.Module):
-    """A smart feedforward layer with activation support."""
+    """A smart feedforward layer with activation support.
+
+    Arguments:
+        in_features(int): Input dimensionality.
+        out_features(int): Output dimensionality.
+        bias(bool, optional): Enable/disable bias for the layer. (Default: True)
+        bias_zero(bool, optional): Start with a 0-vector bias. (Default: True)
+        activ(str, optional): A string like 'tanh' or 'relu' to define the
+            non-linearity type. Default is a linear layer.
+    """
+
     def __init__(self, in_features, out_features, bias=True,
                  bias_zero=True, activ=None):
         super().__init__()
