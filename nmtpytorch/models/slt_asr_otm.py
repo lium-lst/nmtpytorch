@@ -17,7 +17,11 @@ from ..metrics import Metric
 logger = logging.getLogger('nmtpytorch')
 
 
-class SLTOneToMany(nn.Module):
+# A multi-task training regime to achieve ASR and SLT by sharing a
+# speech encoder.
+
+
+class SLTASROneToMany(nn.Module):
     supports_beam_search = True
 
     def set_defaults(self):
