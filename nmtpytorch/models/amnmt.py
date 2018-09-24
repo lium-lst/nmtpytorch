@@ -82,7 +82,6 @@ class AttentiveMNMT(NMT):
             hidden_size=self.opts.model['enc_dim'],
             n_vocab=self.n_src_vocab,
             rnn_type=self.opts.model['enc_type'],
-            src_sorted_batches=True,
             dropout_emb=self.opts.model['dropout_emb'],
             dropout_ctx=self.opts.model['dropout_ctx'],
             dropout_rnn=self.opts.model['dropout_enc'],
@@ -128,7 +127,7 @@ class AttentiveMNMT(NMT):
         logger.info(dataset)
         return dataset
 
-    def encode(self, batch):
+    def encode(self, batch, **kwargs):
         # Get features into (n,c,w*h) and then (w*h,n,c)
         feats = self.cnn(batch['image'])
         feats = feats.view((*feats.shape[:2], -1)).permute(2, 0, 1)
