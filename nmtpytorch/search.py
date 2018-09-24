@@ -172,7 +172,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
 
         # Get best hyp for each sample in the batch
         hyps = beam[:, range(batch.size), top_hyps].t().cpu()
-        results.extend(vocab.list_of_idxs_to_sents(hyps))
+        results.extend(vocab.list_of_idxs_to_sents(hyps.tolist()))
 
     # Recover order of the samples if necessary
     if getattr(data_loader.batch_sampler, 'store_indices', False):
