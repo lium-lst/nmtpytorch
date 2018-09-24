@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from . import FF
+from .. import FF
 
 
 # Decoder without attention that uses a single input vector.

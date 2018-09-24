@@ -2,7 +2,7 @@
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from ..utils.data import sort_batch
+from ...utils.data import sort_batch
 
 
 class TextEncoder(nn.Module):

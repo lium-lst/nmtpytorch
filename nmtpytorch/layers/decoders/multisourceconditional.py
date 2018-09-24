@@ -2,8 +2,9 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..utils.nn import get_rnn_hidden_state
-from . import Fusion, Attention, HierarchicalAttention
+from ...utils.nn import get_rnn_hidden_state
+from ..attention import Attention, HierarchicalAttention
+from .. import Fusion
 from . import ConditionalDecoder
 
 

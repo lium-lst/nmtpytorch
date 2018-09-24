@@ -6,8 +6,8 @@ from torch.autograd import Variable
 from torchvision import models
 from torchvision.models.vgg import cfg as vgg_cfg
 
-from ..utils.misc import get_n_params
-from .flatten import Flatten
+from ...utils.misc import get_n_params
+from ..flatten import Flatten
 
 
 def get_vgg_names(config, batch_norm=False):

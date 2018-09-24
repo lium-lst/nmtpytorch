@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import torch.nn.functional as F
 
-from ..utils.nn import get_rnn_hidden_state
-from . import Fusion
+from ...utils.nn import get_rnn_hidden_state
+from ..attention import Attention, HierarchicalAttention
+from .. import Fusion
 from . import ConditionalDecoder
-from .attention import Attention, HierarchicalAttention
 
 
 class ConditionalMMDecoder(ConditionalDecoder):

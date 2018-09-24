@@ -4,8 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from ..utils.nn import ModuleDict
-from . import FF, Attention
+from ...utils.nn import ModuleDict
+from .. import FF
+from ..attention import Attention
 
 
 class SwitchingGRUDecoder(nn.Module):

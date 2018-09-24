@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from ..utils.nn import get_rnn_hidden_state
-from . import FF, Attention
+from ...utils.nn import get_rnn_hidden_state
+from .. import FF, Attention
 
 
 class ConditionalDecoder(nn.Module):
