@@ -3,6 +3,7 @@ import torch
 from torch.autograd import Variable
 
 from .utils.misc import pbar
+from .utils.topology import Topology
 
 
 def tile_ctx_dict(ctx_dict, idxs):
@@ -14,19 +15,24 @@ def tile_ctx_dict(ctx_dict, idxs):
     }
 
 
-def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
+def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
+                lp_alpha=0., suppress_unk=False):
     """An efficient GPU implementation for beam-search algorithm.
 
     Arguments:
         models (list of Model): Model instance(s) derived from `nn.Module`
             defining a set of methods. See `models/nmt.py`.
         data_loader (DataLoader): A ``DataLoader`` instance.
+        task_id (str, optional): For multi-output models, this selects
+            the decoder. (Default: None)
         beam_size (int, optional): The size of the beam. (Default: 12)
         max_len (int, optional): Maximum target length to stop beam-search
             if <eos> is still not generated. (Default: 200)
         lp_alpha (float, optional): If > 0, applies Google's length-penalty
             normalization instead of simple length normalization.
             lp: ((5 + |Y|)^lp_alpha / (5 + 1)^lp_alpha)
+        suppress_unk (bool, optional): If `True`, suppresses the log-prob
+            of <unk> token.
 
     Returns:
         list:
@@ -39,10 +45,34 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
     k = beam_size
     inf = -1000
     results = []
-    vocab = models[0].trg_vocab
+    enc_args = {}
+
+    if task_id is None:
+        # For classical models that have single encoder, decoder and
+        # target vocabulary
+        decs = [m.dec for m in models]
+        f_inits = [dec.f_init for dec in decs]
+        f_nexts = [dec.f_next for dec in decs]
+        vocab = models[0].trg_vocab
+    else:
+        # A specific input-output topology has been requested
+        task = Topology(task_id)
+        enc_args['enc_ids'] = task.srcs
+        # For new multi-target models: select the first target decoder
+        decs = [m.get_decoder(task.first_trg) for m in models]
+        # Get the necessary init() and next() methods
+        f_inits = [dec.f_init for dec in decs]
+        f_nexts = [dec.f_next for dec in decs]
+        # Get the corresponding vocabulary for the first target
+        vocab = models[0].vocabs[task.first_trg]
+
+    # Common parts
+    encoders = [m.encode for m in models]
+    unk = vocab['<unk>']
+    eos = vocab['<eos>']
     n_vocab = len(vocab)
 
-    # Tensorized beam that will shrink and grow upto max_batch_size
+    # Tensorized beam that will shrink and grow up to max_batch_size
     beam_storage = torch.zeros((max_len, max_batch_size, k)).long().cuda()
     mask = torch.arange(max_batch_size * k).long().cuda()
     nll_storage = torch.zeros(max_batch_size).cuda()
@@ -64,10 +94,10 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
         tile = range(batch.size)
 
         # Encode source modalities
-        ctx_dicts = [m.encode(batch) for m in models]
+        ctx_dicts = [encode(batch, **enc_args) for encode in encoders]
 
         # Get initial decoder state (N*H)
-        h_ts = [m.dec.f_init(ctx_dict) for m, ctx_dict in zip(models, ctx_dicts)]
+        h_ts = [f_init(ctx_dict) for f_init, ctx_dict in zip(f_inits, ctx_dicts)]
 
         # Start with <bos> tokens
         # FIXME: idxs should not change except for informed <bos> embeddings
@@ -85,11 +115,14 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
             # log_p: batch_size x vocab_size (t = 0)
             #        batch_size*beam_size x vocab_size (t > 0)
             log_ps, h_ts = zip(
-                *[m.dec.f_next(cd, m.dec.emb(y_t), h_t[tile]) for
-                    m, cd, h_t in zip(models, ctx_dicts, h_ts)])
+                *[f_next(cd, dec.emb(y_t), h_t[tile]) for
+                    f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
 
             # Do the actual averaging of log-probabilities
             log_p = sum(log_ps).data
+
+            if suppress_unk:
+                log_p[:, unk] = inf
 
             # Detect <eos>'d hyps
             idxs = (idxs == 2).nonzero()
@@ -125,7 +158,7 @@ def beam_search(models, data_loader, beam_size=12, max_len=200, lp_alpha=0.):
                 beam[:t] = beam[:t].gather(2, pdxs.repeat(t, 1, 1))
 
         # Put an explicit <eos> to make idxs_to_sent happy
-        beam[max_len - 1] = 2
+        beam[max_len - 1] = eos
 
         # Find lengths by summing tokens not in (pad,bos,eos)
         lp = beam.gt(2).float().sum(0).clamp(min=1)
