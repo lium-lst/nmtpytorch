@@ -1,13 +1,20 @@
+# Basic layers
 from .ff import FF
-from .rnninit import RNNInitializer
 from .fusion import Fusion
 from .flatten import Flatten
-from .attention import Attention
-from .attentionv2 import Attentionv2
-from .image_encoder import ImageEncoder
-from .text_encoder import TextEncoder
-from .cond_decoder import ConditionalDecoder
-from .condmm_decoder import ConditionalMMDecoder
-from .simplegru_decoder import SimpleGRUDecoder
-from .xu_decoder import XuDecoder
-from .gru_decoder import GRUDecoder
+from .seq_conv import SequenceConvolution
+from .rnninit import RNNInitializer
+from .max_margin import MaxMargin
+
+# Attention layers
+from .attention import *
+
+# ZSpace layers
+from .z import ZSpace
+from .z_att import ZSpaceAtt
+
+# Encoder layers
+from .encoders import *
+
+# Decoder layers
+from .decoders import *
