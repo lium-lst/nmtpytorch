@@ -1,4 +1,4 @@
-![nmtpytorch](docs/logo.png?raw=true "nmtpytorch")
+![nmtpytorch](https://github.com/lium-lst/nmtpytorch/blob/master/docs/logo.png?raw=true "nmtpytorch")
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -11,7 +11,7 @@ Python 2.x whatsoever.
 
 ## Citation
 
-If you use **nmtpytorch**, you may want to cite the following [paper](https://ufal.mff.cuni.cz/pbml/109/art-caglayan-et-al.pdf) although it was for the older Theano version:
+If you use **nmtpytorch**, you may want to cite the following [paper](https://ufal.mff.cuni.cz/pbml/109/art-caglayan-et-al.pdf):
 ```
 @article{nmtpy2017,
   author    = {Ozan Caglayan and
@@ -66,7 +66,7 @@ frequency, defined by `train.disp_freq` option (default: 30 batches).
 tensorboard_dir: ~/tb_dir
 ```
 
-![tensorboard](docs/tensorboard.png?raw=true "tensorboard")
+![tensorboard](https://github.com/lium-lst/nmtpytorch/blob/master/docs/tensorboard.png?raw=true "tensorboard")
 
 
 ## A Single Command-Line Interface
