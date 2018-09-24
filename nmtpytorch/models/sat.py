@@ -122,7 +122,7 @@ class ShowAttendAndTell(NMT):
         logger.info(dataset)
         return dataset
 
-    def encode(self, batch):
+    def encode(self, batch, **kwargs):
         # Get features into (n,c,w*h) and then (w*h,n,c)
         feats = self.cnn(batch['image'])
         feats = feats.view((*feats.shape[:2], -1)).permute(2, 0, 1)
@@ -132,7 +132,7 @@ class ShowAttendAndTell(NMT):
 
         return {'image': (feats, None)}
 
-    def forward(self, batch):
+    def forward(self, batch, **kwargs):
         result = super().forward(batch)
 
         if self.training and self.opts.model['alpha_c'] > 0:
