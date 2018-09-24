@@ -35,15 +35,7 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 
 See [NEWS.md](NEWS.md).
 
-## Installation
-
-See [INSTALL.md](INSTALL.md).
-
 ## Usage Example
-
-A [sample NMT configuration](examples/multi30k-en-de-bpe10k.conf) for
-English-to-German Multi30k is provided which covers nearly all of the `[train]`
-and `[model]` specific options to `NMT`.
 
 After creating a configuration file for your own dataset that suits your need,
 you can run the following command to start training:
@@ -58,16 +50,9 @@ It is possible to override any configuration option through the command-line:
 nmtpy train -C <config file> train.<opt>:<val> model.<opt>:<val> ...
 ```
 
-### Differences compared to Theano-based nmtpy
+## TensorBoard Support
 
-The initial release aims to be (as much as) feature compatible with respect
-to the latest `nmtpy` with some important changes as well.
-
-#### New TensorBoard Support
-
-If you would like to monitor training progress, you may want to install
-[tensorboard-pytorch](https://github.com/lanpa/tensorboard-pytorch). Note that
-you will also need to install the actual TensorBoard server which is shipped
+You will need to install the actual TensorBoard server which is shipped
 within Tensorflow in order to launch the visualization server.
 
 Once the dependencies are installed, you need to define a log directory for
@@ -84,7 +69,7 @@ tensorboard_dir: ~/tb_dir
 ![tensorboard](docs/tensorboard.png?raw=true "tensorboard")
 
 
-#### A Single Command-Line Interface
+## A Single Command-Line Interface
 
 Instead of shipping several tools for training, rescoring, translating, etc.
 here we provide a single command-line interface `nmtpy` which implements
@@ -151,44 +136,3 @@ An arbitrary number of parallel corpora with multiple languages can be defined
 in `[data]` section. Note that you **need** to define at least
 `train_set` and `val_set` datasets in this section for the training and
 early-stopping to work correctly.
-
-We recommend you to take a look at the provided sample
-[configuration](examples/multi30k-en-de-bpe10k.conf) to have an idea about the file format.
-
-#### Training a Model
-
-We still provide a single, model-agnostic `mainloop` that handles everything
-necessary to train, validate and early-stop a model.
-
-#### Defining a Model
-
-You just need to create a new file under `nmtpytorch/models` and define a
-`class` by deriving it from `nn.Module`. The name of this new `class` will be the
-`model_type` that needs to be written inside your configuration file. The next
-steps are to:
-
- - Parse model options passed from the configuration file in `__init__()`
- - Define layers inside `setup()`: Each `nn.Module` object should be assigned
-   as an attribute of the model (i.e. `self.encoder = ...`) in order for
-   PyTorch to work correctly.
- - Create and store relevant dataset objects in `load_data()`
- - Define `compute_loss()` which takes a data iterator and
-   computes the loss over it. This method is used for dev set perplexities.
- - Set `aux_loss` attribute for an additional loss term.
- - Define `forward()` which takes a dictionary with keys as data sources and
-   returns the batch training loss. This is the method called from the `mainloop`
-   during training.
-
-Feel free to copy the methods from `NMT` if you do not need to modify
-some of them.
-
-#### Provided Models
-
-Currently we only provide a **Conditional GRU NMT** [implementation](nmtpytorch/models/nmt.py)
-with Bahdanau-style attention in decoder.
-
-**NOTE**: We recommend limiting the number of tokens in the target vocabulary
-by defining `max_trg_len` in the `[model]` section of your configuration file
-to avoid GPU out of memory errors for very large vocabularies. This is caused
-by the fact that the gradient computation for a batch with very long sequences
-occupies a large amount of memory unless the loss layer is implemented differently.
