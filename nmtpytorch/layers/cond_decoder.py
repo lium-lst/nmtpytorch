@@ -11,7 +11,7 @@ from . import FF, Attention
 class ConditionalDecoder(nn.Module):
     """A conditional decoder with attention à la dl4mt-tutorial."""
     def __init__(self, input_size, hidden_size, ctx_size_dict, ctx_name, n_vocab,
-                 rnn_type, tied_emb=False, dec_init='zero',
+                 rnn_type, tied_emb=False, dec_init='zero', dec_init_activ='tanh',
                  dec_init_size=None, att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
                  transform_ctx=True, mlp_bias=False, dropout_out=0,
@@ -51,6 +51,7 @@ class ConditionalDecoder(nn.Module):
         self.tied_emb = tied_emb
         self.dec_init = dec_init
         self.dec_init_size = dec_init_size
+        self.dec_init_activ = dec_init_activ
         self.att_type = att_type
         self.att_bottleneck = att_bottleneck
         self.att_activ = att_activ
@@ -81,7 +82,7 @@ class ConditionalDecoder(nn.Module):
                 self.dec_init_size = self.ctx_size_dict[self.ctx_name]
             self.ff_dec_init = FF(
                 self.dec_init_size,
-                self.hidden_size * self.n_states, activ='tanh')
+                self.hidden_size * self.n_states, activ=self.dec_init_activ)
 
         # Create first decoder layer necessary for attention
         self.dec0 = RNN(self.input_size, self.hidden_size)
