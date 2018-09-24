@@ -80,11 +80,11 @@ class Attention(nn.Module):
                               self.hid2ctx(hid))    # TxBxC
 
         # Normalize attention scores correctly -> S*B
-        if ctx_mask is None:
-            alpha = F.softmax(scores, dim=0)
-        else:
-            alpha = (scores - scores.max(0)[0]).exp().mul(ctx_mask)
-            alpha = alpha / alpha.sum(0)
+        if ctx_mask is not None:
+            # Mask out padded positions with -inf so that they get 0 attention
+            scores.masked_fill_((1 - ctx_mask).byte(), -1e8)
+
+        alpha = F.softmax(scores, dim=0)
 
         # Transform final context vector to H for further decoders
         return alpha, self.ctx2hid((alpha.unsqueeze(-1) * ctx).sum(0))
