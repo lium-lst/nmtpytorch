@@ -90,7 +90,12 @@ class MainLoop(object):
         # Create optimizer instance
         self.optim = Optimizer(
             self.optimizer, self.model, lr=self.lr, momentum=self.momentum,
-            nesterov=self.nesterov, weight_decay=self.l2_reg, gclip=self.gclip)
+            nesterov=self.nesterov, weight_decay=self.l2_reg,
+            gclip=self.gclip, lr_decay=self.lr_decay,
+            lr_decay_factor=self.lr_decay_factor,
+            lr_decay_mode=self.monitor.lr_decay_mode,
+            lr_decay_min=self.lr_decay_min,
+            lr_decay_patience=self.lr_decay_patience)
         self.print(self.optim)
 
         # Create TensorBoard logger if possible and requested
@@ -116,11 +121,23 @@ class MainLoop(object):
         # Reset gradients
         self.optim.zero_grad()
 
-        out = self.model(batch)
-        self.loss_meter.update(out['loss'], out['n_items'])
+        # Forward pass with training progress
+        out = self.model(batch, uctr=self.monitor.uctr, ectr=self.monitor.ectr)
+        if 'loss' in out:
+            # NOTE: Fix this afterwards so that every model adapts the same style
+            # Classical models have single loss
+            self.loss_meter.update(out['loss'], out['n_items'])
+            loss = out['loss'] / out['n_items']
+        else:
+            # NOTE: For now, let's simply average losses for MTL
+            for tid in out:
+                self.loss_meter.update(out[tid]['loss'], out[tid]['n_items'])
+            # Normalize the losses and take the average
+            # NOTE: averaging may not be a good idea if the model multiplies
+            # them with scalar weights
+            loss = sum([out[k]['loss'] / out[k]['n_items'] for k in out]) / len(out)
 
-        # Normalize and sum with auxiliary multi-task losses
-        loss = out['loss'] / out['n_items']
+        # Add other losses if any
         if self.model.aux_loss:
             loss += sum(list(self.model.aux_loss.values()))
 
@@ -230,10 +247,16 @@ class MainLoop(object):
         results.extend(self.model.test_performance(self.vloss_iterator))
 
         if self.monitor.beam_metrics:
-            self.print('Performing translation search (beam_size:{})'.format(
+            self.print('Performing beam search (beam_size:{})'.format(
                 self.eval_beam))
             beam_time = time.time()
+            # For multitask learning models, language-specific validation uses
+            # by default the 0th Topology in val_tasks
+            task = None
+            if hasattr(self.model, 'val_tasks'):
+                task = self.model.val_tasks[0].direction
             hyps = beam_search([self.model], self.beam_iterator,
+                               task_id=task,
                                beam_size=self.eval_beam,
                                max_len=self.eval_max_len)
             beam_time = time.time() - beam_time
@@ -252,6 +275,12 @@ class MainLoop(object):
 
         # Add new scores to history
         self.monitor.update_scores(results)
+
+        # Do a scheduler LR step
+        lr_change = self.optim.lr_step(self.monitor.get_last_eval_score())
+        if lr_change and self.lr_decay_revert:
+            self.print('Reloading previous best model parameters')
+            self.monitor.reload_previous_best()
 
         # Check early-stop criteria and save snapshots if any
         self.monitor.save_models()
