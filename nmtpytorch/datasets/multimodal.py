@@ -3,7 +3,8 @@ import logging
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import BatchSampler, SequentialSampler
 
-from . import ImageFolderDataset, TextDataset, OneHotDataset, NumpyDataset
+from . import (ImageFolderDataset, TextDataset, OneHotDataset, NumpyDataset,
+               KaldiDataset, NumpySequenceDataset, ShelveDataset)
 from .collate import get_collate
 from ..samplers import BucketBatchSampler
 
@@ -26,7 +27,7 @@ class MultimodalDataset(Dataset):
         bucket_order (str, optional): ``ascending`` or ``descending`` to
             perform length-based curriculum learning. Default is ``None``
             which shuffles bucket order.
-        kwargs (dict): Argument dictionary for the ImageFolder dataset.
+        kwargs (dict): Argument dictionary for datasets.
     """
     def __init__(self, data, mode, batch_size, vocabs, topology,
                  bucket_by, max_len=None, bucket_order=None, **kwargs):
@@ -48,6 +49,8 @@ class MultimodalDataset(Dataset):
             elif self.mode != 'beam' and len(self.topology.get_trg_langs()) > 0:
                 self.bucket_by = self.topology.get_trg_langs()[0]
 
+        # TODO: This should be agnostic to datasets, i.e. no explicit calls
+        # to dataset constructors should be necessary.
         for key, ds in self.topology.all.items():
             if self.mode == 'beam' and ds.trg:
                 # Skip target streams
@@ -66,6 +69,14 @@ class MultimodalDataset(Dataset):
                 self.datasets[ds] = ImageFolderDataset(data[key], **kwargs)
             elif ds._type == "Numpy":
                 self.datasets[ds] = NumpyDataset(data[key])
+            elif ds._type == "Shelve":
+                self.datasets[ds] = ShelveDataset(data[key], **kwargs)
+            elif ds._type == "Kaldi":
+                self.datasets[ds] = KaldiDataset(data[key])
+            elif ds._type == "NumpySequence":
+                self.datasets[ds] = NumpySequenceDataset(data[key], **kwargs)
+            else:
+                raise ValueError("Unknown dataset type: {}.".format(ds))
 
         # Detect dataset sizes
         sizes = set()
