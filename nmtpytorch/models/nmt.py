@@ -30,6 +30,7 @@ class NMT(nn.Module):
             'dec_type': 'gru',          # Decoder type (gru|lstm)
             'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
             'dec_init_size': None,      # feature vector dimensionality for
+            'dec_init_activ': 'tanh',   # Decoder initialization activation func
                                         # dec_init == 'feats'
             'att_type': 'mlp',          # Attention type (mlp|dot)
             'att_temp': 1.,             # Attention temperature
@@ -46,6 +47,7 @@ class NMT(nn.Module):
             'max_len': 80,              # Reject sentences where 'bucket_by' length > 80
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
                                         # the batches will be sorted
+            'bucket_order': None,       #
         }
 
     def __init__(self, opts):
@@ -131,7 +133,6 @@ class NMT(nn.Module):
             hidden_size=self.opts.model['enc_dim'],
             n_vocab=self.n_src_vocab,
             rnn_type=self.opts.model['enc_type'],
-            src_sorted_batches=True,
             dropout_emb=self.opts.model['dropout_emb'],
             dropout_ctx=self.opts.model['dropout_ctx'],
             dropout_rnn=self.opts.model['dropout_enc'],
@@ -152,6 +153,7 @@ class NMT(nn.Module):
             tied_emb=self.opts.model['tied_emb'],
             dec_init=self.opts.model['dec_init'],
             dec_init_size=self.opts.model['dec_init_size'],
+            dec_init_activ=self.opts.model['dec_init_activ'],
             att_type=self.opts.model['att_type'],
             att_temp=self.opts.model['att_temp'],
             att_activ=self.opts.model['att_activ'],
@@ -173,7 +175,8 @@ class NMT(nn.Module):
             mode=mode, batch_size=batch_size,
             vocabs=self.vocabs, topology=self.topology,
             bucket_by=self.opts.model['bucket_by'],
-            max_len=self.opts.model['max_len'])
+            max_len=self.opts.model['max_len'],
+            bucket_order=self.opts.model['bucket_order'])
         logger.info(dataset)
         return dataset
 
@@ -181,7 +184,7 @@ class NMT(nn.Module):
         """Returns a representation for <bos> embeddings for decoding."""
         return torch.LongTensor(batch_size).fill_(self.trg_vocab['<bos>'])
 
-    def encode(self, batch):
+    def encode(self, batch, **kwargs):
         """Encodes all inputs and returns a dictionary.
 
         Arguments:
@@ -197,7 +200,7 @@ class NMT(nn.Module):
         """
         return {str(self.sl): self.enc(batch[self.sl])}
 
-    def forward(self, batch):
+    def forward(self, batch, **kwargs):
         """Computes the forward-pass of the network and returns batch loss.
 
         Arguments:
@@ -228,3 +231,7 @@ class NMT(nn.Module):
             Metric('LOSS', loss.get(), higher_better=False),
             Metric('MRR', mrr.normalized_mrr(), higher_better=True),
         ]
+
+    def get_decoder(self, task_id=None):
+        """Compatibility function for multi-tasking architectures."""
+        return self.dec
