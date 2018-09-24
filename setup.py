@@ -40,6 +40,7 @@ setuptools.setup(
         'Operating System :: POSIX',
     ],
     keywords='nmt neural-mt translation sequence-to-sequence deep-learning pytorch',
+    python_requires='>=3.6',
     install_requires=[
         'numpy', 'scipy', 'scikit-learn', 'tqdm', 'pillow',
         'torch', 'torchvision==0.2.1',
