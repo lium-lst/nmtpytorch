@@ -21,6 +21,8 @@ class AttentiveMNMTFeatures(NMT):
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
             'n_channels': 2048,         # depends on the features used
             'alpha_c': 0.0,             # doubly stoch. attention
+            'img_sequence': False,      # if true img is sequence of img features,
+                                        # otherwise it's a conv map
         })
 
     def __init__(self, opts):
@@ -39,7 +41,6 @@ class AttentiveMNMTFeatures(NMT):
             hidden_size=self.opts.model['enc_dim'],
             n_vocab=self.n_src_vocab,
             rnn_type=self.opts.model['enc_type'],
-            src_sorted_batches=True,
             dropout_emb=self.opts.model['dropout_emb'],
             dropout_ctx=self.opts.model['dropout_ctx'],
             dropout_rnn=self.opts.model['dropout_enc'],
@@ -82,17 +83,27 @@ class AttentiveMNMTFeatures(NMT):
         logger.info(dataset)
         return dataset
 
-    def encode(self, batch):
-        # Get features into (n,c,w*h) and then (w*h,n,c)
+    def encode(self, batch, **kwargs):
+        # Let's start with a None mask by assuming that
+        # we have a fixed-length feature collection
+        feats_mask = None
+
+        # Be it Numpy or NumpySequence, they return
+        # (n_samples, feat_dim, t) by default
+        # Convert it to (t, n_samples, feat_dim)
         feats = batch['image'].view(
             (*batch['image'].shape[:2], -1)).permute(2, 0, 1)
 
+        if self.opts.model['img_sequence']:
+            # Let's create mask in this case
+            feats_mask = feats.ne(0).float().sum(2).ne(0).float()
+
         return {
-            'image': (feats, None),
+            'image': (feats, feats_mask),
             str(self.sl): self.enc(batch[self.sl]),
         }
 
-    def forward(self, batch):
+    def forward(self, batch, **kwargs):
         result = super().forward(batch)
 
         if self.training and self.opts.model['alpha_c'] > 0:
