@@ -40,6 +40,8 @@ if __name__ == '__main__':
     # translate command
     ###################
     parser_trans = subparsers.add_parser('translate', help='translate help')
+    parser_trans.add_argument('-u', '--suppress-unk', action='store_true',
+                              help='Do not generate <unk> tokens.')
     parser_trans.add_argument('-n', '--disable-filters', action='store_true',
                               help='Disable eval_filters given in config')
     parser_trans.add_argument('-b', '--batch-size', type=int, default=16,
@@ -56,6 +58,8 @@ if __name__ == '__main__':
                               help='Select GPU device(s)')
     parser_trans.add_argument('models', type=str, nargs='+',
                               help="Saved model/checkpoint file(s)")
+    parser_trans.add_argument('-tid', '--task-id', type=str, default=None,
+                              help='Task to perform, e.g. en_src:Text, pt_src:Text -> fr_tgt:Text')
 
     group = parser_trans.add_mutually_exclusive_group(required=True)
     # You can translate a set of splits defined in the .conf file
@@ -77,6 +81,8 @@ if __name__ == '__main__':
                               help='Select GPU device(s)')
     parser_test.add_argument('models', type=str, nargs='+',
                               help="Saved model/checkpoint file(s)")
+    parser_test.add_argument('-tid', '--task-id', type=str, default=None,
+                              help='Task to perform, e.g. en_src:Text, pt_src:Text -> fr_tgt:Text')
 
     group = parser_test.add_mutually_exclusive_group(required=True)
     group.add_argument('-s', '--splits', type=str,
