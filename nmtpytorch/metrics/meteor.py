@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import shutil
 import pathlib
 import subprocess
 import pkg_resources
@@ -17,6 +18,10 @@ class METEORScorer(object):
                           "-", "-", "-stdio"]
         self.env = os.environ
         self.env['LC_ALL'] = 'en_US.UTF-8'
+
+        # Sanity check
+        if shutil.which('java') is None:
+            raise RuntimeError('METEOR requires java which is not installed.')
 
     def compute(self, refs, hyps, language="auto"):
         cmdline = self.__cmdline[:]
