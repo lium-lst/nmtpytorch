@@ -34,7 +34,7 @@ setuptools.setup(
     long_description_content_type='text/markdown',
     url='https://github.com/lium-lst/nmtpytorch',
     author='Ozan Caglayan',
-    author_email='ozancag@gmail.com',
+    author_email='ozan.caglayan@univ-lemans.fr',
     license='MIT',
     classifiers=[
         'Intended Audience :: Science/Research',
