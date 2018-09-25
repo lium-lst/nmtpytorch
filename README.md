@@ -9,8 +9,12 @@ inspired from the famous [dl4mt-tutorial](https://github.com/nyu-dl/dl4mt-tutori
 codebase.
 
 `nmtpytorch` is mainly developed by the *Language and Speech Team* from *Le Mans University* but
-received valuable contributions from the *Grounded sequence-to-sequence transduction* [team](https://github.com/srvk/jsalt-2018-grounded-s2s)
-of *Frederick Jelinek Memorial Summer Workshop 2018* at *Johns Hopkins University*.
+receives valuable contributions from the *Grounded sequence-to-sequence transduction* [team](https://github.com/srvk/jsalt-2018-grounded-s2s)
+of *Frederick Jelinek Memorial Summer Workshop 2018* at *Johns Hopkins University*:
+
+Loic Barrault, Ozan Caglayan, Amanda Duarte, Desmond Elliott, Spandana Gella, Nils Holzenberger,
+Chirag Lala, Jasmine (Sun Jae) Lee, Jindřich Libovický, Pranava Madhyastha,
+Florian Metze, Karl Mulligan, Alissa Ostapenko, Shruti Palaskar, Ramon Sanabria, Lucia Specia and Josiah Wang.
 
 If you use **nmtpytorch**, you may want to cite the following [paper](https://ufal.mff.cuni.cz/pbml/109/art-caglayan-et-al.pdf):
 ```
