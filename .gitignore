@@ -3,5 +3,6 @@ nmtpytorch/lib/data/*gz
 nmtpytorch.egg-info
 .cache
 build/
+dist/
 docs/build/
 ipynb/.ipynb_checkpoints
