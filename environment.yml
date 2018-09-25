@@ -1,0 +1,24 @@
+name: nmtpy
+
+dependencies:
+  - python=3.6
+  - cffi
+  - cython
+  - ipython
+  - pyyaml
+  - protobuf>=0.3.2
+  - six
+  - typing
+  - numpy
+  - scipy
+  - scikit-learn
+  - tqdm
+  - pillow
+  - pip:
+    - http://download.pytorch.org/whl/cu90/torch-0.3.1-cp36-cp36m-linux_x86_64.whl
+    - torchvision==0.2.1
+    - sacrebleu>=1.2.9
+    - tensorboardX==1.1
+    - editdistance==0.4
+    - ipdb
+    - -e .
