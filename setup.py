@@ -20,6 +20,11 @@ if shutil.which('java') is None:
 with open('README.md') as f:
     long_description = f.read()
 
+with open('NEWS.md') as f:
+    release_notes = f.read()
+
+long_description = long_description.replace(
+    '## Release Notes\n\nSee [NEWS.md](NEWS.md).\n', release_notes)
 
 setuptools.setup(
     name='nmtpytorch',
