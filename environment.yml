@@ -20,5 +20,6 @@ dependencies:
     - sacrebleu>=1.2.9
     - tensorboardX==1.1
     - editdistance==0.4
+    - subword_nmt==0.3.5
     - ipdb
     - -e .
