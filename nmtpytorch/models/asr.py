@@ -53,7 +53,7 @@ class ASR(nn.Module):
             'lstm_forget_bias': False,      # Initialize forget gate bias to 1 for LSTM
             'lstm_bias_zero': False,        # Use zero biases for LSTM
             'adaptation': False,            # Enable/disable AM adaptation
-            'adaptation_type': 'early',     # Early: shift speech feats, late: shift encodings
+            'adaptation_type': 'early',     # Early: shift feats, late: shift encodings
             'adaptation_dim': None,         # Input dim for auxiliary feat vectors
             'adaptation_activ': None,       # Non-linearity for adaptation FF
         }
