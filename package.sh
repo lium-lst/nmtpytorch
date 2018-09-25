@@ -7,11 +7,15 @@ if [[ -z $VER ]]; then
   exit 1
 fi
 
-echo $VER
 rm -rf build/ dist/
 
+echo "Preparing $VER"
 echo "__version__ = '${VER}'" > nmtpytorch/__init__.py
-#git commit nmtpytorch/__init.py
+
+git commit nmtpytorch/__init.py -m "bump version to ${VER}"
+git tag -a ${VER} -m "Version ${VER}"
+git push origin --tags
+
 python setup.py sdist bdist_wheel
 
 # Upload to TestPyPI
