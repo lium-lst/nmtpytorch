@@ -41,7 +41,9 @@ LANGUAGES = [
 def fix_seed(seed=None):
     if seed is None:
         seed = time.time()
+
     seed = int(seed)
+    random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
