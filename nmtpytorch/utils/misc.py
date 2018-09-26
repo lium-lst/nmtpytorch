@@ -50,6 +50,13 @@ def fix_seed(seed=None):
     return seed
 
 
+def get_meteor_jar(ver='1.5'):
+    root = pathlib.Path(os.getenv('HOME')) / '.nmtpy' / 'meteor-data'
+    jar = root / 'meteor-1.5.jar'
+    assert jar.exists(), "METEOR not installed, please run 'nmtpy-install-extra'"
+    return jar
+
+
 def pbar(iterator, unit='it'):
     return tqdm(iterator, unit=unit, ncols=70, smoothing=0)
 
