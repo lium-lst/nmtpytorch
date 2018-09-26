@@ -85,6 +85,10 @@ After the above installation steps, you finally need to run `nmtpy-install-extra
 in order to fetch and store METEOR related files in your `${HOME}/.nmtpy` folder.
 This step is only required once.
 
+## Documentation
+
+We currently only provide some preliminary documentation in our [wiki](https://github.com/lium-lst/nmtpytorch/wiki).
+
 ## Release Notes
 
 See [NEWS.md](NEWS.md).
