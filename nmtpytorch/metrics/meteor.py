@@ -3,18 +3,15 @@ import os
 import shutil
 import pathlib
 import subprocess
-import pkg_resources
 
-from ..utils.misc import listify
+from ..utils.misc import listify, get_meteor_jar
 from .metric import Metric
-
-METEOR_JAR = pkg_resources.resource_filename('nmtpytorch',
-                                             'lib/meteor-1.5.jar')
 
 
 class METEORScorer(object):
     def __init__(self):
-        self.__cmdline = ["java", "-Xmx2G", "-jar", METEOR_JAR,
+        self.jar = str(get_meteor_jar())
+        self.__cmdline = ["java", "-Xmx2G", "-jar", self.jar,
                           "-", "-", "-stdio"]
         self.env = os.environ
         self.env['LC_ALL'] = 'en_US.UTF-8'
