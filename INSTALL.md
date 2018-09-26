@@ -8,11 +8,11 @@ following packages:
   - A working Java Runtime Environment (i.e. `java` in `$PATH`) for METEOR.
 
 
-We directly carry METEOR v1.5, `multi-bleu.perl` and COCO
-evaluation tools `cocoeval` within the source tree. Moreover, we ship
-METEOR paraphrase files as a GIT submodule in order to track their updates when
-necessary. Since paraphrase files are large, cloning the repository may take
-some time.
+We directly carry `multi-bleu.perl` and COCO evaluation tools `cocoeval` within the source tree.
+
+**NOTE**: In order to get the necessary METEOR files, after installing `nmtpytorch`, you
+need to run `nmtpy-install-extra` once so that they are installed under
+`${HOME}/.nmtpy`.
 
 ## Anaconda Python (Recommended)
 
