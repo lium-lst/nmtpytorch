@@ -12,6 +12,7 @@ from collections import OrderedDict
 # https://github.com/kelvinxu/arctic-captions
 
 from nmtpytorch.cocoeval import Bleu, Meteor, Cider, Rouge
+from nmtpytorch.utils.misc import get_meteor_jar
 
 
 def print_table(results, sort_by='METEOR'):
@@ -44,6 +45,9 @@ if __name__ == '__main__':
                         help="Per-system hypothesis file(s)", nargs='+')
 
     args = parser.parse_args()
+
+    # Check for METEOR
+    get_meteor_jar()
 
     # List of scorers
     scorers = [
