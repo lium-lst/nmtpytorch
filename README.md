@@ -53,7 +53,9 @@ $ pip install nmtpytorch
 
 This will automatically fetch and install the dependencies as well. For the `torch`
 dependency it will specifically install the `torch 0.3.1` package from `PyPI` that
-ships `CUDA 8.0` within.
+ships `CUDA 8.0` within. If instead you want to use a newer version of `CUDA`,
+you can uninstall the `torch` package manually afterwards and install another `0.3.1`
+package from [here](https://pytorch.org/get-started/previous-versions/).
 
 ### conda
 
@@ -62,15 +64,25 @@ a ready-to-use anaconda environment for `nmtpytorch`:
 
 ```
 $ conda update --all
-$ git clone --recursive https://github.com/lium-lst/nmtpytorch.git
+$ git clone https://github.com/lium-lst/nmtpytorch.git
 $ conda env create -f nmtpytorch/environment.yml
 ```
+
+Unlike the `pip` method, this environment explicitly installs the `CUDA 9.0`
+version of `torch 0.3.1` and enables editable mode similar to the development
+mode explained below.
 
 ### Development Mode
 
 For continuous development and testing, it is sufficient to run `python setup.py develop`
 in the root folder of your GIT checkout. From now on, all modifications to the source
 tree are directly taken into account without requiring reinstallation.
+
+### METEOR Installation
+
+After the above installation steps, you finally need to run `nmtpy-install-extra`
+in order to fetch and store METEOR related files in your `${HOME}/.nmtpy` folder.
+This step is only required once.
 
 ## Release Notes
 
