@@ -12,12 +12,12 @@ rm -rf build/ dist/
 echo "Preparing $VER"
 echo "__version__ = '${VER}'" > nmtpytorch/__init__.py
 
-git commit nmtpytorch/__init.py -m "bump version to ${VER}"
-git tag -a ${VER} -m "Version ${VER}"
+git commit nmtpytorch/__init__.py -m "bump version to ${VER}"
+git tag -a "v${VER}" -m "Version ${VER}"
 git push origin --tags
 
 # prep packages
 python setup.py sdist bdist_wheel
 
-twine upload --repository-url https://test.pypi.org/legacy/ dist/*  # Upload to TestPyPI
-#twine upload dist/*  # Upload to PyPI
+#twine upload --repository-url https://test.pypi.org/legacy/ dist/*  # Upload to TestPyPI
+twine upload dist/*  # Upload to PyPI
