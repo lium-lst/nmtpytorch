@@ -7,9 +7,9 @@ from .mnmtdecinit import MNMTDecinit
 # Speech models
 from .asr import ASR
 
-# Requires work
-#from .multitask import Multitask
-#from .multitask_att import MultitaskAtt
+# Experimental: requires work/adaptation
+from .multitask import Multitask
+from .multitask_att import MultitaskAtt
 
 ##########################################
 # Backward-compatibility with older models
