@@ -1,4 +1,0 @@
-[submodule "nmtpytorch/lib/data"]
-	path = nmtpytorch/lib/data
-	url = https://github.com/ozancaglayan/meteor-data.git
-	branch = master
