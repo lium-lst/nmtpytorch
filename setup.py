@@ -12,11 +12,6 @@ def get_nmtpytorch_version():
         return eval(s.split(' ')[-1])
 
 
-if shutil.which('java') is None:
-    print("*** WARNING: 'java' not found.")
-    print("*** WARNING: You need to have JRE installed for METEOR to work.")
-
-
 with open('README.md') as f:
     long_description = f.read()
 
