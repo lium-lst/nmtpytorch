@@ -25,5 +25,4 @@ SOFTWARE.
 **nmtpytorch** includes code from the following projects which have their own licenses:
 
  - `multi-bleu.perl` from [mosesdecoder](https://github.com/moses-smt/mosesdecoder) [[LGPL-2.1](https://github.com/moses-smt/mosesdecoder/blob/master/COPYING)]
- - METEOR v1.5 JAR from [meteor](https://github.com/cmu-mtlab/meteor) [[LGPL-2.1](https://github.com/cmu-mtlab/meteor/blob/master/COPYING)]
  - `pycocoevalcap` from [coco-caption](https://github.com/tylin/coco-caption) [[BSD-2-Clause](https://github.com/tylin/coco-caption/blob/master/license.txt)]
