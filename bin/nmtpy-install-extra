@@ -1,0 +1,22 @@
+#!/bin/bash
+which java &> /dev/null
+if [[ "x$?" == "x1" ]]; then
+  echo "'java' not found in PATH. You need to have a working JRE installation for METEOR."
+else
+  echo "OK: Found 'java'."
+fi
+
+CACHE=${HOME}/.nmtpy
+METEOR=${CACHE}/meteor-data
+
+if [[ ! -d ${CACHE} ]]; then
+  echo "Creating ${CACHE} folder..."
+  mkdir -p ${CACHE}
+fi
+
+if [[ ! -d $METEOR ]]; then
+  git clone https://github.com/ozancaglayan/meteor-1.5-data.git $METEOR
+  pushd $METEOR
+  ./recompress.sh
+  popd
+fi
