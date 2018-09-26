@@ -66,6 +66,12 @@ $ git clone --recursive https://github.com/lium-lst/nmtpytorch.git
 $ conda env create -f nmtpytorch/environment.yml
 ```
 
+### Development Mode
+
+For continuous development and testing, it is sufficient to run `python setup.py develop`
+in the root folder of your GIT checkout. From now on, all modifications to the source
+tree are directly taken into account without requiring reinstallation.
+
 ## Release Notes
 
 See [NEWS.md](NEWS.md).
