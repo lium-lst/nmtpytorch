@@ -1,5 +1,24 @@
 ## Release Notes
 
+### v2.0.0 (26/09/2018)
+  - Ability to install through `pip`.
+  - Advanced layers are now organized into subfolders.
+  - New basic layers: Convolution over sequence, MaxMargin.
+  - New attention layers: Co-attention, multi-head attention, hierarchical attention.
+  - New encoders: Arbitrary sequence-of-vectors encoder, BiLSTMp speech feature encoder.
+  - New decoders: Multi-source decoder, switching decoder, vector decoder.
+  - New datasets: Kaldi dataset (.ark/.scp reader), Shelve dataset, Numpy sequence dataset.
+  - Added learning rate annealing: See `lr_decay*` options in `config.py`.
+  - Removed subword-nmt and METEOR files from repository. We now depend on
+    the PIP package for subword-nmt. For METEOR, `nmtpy-install-extra` should
+    be launched after installation.
+  - More multi-task and multi-input/output `translate` and `training` regimes.
+  - New early-stopping metrics: Character and word error rate (cer,wer) and ROUGE (rouge).
+  - Curriculum learning option for the `BucketBatchSampler`, i.e. length-ordered batches.
+  - New models:
+     - ASR: Listen-attend-and-spell like automatic speech recognition
+     - Multitask*: Experimental multi-tasking & scheduling between many inputs/outputs.
+
 ### v1.4.0 (09/05/2018)
   - Add `environment.yml` for easy installation using `conda`. You can now
   create a ready-to-use `conda` environment by just calling `conda env create -f environment.yml`.
