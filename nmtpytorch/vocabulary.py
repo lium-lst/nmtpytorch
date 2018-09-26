@@ -20,10 +20,25 @@ class Vocabulary(object):
         self.name = name
         self._map = None
         self._imap = None
+        self.freqs = None
+        self.counts = None
         self._allmap = None
         self.n_tokens = None
 
-        self._map = json.load(open(self.vocab))
+        # Load file
+        data = json.load(open(self.vocab))
+
+        # Detect vocabulary: values can be int or a string of type "id count"
+        elem = next(iter(data.values()))
+        if isinstance(elem, str):
+            self._map = {k: int(v.split()[0]) for k, v in data.items()}
+            self.counts = {k: int(v.split()[1]) for k, v in data.items()}
+            total_count = sum(self.counts.values())
+            self.freqs = {k: v / total_count for k, v in self.counts.items()}
+        elif isinstance(elem, int):
+            self._map = data
+        else:
+            raise RuntimeError('Unknown vocabulary format.')
 
         # Sanity check for placeholder tokens
         for tok, idx in self.TOKENS.items():
