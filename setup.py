@@ -30,6 +30,9 @@ setuptools.setup(
     author='Ozan Caglayan',
     author_email='ozan.caglayan@univ-lemans.fr',
     license='MIT',
+    project_urls={
+        'Wiki': 'https://github.com/lium-lst/nmtpytorch/wiki',
+    },
     classifiers=[
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering',
