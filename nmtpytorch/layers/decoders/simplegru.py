@@ -10,7 +10,7 @@ from ..attention import Attention
 
 class SimpleGRUDecoder(nn.Module):
     def __init__(self, input_size, hidden_size, ctx_size_dict, ctx_name, n_vocab,
-                 tied_emb=False, dec_init='mean', att_type='mlp',
+                 tied_emb=False, dec_init='mean_ctx', att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
                  transform_ctx=True, mlp_bias=False, dropout_out=0,
                  emb_maxnorm=None, emb_gradscale=False):
@@ -85,7 +85,7 @@ class SimpleGRUDecoder(nn.Module):
             h_0 = torch.zeros(ctx.shape[1], self.hidden_size)
             return Variable(h_0).cuda()
 
-        elif self.dec_init == 'mean':
+        elif self.dec_init == 'mean_ctx':
             h_0 = self.ff_dec_init(
                 ctx.sum(0).div(ctx_mask.unsqueeze(-1).sum(0))
                 if ctx_mask is not None else ctx.mean(0))

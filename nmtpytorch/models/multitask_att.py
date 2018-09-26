@@ -48,7 +48,7 @@ class MultitaskAtt(nn.Module):
             'td_emb_dim': 128,              # Input size
             'td_dec_dim': 128,              # Decoder hidden size
             'td_tied_emb': False,           # Share decoder embeddings
-            'td_dec_init': 'mean',          # How to initialize decoder (zero/mean/feats)
+            'td_dec_init': 'mean_ctx',      # How to initialize decoder (zero/mean_ctx/feats)
             'td_att_type': 'mlp',           # Attention type (mlp|dot)
             'td_att_temp': 1.,              # Attention temperature
             'td_att_activ': 'tanh',         # Attention non-linearity (all torch nonlins)
