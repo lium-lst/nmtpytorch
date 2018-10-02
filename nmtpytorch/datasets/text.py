@@ -2,9 +2,12 @@
 import logging
 from pathlib import Path
 
-from torch.utils.data import Dataset
+import torch
 
-from ..utils.data import read_sentences, pad_data
+from torch.utils.data import Dataset
+from torch.nn.utils.rnn import pad_sequence
+
+from ..utils.data import read_sentences
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -42,7 +45,7 @@ class TextDataset(Dataset):
 
     @staticmethod
     def to_torch(batch):
-        return pad_data(batch)
+        return pad_sequence([torch.tensor(b, dtype=torch.long) for b in batch])
 
     def __getitem__(self, idx):
         return self.data[idx]
