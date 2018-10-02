@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ..utils.nn import get_activation_fn
+
 
 class FF(nn.Module):
     """A smart feedforward layer with activation support.
@@ -26,16 +28,12 @@ class FF(nn.Module):
         self.bias_zero = bias_zero
         self.activ_type = activ if activ else 'linear'
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.activ = get_activation_fn(activ)
 
         if self.use_bias:
             self.bias = nn.Parameter(torch.Tensor(out_features))
         else:
             self.register_parameter('bias', None)
-
-        if activ is None:
-            self.activ = lambda x: x
-        else:
-            self.activ = getattr(F, activ)
 
         self.reset_parameters()
 

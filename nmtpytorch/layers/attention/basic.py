@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ...utils.nn import get_activation_fn
+
 
 class Attention(nn.Module):
     """Attention layer for seq2seq NMT."""
@@ -11,12 +13,12 @@ class Attention(nn.Module):
                  mlp_bias=False, temp=1., ctx2hid=True):
         super().__init__()
 
-        self.activ = getattr(F, att_activ)
         self.ctx_dim = ctx_dim
         self.hid_dim = hid_dim
         self._ctx2hid = ctx2hid
         self.temperature = temp
         self.att_type = att_type
+        self.activ = get_activation_fn(att_activ)
 
         # The common dimensionality for inner formulation
         if isinstance(att_bottleneck, int):

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn.functional as F
 import torch.nn as nn
 
+from ..utils.nn import get_activation_fn
 from . import FF
 
 
@@ -32,8 +32,7 @@ class ZSpace(nn.Module):
         self.ctx_size_dict = ctx_size_dict
         self.z_size = z_size
         self.z_type = z_type.lower() if z_type else None
-        if activ is not None:
-            self.activ = getattr(F, activ)
+        self.activ = get_activation_fn(activ)
 
         # Safety check
         assert self.z_type in (None, 'ff', 'multi', 'highway'), \
@@ -79,9 +78,6 @@ class ZSpace(nn.Module):
             projectors[modality] = FF(
                 enc_vec[0].shape[0], self.z_size, activ=None)
 
-        if self.activ is None:
-            return self.combination
-        else:
-            return self.activ(self.combination)
+        return self.activ(self.combination)
         # TODO: get parameter from multitask.py to project to z_size which != enc_size
         # return self.combination
