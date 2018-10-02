@@ -3,7 +3,7 @@ import logging
 
 import torch.optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.nn.utils.clip_grad import clip_grad_norm
+from torch.nn.utils import clip_grad_norm_
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -111,7 +111,7 @@ class Optimizer(object):
 
     def _step(self, closure=None):
         """Gradient clipping aware step()."""
-        clip_grad_norm(self.params, self.gclip)
+        clip_grad_norm_(self.params, self.gclip)
         self.optim.step(closure)
 
     def lr_step(self, metric):
