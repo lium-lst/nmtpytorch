@@ -56,7 +56,7 @@ class SwitchingGRUDecoder(nn.Module):
             self.out2prob.weight = self.emb.weight
 
         # Final loss
-        self.nll_loss = nn.NLLLoss(size_average=False, ignore_index=0)
+        self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
 
         # Attention
         self.alphas = []

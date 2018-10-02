@@ -55,7 +55,7 @@ class VectorDecoder(nn.Module):
         if self.tied_emb:
             self.out2prob.weight = self.emb.weight
 
-        self.nll_loss = nn.NLLLoss(size_average=False, ignore_index=0)
+        self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
 
     def f_init(self, ctx_dict):
         """Returns the initial h_0 for the decoder."""
