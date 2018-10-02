@@ -84,7 +84,7 @@ class MainLoop(object):
                 self.print(' -> froze parameter {}.*'.format(name))
 
         # Move to cuda
-        self.model.cuda()
+        self.model.to('cuda')
         self.print(self.model)
 
         # Create optimizer instance
@@ -114,9 +114,6 @@ class MainLoop(object):
     def train_batch(self, batch):
         """Trains a batch."""
         nn_start = time.time()
-
-        # Forward pass returns dict
-        batch.to_gpu()
 
         # Reset gradients
         self.optim.zero_grad()

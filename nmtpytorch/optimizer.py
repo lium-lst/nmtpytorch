@@ -7,7 +7,7 @@ from torch.nn.utils import clip_grad_norm_
 
 logger = logging.getLogger('nmtpytorch')
 
-# Setup optimizer (should always come after model.cuda())
+# Setup optimizer (should always come after model.to())
 # iterable of dicts for per-param options where each dict
 # is {'params' : [p1, p2, p3...]}.update(generic optimizer args)
 # Example:

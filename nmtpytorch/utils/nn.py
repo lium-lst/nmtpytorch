@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from torch.nn import Module
 
 
 def get_rnn_hidden_state(h):

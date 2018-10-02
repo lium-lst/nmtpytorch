@@ -2,7 +2,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from ...utils.nn import get_rnn_hidden_state
 from .. import FF, Attention
@@ -114,8 +113,8 @@ class ConditionalDecoder(nn.Module):
 
     def _rnn_init_zero(self, ctx_dict):
         ctx, _ = ctx_dict[self.ctx_name]
-        h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_states)
-        return Variable(h_0).cuda()
+        return torch.zeros(
+            ctx.shape[1], self.hidden_size * self.n_states, device='cuda')
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         ctx, ctx_mask = ctx_dict[self.ctx_name]
@@ -165,15 +164,15 @@ class ConditionalDecoder(nn.Module):
         ground-truth target token indices `y`. Only called during training.
 
         Arguments:
-            ctxs(Variable): A variable of `S*B*ctx_dim` representing the source
+            ctxs(Tensor): A tensor of `S*B*ctx_dim` representing the source
                 annotations in an order compatible with ground-truth targets.
-            y(Variable): A variable of `T*B` containing ground-truth target
+            y(Tensor): A tensor of `T*B` containing ground-truth target
                 token indices for the given batch.
         """
 
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device='cuda')
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

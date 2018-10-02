@@ -58,18 +58,18 @@ class Attention(nn.Module):
         decoder's hidden state and source annotations.
 
         Arguments:
-            hid(Variable): A set of decoder hidden states of shape `T*B*H`
+            hid(Tensor): A set of decoder hidden states of shape `T*B*H`
                 where `T` == 1, `B` is batch dim and `H` is hidden state dim.
-            ctx(Variable): A set of annotations of shape `S*B*C` where `S`
+            ctx(Tensor): A set of annotations of shape `S*B*C` where `S`
                 is the source timestep dim, `B` is batch dim and `C`
                 is annotation dim.
             ctx_mask(FloatTensor): A binary mask of shape `S*B` with zeroes
                 in the padded positions.
 
         Returns:
-            scores(Variable): A variable of shape `S*B` containing normalized
+            scores(Tensor): A tensor of shape `S*B` containing normalized
                 attention scores for each position and sample.
-            z_t(Variable): A variable of shape `B*H` containing the final
+            z_t(Tensor): A tensor of shape `B*H` containing the final
                 attended context vector for this target decoding timestep.
 
         Notes:

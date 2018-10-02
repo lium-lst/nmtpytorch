@@ -2,7 +2,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from ...utils.nn import get_rnn_hidden_state
 from .. import FF
@@ -121,8 +120,8 @@ class XuDecoder(nn.Module):
         return torch.split(h, self.hidden_size, dim=-1)
 
     def _rnn_init_zero(self, ctx, ctx_mask):
-        h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_states)
-        return Variable(h_0).cuda()
+        return torch.zeros(
+            ctx.shape[1], self.hidden_size * self.n_states, device='cuda')
 
     def _rnn_init_mean_ctx(self, ctx, ctx_mask):
         mean_ctx = ctx.mean(dim=0)
@@ -181,7 +180,7 @@ class XuDecoder(nn.Module):
     def forward(self, ctx_dict, y):
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device='cuda')
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

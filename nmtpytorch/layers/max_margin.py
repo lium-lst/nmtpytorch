@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-
-import numpy as np
 
 # Layer contributed by @elliottd
 
@@ -26,9 +23,9 @@ class MaxMargin(nn.Module):
            batches and the same number of feats.
 
         Arguments:
-            enc1(Variable): A variable of `B*feats` representing the
+            enc1(Tensor): A tensor of `B*feats` representing the
                 annotation vectors of the first encoder.
-            enc2(Variable): A variable of `B*feats` representation the
+            enc2(Tensor): A tensor of `B*feats` representation the
                 annotation vectors of the second encoder.
         """
 
@@ -45,7 +42,7 @@ class MaxMargin(nn.Module):
         if enc1.shape[0] == 1:
             # There is no error when we have a single-instance batch.
             # Return a dummy error of 1e-5 as a regularizer
-            return Variable(torch.from_numpy(np.array([1e-3], dtype='float32'))).cuda()
+            return torch.tensor([1e-3]).to('cuda')
 
         # compute enc1-enc2 score matrix
         scores = self.cosine_sim(enc1, enc2)
@@ -57,10 +54,9 @@ class MaxMargin(nn.Module):
         cost_enc2 = (self.margin + scores - d1).clamp(min=0)
 
         # clear diagonals
-        mask = torch.eye(scores.size(0)) > .5
-        mask_v = Variable(mask).cuda()
-        cost_enc2 = cost_enc2.masked_fill_(mask_v, 0)
-        cost_enc1 = cost_enc1.masked_fill_(mask_v, 0)
+        mask = torch.eye(scores.size(0), device='cuda') > .5
+        cost_enc2 = cost_enc2.masked_fill_(mask, 0)
+        cost_enc1 = cost_enc1.masked_fill_(mask, 0)
 
         # keep the maximum violating negative for each query
         if self.max_violation:

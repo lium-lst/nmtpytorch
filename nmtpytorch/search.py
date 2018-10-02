@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import torch
-from torch.autograd import Variable
 
 from .utils.misc import pbar
 from .utils.topology import Topology
@@ -73,13 +72,13 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
     n_vocab = len(vocab)
 
     # Tensorized beam that will shrink and grow up to max_batch_size
-    beam_storage = torch.zeros((max_len, max_batch_size, k)).long().cuda()
-    mask = torch.arange(max_batch_size * k).long().cuda()
-    nll_storage = torch.zeros(max_batch_size).cuda()
+    beam_storage = torch.zeros(
+        max_len, max_batch_size, k, dtype=torch.long, device='cuda')
+    mask = torch.arange(max_batch_size * k, device='cuda')
+    nll_storage = torch.zeros(max_batch_size, device='cuda')
 
     for batch in pbar(data_loader, unit='batch'):
-        # Send to GPU
-        batch.to_gpu(volatile=True)
+        # TODO: Volatile?
 
         # Always use the initial storage
         beam = beam_storage.narrow(1, 0, batch.size).zero_()
@@ -106,7 +105,9 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
         for t in range(max_len):
             # Fetch embs for the next iteration (N*K, E)
             # y_ts = [m.dec.emb(Variable(idxs, volatile=True).cuda()) for m in models]
-            y_t = Variable(idxs, volatile=True).cuda()
+            # TODO: Volatile
+            #y_t = Variable(idxs, volatile=True).cuda()
+            y_t = idxs
 
             # Select correct positions from source context
             ctx_dicts = [tile_ctx_dict(cd, tile) for cd in ctx_dicts]

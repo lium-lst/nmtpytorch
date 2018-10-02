@@ -90,7 +90,7 @@ class VectorDecoder(nn.Module):
     def forward(self, ctx_dict, y):
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device='cuda')
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

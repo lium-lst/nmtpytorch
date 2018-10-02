@@ -1,23 +1,11 @@
-from torch.autograd import Variable
+# -*- coding: utf-8 -*-
 
 
 class Batch(object):
-    def __init__(self, batch_size, data_dict):
+    def __init__(self, batch_size, data_dict, device='cuda:0'):
         self.size = batch_size
-        self.data = data_dict
-        self.device = None
-
-    def to_gpu(self, volatile=False):
-        if self.device is None:
-            self.device = 'gpu'
-            self.data = {
-                k: Variable(v, volatile=volatile).cuda() for k, v in self.data.items()}
-
-    def to_cpu(self, volatile=False):
-        if self.device is None:
-            self.device = 'cpu'
-            self.data = {
-                k: Variable(v, volatile=volatile) for k, v in self.data.items()}
+        self.device = device
+        self.data = {k: v.to(device) for k, v in data_dict.items()}
 
     def __getitem__(self, key):
         return self.data[key]

@@ -317,8 +317,9 @@ class Multitask(nn.Module):
         #for d in self.decs:
         #    mrr[d] = MeanReciprocalRank(self.n_tvocabs[d])
 
+        # TODO: Volatile
+
         for batch in data_loader:
-            batch.to_gpu(volatile=True)
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
                 for d in out.keys():

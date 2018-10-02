@@ -19,14 +19,14 @@ class BiLSTMp(nn.Module):
             factor for each LSTM.
         dropout (float, optional): Use dropout (Default: 0.)
     Input:
-        x (Variable): A variable of shape (n_timesteps, n_samples, n_feats)
+        x (Tensor): A tensor of shape (n_timesteps, n_samples, n_feats)
             that includes acoustic features of dimension ``n_feats`` per
             each timestep (in the first dimension).
 
     Output:
-        hs (Variable): A variable of shape (n_timesteps, n_samples, hidden * 2)
+        hs (Tensor): A tensor of shape (n_timesteps, n_samples, hidden * 2)
             that contains encoder hidden states for all timesteps.
-        mask (Variable): `None` since this layer expects all equal frame inputs.
+        mask (Tensor): `None` since this layer expects all equal frame inputs.
     """
     def __init__(self, input_size, hidden_size, proj_size, layers,
                  proj_activ='tanh', dropout=0):

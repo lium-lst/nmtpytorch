@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from . import FF, Attention, HierarchicalAttention
 
@@ -42,7 +41,7 @@ class ZSpaceAtt(nn.Module):
             {modality : encoder_result}.
 
     Output:
-        z (Variable): A sequence of z_len-dimensional vectors of shape z_size.
+        z (Tensor): A sequence of z_len-dimensional vectors of shape z_size.
     """
 
     def __init__(self, ctx_size_dict, z_size, z_len=10, z_transform=None, z_in_size=256,
@@ -132,14 +131,13 @@ class ZSpaceAtt(nn.Module):
 
     def _rnn_init_zero(self, ctx_dict):
         # * self.n_states) # <-- ?? was used in cond_decoder.py
-        h_0 = torch.zeros(self.ctx_size, self.z_size)
-        return Variable(h_0).cuda()
+        return torch.zeros(self.ctx_size, self.z_size, device='cuda')
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         # NOTE: averaging the mean of all modalities
         # NOTE: all ctx should have the same size at this point
         key = next(iter(ctx_dict))
-        res = torch.autograd.Variable(torch.zeros(ctx_dict[key][0].shape[1:])).cuda()
+        res = torch.zeros(ctx_dict[key][0].shape[1:], device='cuda')
         for e in ctx_dict.keys():
             ctx, ctx_mask = ctx_dict[e]
             if ctx_mask is None:
@@ -190,7 +188,7 @@ class ZSpaceAtt(nn.Module):
         summ = None
         for e in att_ctx_dict.keys():
             if summ is None:
-                summ = torch.autograd.Variable(torch.zeros(att_ctx_dict[e].shape)).cuda()
+                summ = torch.zeros(att_ctx_dict[e].shape, device='cuda')
             summ += att_ctx_dict[e]
         return None, summ
 

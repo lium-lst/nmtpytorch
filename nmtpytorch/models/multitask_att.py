@@ -486,8 +486,9 @@ class MultitaskAtt(nn.Module):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
 
+        # TODO: Volatile
+
         for batch in data_loader:
-            batch.to_gpu(volatile=True)
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
                 for d in out.keys():

@@ -219,8 +219,9 @@ class ASR(nn.Module):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
 
+        # TODO: Volatile
+
         for batch in data_loader:
-            batch.to_gpu(volatile=True)
             out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
 

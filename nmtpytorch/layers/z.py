@@ -25,7 +25,7 @@ class ZSpace(nn.Module):
             {modality : encoder_result}.
 
     Output:
-        z (Variable): A single-dimensional variable of shape z_size.
+        z (Tensor): A single-dimensional tensor of shape z_size.
     """
     def __init__(self, ctx_size_dict, z_size, z_type=None, activ=None):
         super().__init__()

@@ -28,14 +28,14 @@ class FeatureEncoder(nn.Module):
         dropout_ctx(float, optional): Dropout rate for the hidden states (Default: 0.)
 
     Input:
-        x (Variable): A variable of shape (n_timesteps, n_samples)
+        x (Tensor): A tensor of shape (n_timesteps, n_samples)
             including the integer token indices for the given batch.
     Output:
-        hs (Variable): A variable of shape (n_timesteps, n_samples, hidden)
+        hs (Tensor): A tensor of shape (n_timesteps, n_samples, hidden)
             that contains encoder hidden states for all timesteps. If
             bidirectional, `hs` is doubled in size in the last dimension
             to contain both directional states.
-        mask (Variable): A binary mask of shape (n_timesteps, n_samples)
+        mask (Tensor): A binary mask of shape (n_timesteps, n_samples)
             that may further be used in attention and/or decoder.
     """
     def __init__(self, input_size, proj_size, hidden_size, rnn_type,
