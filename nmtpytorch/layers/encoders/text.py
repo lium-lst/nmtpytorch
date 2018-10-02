@@ -83,7 +83,7 @@ class TextEncoder(nn.Module):
                        bidirectional=self.bidirectional)
 
     def forward(self, x):
-        if (x == 0).nonzero().size():
+        if (x == 0).nonzero().numel():
             return self.forward_mixed_len_batches(x)
         else:
             return self.forward_same_len_batches(x)
