@@ -98,15 +98,11 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
 
         # Start with <bos> tokens
         # FIXME: idxs should not change except for informed <bos> embeddings
+        # In case of different <bos> possibility, these should be asked
+        # from each model to support ensembling
         idxs = models[0].get_bos(batch.size).to('cuda')
 
         for t in range(max_len):
-            # Fetch embs for the next iteration (N*K, E)
-            # y_ts = [m.dec.emb(Variable(idxs, volatile=True).cuda()) for m in models]
-            # TODO: Volatile
-            #y_t = Variable(idxs, volatile=True).cuda()
-            y_t = idxs
-
             # Select correct positions from source context
             ctx_dicts = [tile_ctx_dict(cd, tile) for cd in ctx_dicts]
 
@@ -114,7 +110,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             # log_p: batch_size x vocab_size (t = 0)
             #        batch_size*beam_size x vocab_size (t > 0)
             log_ps, h_ts = zip(
-                *[f_next(cd, dec.emb(y_t), h_t[tile]) for
+                *[f_next(cd, dec.emb(idxs), h_t[tile]) for
                     f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
 
             # Do the actual averaging of log-probabilities
