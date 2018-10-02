@@ -1,9 +1,21 @@
 # -*- coding: utf-8 -*-
+import torch
+import torch.nn.functional as F
 
 
 def get_rnn_hidden_state(h):
     """Returns h_t transparently regardless of RNN type."""
     return h if not isinstance(h, tuple) else h[0]
+
+
+def get_activation_fn(name):
+    """Returns a callable activation function from torch."""
+    if name is None:
+        return lambda x: x
+    elif name in ('sigmoid', 'tanh'):
+        return getattr(torch, name)
+    else:
+        return getattr(F, name)
 
 
 def mean_pool(data):
