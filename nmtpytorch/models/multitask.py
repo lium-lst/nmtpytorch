@@ -291,7 +291,7 @@ class Multitask(nn.Module):
                 and target modalities.
 
         Returns:
-            Variable:
+            Tensor:
                 A scalar loss normalized w.r.t batch size and token counts.
         """
         #uctr = kwargs['uctr']
