@@ -78,8 +78,6 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
     nll_storage = torch.zeros(max_batch_size, device='cuda')
 
     for batch in pbar(data_loader, unit='batch'):
-        # TODO: Volatile?
-
         # Always use the initial storage
         beam = beam_storage.narrow(1, 0, batch.size).zero_()
 
@@ -100,7 +98,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
 
         # Start with <bos> tokens
         # FIXME: idxs should not change except for informed <bos> embeddings
-        idxs = models[0].get_bos(batch.size).cuda()
+        idxs = models[0].get_bos(batch.size).to('cuda')
 
         for t in range(max_len):
             # Fetch embs for the next iteration (N*K, E)
