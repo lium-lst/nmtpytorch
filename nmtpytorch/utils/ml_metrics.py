@@ -16,7 +16,7 @@ class Loss(object):
 
     def update(self, loss, n_items):
         # Store last batch loss
-        self.batch_loss = loss.data.cpu()[0]
+        self.batch_loss = loss.item()
         # Add it to cumulative loss
         self._loss += self.batch_loss
         # Normalize batch loss w.r.t n_items

@@ -173,7 +173,7 @@ class MainLoop(object):
                     self.monitor.ectr, self.monitor.uctr,
                     self.loss_meter.batch_loss)
                 for key, value in self.model.aux_loss.items():
-                    val = value.data.cpu()[0]
+                    val = value.item()
                     msg += ' [{}: {:.3f}]'.format(key, val)
                     self.tb.log_scalar('train_' + key.upper(),
                                        val, self.monitor.uctr)
