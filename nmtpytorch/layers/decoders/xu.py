@@ -166,7 +166,7 @@ class XuDecoder(nn.Module):
         if self.ctx2out:
             logit += self.ff_out_ctx(z_t)
 
-        logit = F.tanh(logit)
+        logit = torch.tanh(logit)
         if self.dropout > 0:
             logit = self.do(logit)
 
