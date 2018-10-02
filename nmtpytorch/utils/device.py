@@ -2,7 +2,7 @@ import os
 import subprocess
 
 
-class GPUManager(object):
+class DeviceManager(object):
 
     def collect_stats(self):
         try:
