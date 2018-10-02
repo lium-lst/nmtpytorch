@@ -40,12 +40,12 @@ class AttentiveMNMT(NMT):
                 self.opts.model['cnn_layer'])
 
     def reset_parameters(self):
-        """Initializes learnable weights with kaiming_normal()."""
+        """Initializes learnable weights with kaiming normal."""
         for name, param in self.named_parameters():
             if (param.requires_grad and 'bias' not in name and
                     not name.startswith('cnn')):
                 logger.info('  Initializing weights for {}'.format(name))
-                nn.init.kaiming_normal(param.data)
+                nn.init.kaiming_normal_(param.data)
 
     def setup(self, is_train=True):
         logger.info('Loading CNN')

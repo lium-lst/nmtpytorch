@@ -121,7 +121,7 @@ class NMT(nn.Module):
     def reset_parameters(self):
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
-                nn.init.kaiming_normal(param.data)
+                nn.init.kaiming_normal_(param.data)
 
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""

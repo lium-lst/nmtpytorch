@@ -113,11 +113,11 @@ class ASR(nn.Module):
         return self.defaults
 
     def reset_parameters(self):
-        # Use kaiming_normal for everything as it is a sane default
+        # Use kaiming normal for everything as it is a sane default
         # Do not touch biases for now
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
-                nn.init.kaiming_normal(param.data)
+                nn.init.kaiming_normal_(param.data)
 
         if self.opts.model['lstm_bias_zero'] or \
                 self.opts.model['lstm_forget_bias']:
