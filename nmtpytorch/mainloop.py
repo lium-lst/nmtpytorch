@@ -292,7 +292,7 @@ class MainLoop(object):
 
     def __call__(self):
         """Runs training loop."""
-        self.print('Training started on %s' % time.strftime('%d-%m-%Y %H:%M'))
+        self.print('Training started on %s' % time.strftime('%d-%m-%Y %H:%M:%S'))
         self.model.train(True)
         torch.set_grad_enabled(True)
 
