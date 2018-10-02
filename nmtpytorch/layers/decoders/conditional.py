@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state
+from ...utils.device import DEVICE
 from .. import FF, Attention
 
 
@@ -114,7 +115,7 @@ class ConditionalDecoder(nn.Module):
     def _rnn_init_zero(self, ctx_dict):
         ctx, _ = ctx_dict[self.ctx_name]
         return torch.zeros(
-            ctx.shape[1], self.hidden_size * self.n_states, device='cuda')
+            ctx.shape[1], self.hidden_size * self.n_states, device=DEVICE)
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         ctx, ctx_mask = ctx_dict[self.ctx_name]
@@ -172,7 +173,7 @@ class ConditionalDecoder(nn.Module):
 
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab, device='cuda')
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=DEVICE)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

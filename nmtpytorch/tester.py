@@ -3,8 +3,11 @@ import time
 import logging
 from pathlib import Path
 
+import torch
+
 from .utils.misc import load_pt_file
 from .utils.data import make_dataloader
+from .utils.device import DEVICE
 
 from . import models
 from .config import Options
@@ -39,8 +42,8 @@ class Tester(object):
         instance.setup(is_train=False)
         # Load weights
         instance.load_state_dict(weights, strict=True)
-        # Move to GPU
-        instance.to('cuda')
+        # Move to device
+        instance.to(DEVICE)
         # Switch to eval mode
         instance.train(False)
 

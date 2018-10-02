@@ -39,9 +39,8 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 
 ## Installation
 
-`nmtpytorch` currently requires `python>=3.6`, `torch==0.4.1` and a GPU to work.
-We are not planning to support Python 2.x but we will be adding multi-GPU
-and CPU support in the next releases.
+`nmtpytorch` currently requires `python>=3.6` and `torch==0.4.1`.
+We are not planning to support Python 2.x.
 
 ### pip
 

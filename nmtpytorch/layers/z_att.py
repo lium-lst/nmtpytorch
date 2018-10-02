@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from . import FF, Attention, HierarchicalAttention
+from ..utils.device import DEVICE
 
 
 # TODO: allow for returning a sequence of z states (will require mask)
@@ -131,13 +132,13 @@ class ZSpaceAtt(nn.Module):
 
     def _rnn_init_zero(self, ctx_dict):
         # * self.n_states) # <-- ?? was used in cond_decoder.py
-        return torch.zeros(self.ctx_size, self.z_size, device='cuda')
+        return torch.zeros(self.ctx_size, self.z_size, device=DEVICE)
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         # NOTE: averaging the mean of all modalities
         # NOTE: all ctx should have the same size at this point
         key = next(iter(ctx_dict))
-        res = torch.zeros(ctx_dict[key][0].shape[1:], device='cuda')
+        res = torch.zeros(ctx_dict[key][0].shape[1:], device=DEVICE)
         for e in ctx_dict.keys():
             ctx, ctx_mask = ctx_dict[e]
             if ctx_mask is None:
@@ -188,7 +189,7 @@ class ZSpaceAtt(nn.Module):
         summ = None
         for e in att_ctx_dict.keys():
             if summ is None:
-                summ = torch.zeros(att_ctx_dict[e].shape, device='cuda')
+                summ = torch.zeros(att_ctx_dict[e].shape, device=DEVICE)
             summ += att_ctx_dict[e]
         return None, summ
 

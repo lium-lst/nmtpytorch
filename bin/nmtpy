@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+
+# NOTE: May be tuned for cpu mode?
 os.environ['MKL_NUM_THREADS'] = '1'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -11,7 +13,7 @@ import argparse
 from nmtpytorch import logger
 from nmtpytorch.config import Options
 from nmtpytorch.utils.misc import setup_experiment, fix_seed
-from nmtpytorch.utils.gpu import GPUManager
+from nmtpytorch.utils.device import DeviceManager
 
 
 if __name__ == '__main__':
@@ -33,6 +35,8 @@ if __name__ == '__main__':
                               help="Optional experiment suffix.")
     parser_train.add_argument('-S', '--short', action='store_true',
                               help="Use short experiment id in filenames.")
+    parser_train.add_argument('-d', '--device-id', type=str, default='cuda:0',
+                              help='cpu or cuda:0 (Default: cuda:0)')
     parser_train.add_argument('overrides', nargs="*", default=[],
                               help="(section).key:value overrides for config")
 
@@ -54,8 +58,8 @@ if __name__ == '__main__':
                               help='Apply length-penalty (Default: 0.)')
     parser_trans.add_argument('-t', '--att-temp', type=float, default=1.,
                               help='Temperature for attention (Default: 1.)')
-    parser_trans.add_argument('-d', '--device-id', type=str, default='auto_1',
-                              help='Select GPU device(s)')
+    parser_trans.add_argument('-d', '--device-id', type=str, default='cuda:0',
+                              help='cpu or cuda:0 (Default: cuda:0)')
     parser_trans.add_argument('models', type=str, nargs='+',
                               help="Saved model/checkpoint file(s)")
     parser_trans.add_argument('-tid', '--task-id', type=str, default=None,
@@ -77,8 +81,8 @@ if __name__ == '__main__':
     parser_test = subparsers.add_parser('test', help='test help')
     parser_test.add_argument('-b', '--batch-size', type=int, default=64,
                               help='Batch size for beam-search')
-    parser_test.add_argument('-d', '--device-id', type=str, default='auto_1',
-                              help='Select GPU device(s)')
+    parser_test.add_argument('-d', '--device-id', type=str, default='cuda:0',
+                              help='cpu or cuda:0 (Default: cuda:0)')
     parser_test.add_argument('models', type=str, nargs='+',
                               help="Saved model/checkpoint file(s)")
     parser_test.add_argument('-tid', '--task-id', type=str, default=None,
@@ -104,13 +108,8 @@ if __name__ == '__main__':
         # Setup experiment folders
         setup_experiment(opts, args.suffix, args.short)
 
-    # Detect device_id
-    device_id = (opts.train['device_id'] if args.cmd not in
-                 ('test', 'translate') else args.device_id)
-
-    # Reserve GPUs
-    gpu_devs = GPUManager()(device_id, strict=True)
-    assert len(gpu_devs) == 1, "Multi-GPU mode not implemented yet."
+    # Reserve device(s)
+    dev_mgr = DeviceManager(args.device_id)
 
     # translate entry point
     if args.cmd in ('translate', 'test'):
@@ -149,10 +148,13 @@ if __name__ == '__main__':
     # Instantiate the model object
     model = getattr(models, opts.train['model_type'])(opts=opts)
 
-    log.info("PyTorch {} (CUDA: {}) on '{}' (GPUs: {})".format(
-        torch.__version__, torch.version.cuda, platform.node(), gpu_devs))
-    log.info("Nmtpytorch version: {}".format(nmtpytorch.__version__))
+    log.info("Python {} -- torch {} with CUDA {} (on machine '{}')".format(
+        platform.python_version(), torch.__version__,
+        torch.version.cuda, platform.node()))
+    log.info("nmtpytorch {}".format(nmtpytorch.__version__))
+    log.info(dev_mgr)
     log.info("Seed for further reproducibility: {}".format(opts.train['seed']))
+
     if 'SLURM_JOB_ID' in os.environ:
         log.info("SLURM Job ID: {}".format(os.environ['SLURM_JOB_ID']))
     loop = MainLoop(model, opts.train)

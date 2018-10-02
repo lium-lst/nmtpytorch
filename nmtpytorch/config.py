@@ -32,7 +32,7 @@ TRAIN_DEFAULTS = {
     'eval_metrics': 'loss',      # comma sep. metrics, 1st -> earlystopping
     'eval_filters': '',          # comma sep. filters to apply to refs/hyps
     'eval_beam': 6,              # Validation beam size
-    'eval_batch_size': 16,       # batch_size for GPU beam-search
+    'eval_batch_size': 16,       # batch_size for beam-search
     'eval_freq': 3000,           # 0 means 'End of epochs'
     'eval_max_len': 200,         # max seq len to stop during beam search
     'eval_start': 1,             # Epoch which validation will start

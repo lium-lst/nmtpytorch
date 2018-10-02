@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import FF
+from ...utils.device import DEVICE
 from ..attention import Attention
 
 
@@ -65,7 +66,7 @@ class SwitchingGRUDecoder(nn.Module):
         but passed for compatibility with beam search."""
         self.alphas = []
         batch_size = next(iter(sources.values()))[0].shape[1]
-        return torch.zeros(batch_size, self.hidden_size, device='cuda')
+        return torch.zeros(batch_size, self.hidden_size, device=DEVICE)
 
     def f_next(self, sources, y, h):
         # Get hidden states from the first decoder (purely cond. on LM)
@@ -108,7 +109,7 @@ class SwitchingGRUDecoder(nn.Module):
 
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab, device='cuda')
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=DEVICE)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

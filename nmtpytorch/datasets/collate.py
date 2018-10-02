@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
+from ..utils.device import DEVICE
 
 
 class Batch(object):
-    def __init__(self, batch_size, data_dict, device='cuda:0'):
+    def __init__(self, batch_size, data_dict):
         self.size = batch_size
-        self.device = device
-        self.data = {k: v.to(device) for k, v in data_dict.items()}
+        self.data = {k: v.to(DEVICE) for k, v in data_dict.items()}
 
     def __getitem__(self, key):
         return self.data[key]
 
     def __repr__(self):
-        s = "Batch(size={}, device={})\n".format(self.size, self.device)
+        s = "Batch(size={}, device={})\n".format(self.size, DEVICE)
         for key in self.data:
             s += "  {:10s} -> {}\n".format(str(key), self.data[key].shape)
         return s

@@ -11,6 +11,7 @@ from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 from .utils.data import make_dataloader
 from .utils.topology import Topology
+from .utils.device import DEVICE
 
 from . import models
 from .config import Options
@@ -38,7 +39,7 @@ class Translator(object):
         # Disable gradient tracking
         torch.set_grad_enabled(False)
 
-        # Create model instances and move them to GPU
+        # Create model instances and move them to device
         for model_file in self.models:
             weights, _, opts = load_pt_file(model_file)
             opts = Options.from_dict(opts)
@@ -60,8 +61,8 @@ class Translator(object):
             instance.setup(is_train=False)
             # Load weights
             instance.load_state_dict(weights, strict=True)
-            # Move to GPU
-            instance.to('cuda')
+            # Move to device
+            instance.to(DEVICE)
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)

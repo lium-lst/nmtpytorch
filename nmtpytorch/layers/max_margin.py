@@ -2,6 +2,8 @@
 import torch
 import torch.nn as nn
 
+from ..utils.device import DEVICE
+
 # Layer contributed by @elliottd
 
 
@@ -42,7 +44,7 @@ class MaxMargin(nn.Module):
         if enc1.shape[0] == 1:
             # There is no error when we have a single-instance batch.
             # Return a dummy error of 1e-5 as a regularizer
-            return torch.tensor([1e-3]).to('cuda')
+            return torch.tensor([1e-3], device=DEVICE)
 
         # compute enc1-enc2 score matrix
         scores = self.cosine_sim(enc1, enc2)
@@ -54,7 +56,7 @@ class MaxMargin(nn.Module):
         cost_enc2 = (self.margin + scores - d1).clamp(min=0)
 
         # clear diagonals
-        mask = torch.eye(scores.size(0), device='cuda') > .5
+        mask = torch.eye(scores.size(0), device=DEVICE) > .5
         cost_enc2 = cost_enc2.masked_fill_(mask, 0)
         cost_enc1 = cost_enc1.masked_fill_(mask, 0)
 

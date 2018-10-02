@@ -3,6 +3,7 @@ import torch
 
 from .utils.misc import pbar
 from .utils.topology import Topology
+from .utils.device import DEVICE
 
 
 def tile_ctx_dict(ctx_dict, idxs):
@@ -16,7 +17,7 @@ def tile_ctx_dict(ctx_dict, idxs):
 
 def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
                 lp_alpha=0., suppress_unk=False):
-    """An efficient GPU implementation for beam-search algorithm.
+    """An efficient implementation for beam-search algorithm.
 
     Arguments:
         models (list of Model): Model instance(s) derived from `nn.Module`
@@ -73,9 +74,9 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
 
     # Tensorized beam that will shrink and grow up to max_batch_size
     beam_storage = torch.zeros(
-        max_len, max_batch_size, k, dtype=torch.long, device='cuda')
-    mask = torch.arange(max_batch_size * k, device='cuda')
-    nll_storage = torch.zeros(max_batch_size, device='cuda')
+        max_len, max_batch_size, k, dtype=torch.long, device=DEVICE)
+    mask = torch.arange(max_batch_size * k, device=DEVICE)
+    nll_storage = torch.zeros(max_batch_size, device=DEVICE)
 
     for batch in pbar(data_loader, unit='batch'):
         # Always use the initial storage
@@ -100,7 +101,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
         # FIXME: idxs should not change except for informed <bos> embeddings
         # In case of different <bos> possibility, these should be asked
         # from each model to support ensembling
-        idxs = models[0].get_bos(batch.size).to('cuda')
+        idxs = models[0].get_bos(batch.size).to(DEVICE)
 
         for t in range(max_len):
             # Select correct positions from source context

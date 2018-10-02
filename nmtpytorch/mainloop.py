@@ -7,7 +7,7 @@ import torch
 from .evaluator import Evaluator
 from .optimizer import Optimizer
 from .monitor import Monitor
-from .utils.gpu import GPUManager
+from .utils.device import DEVICE
 from .utils.misc import get_module_groups
 from .utils.misc import load_pt_file, fix_seed
 from .utils.ml_metrics import Loss
@@ -86,7 +86,7 @@ class MainLoop(object):
                 self.print(' -> froze parameter {}.*'.format(name))
 
         # Move to cuda
-        self.model.to('cuda')
+        self.model.to(DEVICE)
         self.print(self.model)
 
         # Create optimizer instance
@@ -110,8 +110,7 @@ class MainLoop(object):
         fix_seed(self.seed + 1)
 
         # Print memory usage before training
-        self.print("Memory usage before training: {}".format(
-            GPUManager.get_mem_usage()))
+        #self.print("Memory usage: {}".format(GPUManager.get_mem_usage()))
 
     def train_batch(self, batch):
         """Trains a batch."""
@@ -176,7 +175,7 @@ class MainLoop(object):
                     msg += ' [{}: {:.3f}]'.format(key, val)
                     self.tb.log_scalar('train_' + key.upper(),
                                        val, self.monitor.uctr)
-                msg += ' (used GPU: {})'.format(GPUManager.get_mem_usage(False))
+                #msg += ' (used GPU: {})'.format(GPUManager.get_mem_usage(False))
                 self.print(msg)
 
             # Do validation?

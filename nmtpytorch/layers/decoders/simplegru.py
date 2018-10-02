@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import FF
+from ...utils.device import DEVICE
 from ..attention import Attention
 
 
@@ -81,7 +82,7 @@ class SimpleGRUDecoder(nn.Module):
         ctx, ctx_mask = ctx_dict[self.ctx_name]
 
         if self.dec_init == 'zero':
-            return torch.zeros(ctx.shape[1], self.hidden_size, device='cuda')
+            return torch.zeros(ctx.shape[1], self.hidden_size, device=DEVICE)
 
         elif self.dec_init == 'mean_ctx':
             h_0 = self.ff_dec_init(
@@ -127,7 +128,7 @@ class SimpleGRUDecoder(nn.Module):
     def forward(self, ctx_dict, y):
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab, device='cuda')
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=DEVICE)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)
