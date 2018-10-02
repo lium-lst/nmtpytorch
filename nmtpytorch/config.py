@@ -10,9 +10,6 @@ from ast import literal_eval
 
 
 TRAIN_DEFAULTS = {
-    'device_id': 'auto_1',       # auto_N for automatic N gpus
-                                 # 0,1,2 for manual N gpus
-                                 # 0 for 0th (single) GPU
     'num_workers': 0,            # number of workers for data loading (0=disabled)
     'pin_memory': False,         # pin_memory for DataLoader (Default: False)
     'seed': 0,                   # > 0 if you want to reproduce a previous experiment
