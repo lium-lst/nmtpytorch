@@ -25,6 +25,9 @@ class Tester(object):
 
         self.model_file = self.models[0]
 
+        # Disable gradient tracking
+        torch.set_grad_enabled(False)
+
         weights, _, opts = load_pt_file(self.model_file)
         opts = Options.from_dict(opts)
         instance = getattr(models, opts.train['model_type'])(opts=opts)
@@ -37,7 +40,7 @@ class Tester(object):
         # Load weights
         instance.load_state_dict(weights, strict=True)
         # Move to GPU
-        instance.cuda()
+        instance.to('cuda')
         # Switch to eval mode
         instance.train(False)
 

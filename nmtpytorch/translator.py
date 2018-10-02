@@ -5,6 +5,8 @@ import time
 import logging
 from pathlib import Path
 
+import torch
+
 from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 from .utils.data import make_dataloader
@@ -33,6 +35,9 @@ class Translator(object):
         # Store each model instance
         self.instances = []
 
+        # Disable gradient tracking
+        torch.set_grad_enabled(False)
+
         # Create model instances and move them to GPU
         for model_file in self.models:
             weights, _, opts = load_pt_file(model_file)
@@ -56,7 +61,7 @@ class Translator(object):
             # Load weights
             instance.load_state_dict(weights, strict=True)
             # Move to GPU
-            instance.cuda()
+            instance.to('cuda')
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)
