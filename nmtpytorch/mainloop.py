@@ -2,6 +2,8 @@
 import time
 import logging
 
+import torch
+
 from .evaluator import Evaluator
 from .optimizer import Optimizer
 from .monitor import Monitor
@@ -238,6 +240,7 @@ class MainLoop(object):
         results = []
         self.monitor.vctr += 1
         self.model.train(False)
+        torch.set_grad_enabled(False)
 
         # Collect simple validation stats first
         self.print('Computing evaluation loss...')
@@ -285,11 +288,13 @@ class MainLoop(object):
         # Dump summary and switch back to training mode
         self.monitor.val_summary()
         self.model.train(True)
+        torch.set_grad_enabled(True)
 
     def __call__(self):
         """Runs training loop."""
         self.print('Training started on %s' % time.strftime('%d-%m-%Y %H:%M'))
         self.model.train(True)
+        torch.set_grad_enabled(True)
 
         # Evaluate once before even starting training
         if self.eval_zero:
