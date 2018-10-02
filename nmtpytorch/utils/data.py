@@ -23,15 +23,6 @@ def sort_batch(seqbatch):
     return (oidxs, sidxs, slens.data.tolist(), omask.float())
 
 
-def pad_data(seqs):
-    """Pads sequences with zero for minibatch processing."""
-    lengths = [len(s) for s in seqs]
-    max_len = max(lengths)
-    out = torch.LongTensor(
-        [s + [0] * (max_len - len_) for s, len_ in zip(seqs, lengths)]).t()
-    return out
-
-
 def pad_video_sequence(seqs):
     """
     Pads video sequences with zero vectors for minibatch processing.
