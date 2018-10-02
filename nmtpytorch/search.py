@@ -166,7 +166,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             1, sorted=False, largest=True)[1].squeeze(1)
 
         # Get best hyp for each sample in the batch
-        hyps = beam[:, range(batch.size), top_hyps].t().cpu()
+        hyps = beam[:, range(batch.size), top_hyps].t().to('cpu')
         results.extend(vocab.list_of_idxs_to_sents(hyps.tolist()))
 
     # Recover order of the samples if necessary
