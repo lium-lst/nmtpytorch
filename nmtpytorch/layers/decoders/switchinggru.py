@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from ...utils.nn import ModuleDict
 from .. import FF
 from ..attention import Attention
 
@@ -31,7 +30,7 @@ class SwitchingGRUDecoder(nn.Module):
             atts[name] = Attention(
                 enc_size, self.hidden_size, att_type=att_type)
 
-        self.atts = ModuleDict(atts)
+        self.atts = nn.ModuleDict(atts)
 
         # Create target embeddings
         self.emb = nn.Embedding(self.n_vocab, self.input_size, padding_idx=0)

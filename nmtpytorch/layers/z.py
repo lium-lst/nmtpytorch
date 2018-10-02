@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 from . import FF
-from ..utils.nn import ModuleDict
 
 
 # TODO: allow for returning a sequence of z states (will require mask)
@@ -44,7 +43,7 @@ class ZSpace(nn.Module):
             assert(len(set([size for size in ctx_size_dict.values()])) == 1), \
                 "Encoder vector sizes are not equal! Consider using z_type:ff in config."
         elif z_type == 'ff':
-            self.z_proj = ModuleDict()
+            self.z_proj = nn.ModuleDict()
             for k, v in self.ctx_size_dict.items():
                 self.z_proj[k] = FF(v, self.z_size, activ=None)
         else:
@@ -75,7 +74,7 @@ class ZSpace(nn.Module):
         # first project to z_size
 
         # FIXME: This is not working
-        projectors = ModuleDict()
+        projectors = nn.ModuleDict()
         for modality, enc_vec in x.items():
             projectors[modality] = FF(
                 enc_vec[0].shape[0], self.z_size, activ=None)

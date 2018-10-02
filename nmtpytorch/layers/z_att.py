@@ -4,7 +4,6 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from . import FF, Attention, HierarchicalAttention
-from ..utils.nn import ModuleDict
 
 
 # TODO: allow for returning a sequence of z states (will require mask)
@@ -76,7 +75,7 @@ class ZSpaceAtt(nn.Module):
         # Each layer maps ctx_size_dict[k] to z_in_size (==ctx_size)
         # z_transform tells the kind of (non-)linearity to use
         if self.z_transform:
-            self.z_transforms = ModuleDict()
+            self.z_transforms = nn.ModuleDict()
             for k in self.ctx_size_dict:
                 self.z_transforms[k] = FF(
                     self.ctx_size_dict[k], self.z_in_size, activ=z_transform)
@@ -90,7 +89,7 @@ class ZSpaceAtt(nn.Module):
 
         # Create an attention layer for each modality
         # TODO: sharing weights between att. mechanisms is possible
-        self.att = ModuleDict()
+        self.att = nn.ModuleDict()
         for k in self.ctx_size_dict:
             att_in_size = self.ctx_size if self.z_transform else self.ctx_size_dict[k]
             self.att[k] = Attention(

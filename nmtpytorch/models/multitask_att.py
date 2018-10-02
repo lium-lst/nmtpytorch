@@ -15,7 +15,7 @@ from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
-from ..utils.nn import ModuleDict, mean_pool
+from ..utils.nn import mean_pool
 from ..utils.scheduler import Scheduler
 
 logger = logging.getLogger('nmtpytorch')
@@ -277,7 +277,7 @@ class MultitaskAtt(nn.Module):
         """Sets up NN topology by creating the layers."""
 
         # create encoders
-        self.encs = ModuleDict()
+        self.encs = nn.ModuleDict()
         self.encs_type = {}
         enc_switcher = {
             "Text": self.create_text_encoder,
@@ -285,7 +285,7 @@ class MultitaskAtt(nn.Module):
             "Kaldi": self.create_speech_encoder,
             "Shelve": self.create_video_encoder
         }
-        self.single_ffs = ModuleDict()
+        self.single_ffs = nn.ModuleDict()
         ff_switcher = {
             "Text": self.create_text_ff,
             "Kaldi": self.create_speech_ff,
@@ -319,7 +319,7 @@ class MultitaskAtt(nn.Module):
         self.ctx_sizes['z'] = self.z_size
 
         # create decoders
-        self.decs = ModuleDict()
+        self.decs = nn.ModuleDict()
         self.dec_types = {}
         dec_switcher = {
             "Image": self.create_image_decoder,
