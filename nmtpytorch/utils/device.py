@@ -1,3 +1,4 @@
+import re
 import os
 import shutil
 import subprocess
@@ -5,93 +6,88 @@ import subprocess
 import torch
 
 DEVICE = None
+DEVICE_IDS = None
 
 
 class DeviceManager:
     __errors = {
+        'BadDeviceFormat': 'Device can be cpu, gpu or [N]gpu, i.e. 2gpu',
         'NoDevFiles': 'Make sure you requested a GPU resource from your cluster.',
         'NoSMI': 'nvidia-smi is not installed. Are you on the correct node?',
         'EnvVar': 'Please set CUDA_VISIBLE_DEVICES explicitly.',
-        'NotEnoughGPU': 'You requested more GPUs than it is available.',
-        'NoMultiGPU': 'Multi-GPU not supported, please restrict CUDA_VISIBLE_DEVICES',
+        'NotEnoughGPU': 'You requested {} GPUs while you have access to only {}.',
     }
 
-    def __init__(self, dev='cuda'):
-        # What user requests
-        self.dev = dev
-        self.req_cpu = dev == 'cpu'
-        self.req_gpu = dev.startswith('cuda')
-        self.req_multi_gpu = self.req_gpu and ',' in dev
-        self.req_n_gpu = len(dev[5:].split(',')) if self.req_gpu else 0
+    def __init__(self, dev):
+        self.dev = dev.lower()
         self.pid = os.getpid()
+        self.req_cpu = False
+        self.req_gpu = False
+        self.req_n_gpu = 0
+        self.req_multi_gpu = False
+        self.nvidia_smi = False
+        self.cuda_dev_ids = None
 
-        # What we have
-        self.nvidia_smi = shutil.which('nvidia-smi')
-        self.cuda_vis_dev = os.environ.get('CUDA_VISIBLE_DEVICES', None)
+        if not re.match('(cpu|[0-9]{0,1}gpu)$', self.dev):
+            raise RuntimeError(self.__errors['BadDeviceFormat'])
 
-        if self.req_gpu:
-            self.__check_gpu_setup()
+        if self.dev == 'cpu':
+            self.req_cpu = True
+            self.dev = torch.device('cpu')
+        else:
+            self.req_gpu = True
+            if self.dev == 'gpu':
+                self.req_n_gpu = 1
+            else:
+                self.req_n_gpu = int(self.dev[0])
 
-        global DEVICE
-        DEVICE = torch.device(dev)
+            self.req_multi_gpu = self.req_n_gpu > 1
 
-    def __check_gpu_setup(self):
-        if self.nvidia_smi is None:
-            raise RuntimeError(self.__errors['NoSMI'])
-        if self.cuda_vis_dev == "NoDevFiles":
-            raise RuntimeError(self.__errors['NoDevFiles'])
-        elif self.cuda_vis_dev is None:
-            raise RuntimeError(self.__errors['EnvVar'])
+            # What we have
+            self.nvidia_smi = shutil.which('nvidia-smi')
+            self.cuda_dev_ids = os.environ.get('CUDA_VISIBLE_DEVICES', None)
 
-        # How many GPUs do we have access to?
-        self.avail_gpus = self.cuda_vis_dev.split(',')
-        self.n_avail_gpus = len(self.avail_gpus)
+            if self.nvidia_smi is None:
+                raise RuntimeError(self.__errors['NoSMI'])
+            if self.cuda_dev_ids == "NoDevFiles":
+                raise RuntimeError(self.__errors['NoDevFiles'])
+            elif self.cuda_dev_ids is None:
+                raise RuntimeError(self.__errors['EnvVar'])
 
-        # NOTE: Remove this once multi-GPU is supported
-        if self.req_n_gpu > 1 or self.n_avail_gpus > 1:
-            raise RuntimeError(self.__errors['NoMultiGPU'])
+            # How many GPUs do we have access to?
+            self.cuda_dev_ids = [int(de) for de in self.cuda_dev_ids.split(',')]
 
-        if self.req_n_gpu > self.n_avail_gpus:
-            raise RuntimeError(self.__errors['NotEnoughGPU'])
+            if self.req_n_gpu > len(self.cuda_dev_ids):
+                raise RuntimeError(
+                    self.__errors['NotEnoughGPU'].format(self.req_n_gpu, len(self.cuda_dev_ids)))
+            else:
+                self.cuda_dev_ids = self.cuda_dev_ids[:self.req_n_gpu]
+
+            # Set master device
+            self.dev = torch.device('cuda:{}'.format(self.cuda_dev_ids[0]))
+
+            global DEVICE
+            DEVICE = self.dev
 
     def get_cuda_mem_usage(self, name=True):
-        if self.cpu:
+        if self.req_cpu:
             return None
 
-        p = subprocess.run([
+        pr = subprocess.run([
             self.nvidia_smi,
             "--query-compute-apps=pid,gpu_name,used_memory",
             "--format=csv,noheader"], stdout=subprocess.PIPE, universal_newlines=True)
 
-        for line in p.stdout.strip().split('\n'):
+        for line in pr.stdout.strip().split('\n'):
             pid, gpu_name, usage = line.split(',')
             if int(pid) == self.pid:
                 if name:
                     return '{} -> {}'.format(gpu_name.strip(), usage.strip())
-                else:
-                    return usage.strip()
+                return usage.strip()
 
         return 'N/A'
-
-    def get_free_gpus(self):
-        """Deprecated: please explicitly give CUDA_VISIBLE_DEVICES."""
-        if self.cpu:
-            return None
-
-        p = subprocess.run([self.nvidia_smi, "-q", "-d", "PIDS"],
-                           stdout=subprocess.PIPE,
-                           universal_newlines=True)
-
-        # Boolean map
-        self.free_map = ["None" in l for l in p.stdout.split('\n')
-                         if "Processes" in l]
-
-        self.free_count = self.free_map.count(True)
-        self.free_idxs = [i for i in range(len(self.free_map))
-                          if self.free_map[i]]
 
     def __repr__(self):
         if self.req_cpu:
             return "DeviceManager(dev='cpu')"
-        else:
-            return "DeviceManager(dev='cuda', n_gpu={})".format(self.req_n_gpu)
+        return "DeviceManager({}, n_gpu={})".format(self.dev, self.req_n_gpu)

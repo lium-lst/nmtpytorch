@@ -19,12 +19,13 @@ logger = logging.getLogger('nmtpytorch')
 
 
 class MainLoop:
-    def __init__(self, model, train_opts, history=None, mode='train'):
+    def __init__(self, model, train_opts, dev_mgr):
         # Get all training options into this mainloop
         self.__dict__.update(train_opts)
 
         self.print = logger.info
         self.model = model
+        self.dev_mgr = dev_mgr
         self.epoch_valid = (self.eval_freq == 0)
 
         # Load training and validation data & create iterators
@@ -37,7 +38,6 @@ class MainLoop:
         self.monitor = Monitor(self.save_path / self.subfolder, self.exp_id,
                                self.model, logger, self.patience,
                                self.eval_metrics,
-                               history=history,
                                save_best_metrics=self.save_best_metrics,
                                n_checkpoints=self.n_checkpoints)
 
@@ -85,8 +85,6 @@ class MainLoop:
             for name in get_module_groups(frozen):
                 self.print(' -> froze parameter {}.*'.format(name))
 
-        # Move to device
-        self.model.to(DEVICE)
         self.print(self.model)
 
         # Create optimizer instance
@@ -112,6 +110,15 @@ class MainLoop:
         # Print memory usage before training
         #self.print("Memory usage: {}".format(GPUManager.get_mem_usage()))
 
+        if self.dev_mgr.req_multi_gpu:
+            self.net = torch.nn.DataParallel(
+                self.model, device_ids=self.dev_mgr.cuda_dev_ids, dim=1)
+        else:
+            self.net = self.model
+
+        # Move to device
+        self.net.to(DEVICE)
+
     def train_batch(self, batch):
         """Trains a batch."""
         nn_start = time.time()
@@ -120,7 +127,7 @@ class MainLoop:
         self.optim.zero_grad()
 
         # Forward pass with training progress
-        out = self.model(batch, uctr=self.monitor.uctr, ectr=self.monitor.ectr)
+        out = self.net(batch, uctr=self.monitor.uctr, ectr=self.monitor.ectr)
         if 'loss' in out:
             # NOTE: Fix this afterwards so that every model adapts the same style
             # Classical models have single loss
@@ -136,8 +143,8 @@ class MainLoop:
             loss = sum([out[k]['loss'] / out[k]['n_items'] for k in out]) / len(out)
 
         # Add other losses if any
-        if self.model.aux_loss:
-            loss += sum(list(self.model.aux_loss.values()))
+        if self.net.aux_loss:
+            loss += sum(list(self.net.aux_loss.values()))
 
         # Backward pass
         loss.backward()
@@ -170,7 +177,7 @@ class MainLoop:
                 msg = "Epoch {} - update {:10d} => loss: {:.3f}".format(
                     self.monitor.ectr, self.monitor.uctr,
                     self.loss_meter.batch_loss)
-                for key, value in self.model.aux_loss.items():
+                for key, value in self.net.aux_loss.items():
                     val = value.item()
                     msg += ' [{}: {:.3f}]'.format(key, val)
                     self.tb.log_scalar('train_' + key.upper(),
@@ -238,12 +245,12 @@ class MainLoop:
         """Do early-stopping validation."""
         results = []
         self.monitor.vctr += 1
-        self.model.train(False)
+        self.net.train(False)
         torch.set_grad_enabled(False)
 
         # Collect simple validation stats first
         self.print('Computing evaluation loss...')
-        results.extend(self.model.test_performance(self.vloss_iterator))
+        results.extend(self.net.test_performance(self.vloss_iterator))
 
         if self.monitor.beam_metrics:
             self.print('Performing beam search (beam_size:{})'.format(
@@ -252,9 +259,9 @@ class MainLoop:
             # For multitask learning models, language-specific validation uses
             # by default the 0th Topology in val_tasks
             task = None
-            if hasattr(self.model, 'val_tasks'):
-                task = self.model.val_tasks[0].direction
-            hyps = beam_search([self.model], self.beam_iterator,
+            if hasattr(self.net, 'val_tasks'):
+                task = self.net.val_tasks[0].direction
+            hyps = beam_search([self.net], self.beam_iterator,
                                task_id=task,
                                beam_size=self.eval_beam,
                                max_len=self.eval_max_len)
@@ -286,13 +293,13 @@ class MainLoop:
 
         # Dump summary and switch back to training mode
         self.monitor.val_summary()
-        self.model.train(True)
+        self.net.train(True)
         torch.set_grad_enabled(True)
 
     def __call__(self):
         """Runs training loop."""
         self.print('Training started on %s' % time.strftime('%d-%m-%Y %H:%M:%S'))
-        self.model.train(True)
+        self.net.train(True)
         torch.set_grad_enabled(True)
 
         # Evaluate once before even starting training
