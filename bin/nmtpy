@@ -29,8 +29,8 @@ if __name__ == '__main__':
                               help="Optional experiment suffix.")
     parser_train.add_argument('-S', '--short', action='store_true',
                               help="Use short experiment id in filenames.")
-    parser_train.add_argument('-d', '--device-id', type=str, default='cuda:0',
-                              help='cpu or cuda:0 (Default: cuda:0)')
+    parser_train.add_argument('-d', '--device-id', type=str, default='cuda',
+                              help='cpu or cuda (Default: cuda)')
     parser_train.add_argument('overrides', nargs="*", default=[],
                               help="(section).key:value overrides for config")
 
@@ -52,8 +52,8 @@ if __name__ == '__main__':
                               help='Apply length-penalty (Default: 0.)')
     parser_trans.add_argument('-t', '--att-temp', type=float, default=1.,
                               help='Temperature for attention (Default: 1.)')
-    parser_trans.add_argument('-d', '--device-id', type=str, default='cuda:0',
-                              help='cpu or cuda:0 (Default: cuda:0)')
+    parser_trans.add_argument('-d', '--device-id', type=str, default='cuda',
+                              help='cpu or cuda (Default: cuda)')
     parser_trans.add_argument('models', type=str, nargs='+',
                               help="Saved model/checkpoint file(s)")
     parser_trans.add_argument('-tid', '--task-id', type=str, default=None,
@@ -75,8 +75,8 @@ if __name__ == '__main__':
     parser_test = subparsers.add_parser('test', help='test help')
     parser_test.add_argument('-b', '--batch-size', type=int, default=64,
                               help='Batch size for beam-search')
-    parser_test.add_argument('-d', '--device-id', type=str, default='cuda:0',
-                              help='cpu or cuda:0 (Default: cuda:0)')
+    parser_test.add_argument('-d', '--device-id', type=str, default='cuda',
+                              help='cpu or cuda (Default: cuda)')
     parser_test.add_argument('models', type=str, nargs='+',
                               help="Saved model/checkpoint file(s)")
     parser_test.add_argument('-tid', '--task-id', type=str, default=None,

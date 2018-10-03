@@ -85,7 +85,7 @@ class MainLoop:
             for name in get_module_groups(frozen):
                 self.print(' -> froze parameter {}.*'.format(name))
 
-        # Move to cuda
+        # Move to device
         self.model.to(DEVICE)
         self.print(self.model)
 

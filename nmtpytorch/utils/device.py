@@ -16,7 +16,7 @@ class DeviceManager:
         'NoMultiGPU': 'Multi-GPU not supported, please restrict CUDA_VISIBLE_DEVICES',
     }
 
-    def __init__(self, dev='cuda:0'):
+    def __init__(self, dev='cuda'):
         # What user requests
         self.dev = dev
         self.req_cpu = dev == 'cpu'
