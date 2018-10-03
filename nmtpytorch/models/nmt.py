@@ -8,7 +8,7 @@ from ..layers import TextEncoder, ConditionalDecoder
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
-from ..utils.ml_metrics import MeanReciprocalRank, Loss
+from ..utils.ml_metrics import Loss
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
@@ -219,18 +219,13 @@ class NMT(nn.Module):
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
-        mrr = MeanReciprocalRank(self.n_trg_vocab)
-
-        # TODO: Volatile
 
         for batch in data_loader:
             out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
-            mrr.update(batch[self.tl][1:].data, out['logps'])
 
         return [
             Metric('LOSS', loss.get(), higher_better=False),
-            Metric('MRR', mrr.normalized_mrr(), higher_better=True),
         ]
 
     def get_decoder(self, task_id=None):

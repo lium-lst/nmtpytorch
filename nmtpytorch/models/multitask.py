@@ -313,22 +313,15 @@ class Multitask(nn.Module):
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
-        #mrr = {}
-        #for d in self.decs:
-        #    mrr[d] = MeanReciprocalRank(self.n_tvocabs[d])
-
-        # TODO: Volatile
 
         for batch in data_loader:
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
                 for d in out.keys():
                     loss.update(out[d]['loss'], out[d]['n_items'])
-                #mrr[d].update(batch[d][1:].data, out[d]['logps'])
 
         return [
             Metric('LOSS', loss.get(), higher_better=False),
-            #Metric('MRR', mrr.normalized_mrr(), higher_better=True),
         ]
 
     ######
