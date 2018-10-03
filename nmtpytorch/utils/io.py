@@ -2,7 +2,7 @@
 from collections import deque
 
 
-class FileRotator(object):
+class FileRotator:
     """A fixed queue with Path() elements where pushing a new element pops
     the oldest one and removes it from disk.
 

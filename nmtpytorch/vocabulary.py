@@ -7,7 +7,7 @@ from collections import OrderedDict
 logger = logging.getLogger('nmtpytorch')
 
 
-class Vocabulary(object):
+class Vocabulary:
     """Smart vocabulary class for integer<->token mapping."""
 
     TOKENS = {"<pad>": 0,

@@ -17,7 +17,7 @@ logger = logging.getLogger('nmtpytorch')
     # ], lr=1e-2, momentum=0.9)
 
 
-class Optimizer(object):
+class Optimizer:
     # Class dict to map lowercase identifiers to actual classes
     methods = {
         'adadelta':   torch.optim.Adadelta,

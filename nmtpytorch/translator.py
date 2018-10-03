@@ -20,7 +20,7 @@ from .search import beam_search
 logger = logging.getLogger('nmtpytorch')
 
 
-class Translator(object):
+class Translator:
     """A utility class to pack translation related features."""
 
     def __init__(self, **kwargs):

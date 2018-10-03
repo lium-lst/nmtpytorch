@@ -9,7 +9,7 @@ BLEU_SCRIPT = pkg_resources.resource_filename('nmtpytorch',
                                               'lib/multi-bleu.perl')
 
 
-class BLEUScorer(object):
+class BLEUScorer:
     """BLEUScorer class."""
     def __init__(self):
         # For multi-bleu.perl we give the reference(s) files as argv,

@@ -2,7 +2,7 @@
 import logging
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import TextEncoder, ImageEncoder, VectorDecoder
 from ..layers import ZSpace
@@ -317,7 +317,7 @@ class Multitask(nn.Module):
         for batch in data_loader:
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
-                for d in out.keys():
+                for d in out:
                     loss.update(out[d]['loss'], out[d]['n_items'])
 
         return [

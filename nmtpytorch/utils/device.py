@@ -7,7 +7,7 @@ import torch
 DEVICE = None
 
 
-class DeviceManager(object):
+class DeviceManager:
     __errors = {
         'NoDevFiles': 'Make sure you requested a GPU resource from your cluster.',
         'NoSMI': 'nvidia-smi is not installed. Are you on the correct node?',
@@ -61,9 +61,7 @@ class DeviceManager(object):
         p = subprocess.run([
             self.nvidia_smi,
             "--query-compute-apps=pid,gpu_name,used_memory",
-            "--format=csv,noheader"],
-            stdout=subprocess.PIPE,
-            universal_newlines=True)
+            "--format=csv,noheader"], stdout=subprocess.PIPE, universal_newlines=True)
 
         for line in p.stdout.strip().split('\n'):
             pid, gpu_name, usage = line.split(',')

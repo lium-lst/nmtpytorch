@@ -15,7 +15,7 @@ from .config import Options
 logger = logging.getLogger('nmtpytorch')
 
 
-class Tester(object):
+class Tester:
     """Tester for models without beam-search."""
 
     def __init__(self, **kwargs):

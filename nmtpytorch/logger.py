@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-from .cleanup import cleanup
 import pathlib
 import logging
+
+from .cleanup import cleanup
 
 
 def setup(opts=None):

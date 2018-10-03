@@ -49,7 +49,7 @@ resnet_layers = {
 }
 
 
-class ImageEncoder(object):
+class ImageEncoder:
     CFG_MAP = {
         # ResNet variants
         'resnet18': resnet_layers,

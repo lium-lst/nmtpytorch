@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 from ..layers import ImageEncoder, TextEncoder, ConditionalMMDecoder

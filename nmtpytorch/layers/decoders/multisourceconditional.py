@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state

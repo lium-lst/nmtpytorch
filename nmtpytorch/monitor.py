@@ -8,7 +8,7 @@ from .utils.misc import load_pt_file
 from .metrics import beam_metrics, metric_info
 
 
-class Monitor(object):
+class Monitor:
     """Class that tracks training progress. The following informations are
     kept as object attributes:
         self.ectr:       # of epochs done so far

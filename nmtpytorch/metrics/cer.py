@@ -4,7 +4,7 @@ import editdistance
 from .metric import Metric
 
 
-class CERScorer(object):
+class CERScorer:
     """This is the same as WER but computes CER and also WER after post-processing."""
     def compute(self, refs, hyps, language=None, lowercase=False):
         if isinstance(hyps, str):

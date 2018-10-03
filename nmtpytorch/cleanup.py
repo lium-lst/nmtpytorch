@@ -7,7 +7,7 @@ import pathlib
 import traceback
 
 
-class Cleanup(object):
+class Cleanup:
     def __init__(self):
         self.temp_files = set()
         self.processes = set()

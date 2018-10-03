@@ -2,7 +2,7 @@
 import logging
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import ConditionalDecoder, FeatureEncoder
 from ..utils.misc import get_n_params

@@ -2,7 +2,7 @@
 import logging
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import BiRNNPv1
 from ..layers import ConditionalDecoder

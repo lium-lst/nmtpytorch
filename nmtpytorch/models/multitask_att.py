@@ -3,7 +3,7 @@ import logging
 import numpy as np
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import TextEncoder, ImageEncoder, VectorDecoder
 from ..layers import FeatureEncoder, MaxMargin, FF
@@ -300,13 +300,13 @@ class MultitaskAtt(nn.Module):
             create_ff = ff_switcher.get(e._type, "Invalid FF transform {} for {}".format(e._type, e))
             self.single_ffs[str(e)] = create_ff(str(e))
 
-            if e._type in ('Shelve'):
+            if e._type.startswith('Shelve'):
                 if 've_enc_dim' in self.opts.model:
                     if self.opts.model['ve_bidirectional']:
                         self.ctx_sizes[str(e)] = self.opts.model['ve_enc_dim'] * 2
                     else:
                         self.ctx_sizes[str(e)] = self.opts.model['ve_enc_dim']
-            elif e._type in ('Kaldi'):
+            elif e._type.startswith('Kaldi'):
                 self.ctx_sizes[str(e)] = self.opts.model['se_enc_dim'] * 2
 
         # create shared space
@@ -489,7 +489,7 @@ class MultitaskAtt(nn.Module):
         for batch in data_loader:
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
-                for d in out.keys():
+                for d in out:
                     loss.update(out[d]['loss'], out[d]['n_items'])
 
         return [

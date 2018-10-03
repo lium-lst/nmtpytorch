@@ -9,7 +9,7 @@ from sklearn.metrics import label_ranking_average_precision_score as lrap
 from .device import DEVICE
 
 
-class Loss(object):
+class Loss:
     """Accumulates and computes correctly training and validation losses."""
     def __init__(self):
         self._loss = 0
@@ -30,7 +30,7 @@ class Loss(object):
         return self._loss / self._denom
 
 
-class CoverageError(object):
+class CoverageError:
     def __init__(self):
         self._cov = 0
         self._n_items = 0
@@ -43,7 +43,7 @@ class CoverageError(object):
         return self._cov / self._n_items
 
 
-class LRAPScore(object):
+class LRAPScore:
     def __init__(self):
         self._lrap = 0
         self._n_items = 0
@@ -56,7 +56,7 @@ class LRAPScore(object):
         return self._lrap / self._n_items
 
 
-class MeanReciprocalRank(object):
+class MeanReciprocalRank:
     """Computes the mean reciprocal rank (MRR) metric for a batch along with
     per time-step MRR statistics that accumulate."""
     def __init__(self, n_classes):

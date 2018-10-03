@@ -13,7 +13,7 @@
 from .cider_scorer import CiderScorer
 
 
-class Cider(object):
+class Cider:
     """Main Class to compute the CIDEr metric."""
 
     def __init__(self, test=None, refs=None, n=4, sigma=6.0):
@@ -42,10 +42,10 @@ class Cider(object):
             ref = gts[id]
 
             # Sanity check.
-            assert(type(hypo) is list)
-            assert(len(hypo) == 1)
-            assert(type(ref) is list)
-            assert(len(ref) > 0)
+            assert isinstance(hypo, list)
+            assert isinstance(ref, list)
+            assert len(hypo) == 1
+            assert len(ref) > 0
 
             cider_scorer += (hypo[0], ref)
 

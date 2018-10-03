@@ -8,7 +8,7 @@ from .topology import Topology
 logger = logging.getLogger('nmtpytorch')
 
 
-class Scheduler(object):
+class Scheduler:
     def __init__(self, topology, schedule_type_enc=None, schedule_type_dec=None,
                  droptask_prob=1, droptask_e_delay=None, manual_schedule=None):
 

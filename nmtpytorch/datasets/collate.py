@@ -2,7 +2,7 @@
 from ..utils.device import DEVICE
 
 
-class Batch(object):
+class Batch:
     def __init__(self, batch_size, data_dict):
         self.size = batch_size
         self.data = {k: v.to(DEVICE) for k, v in data_dict.items()}

@@ -18,7 +18,7 @@ from .search import beam_search
 logger = logging.getLogger('nmtpytorch')
 
 
-class MainLoop(object):
+class MainLoop:
     def __init__(self, model, train_opts, history=None, mode='train'):
         # Get all training options into this mainloop
         self.__dict__.update(train_opts)

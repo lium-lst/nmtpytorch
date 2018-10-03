@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from .. import FF

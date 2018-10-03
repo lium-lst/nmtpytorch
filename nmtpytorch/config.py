@@ -67,7 +67,7 @@ def resolve_path(value):
         return value
 
 
-class Options(object):
+class Options:
     @staticmethod
     def __parse_value(value):
         """Automatic type conversion for configuration values.

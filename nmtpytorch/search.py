@@ -112,7 +112,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             #        batch_size*beam_size x vocab_size (t > 0)
             log_ps, h_ts = zip(
                 *[f_next(cd, dec.emb(idxs), h_t[tile]) for
-                    f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
+                  f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
 
             # Do the actual averaging of log-probabilities
             log_p = sum(log_ps).data
@@ -138,7 +138,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             # Reduce (N, K*V) to k-best
             nll, beam[t] = nll.unsqueeze_(2).add(log_p.view(
                 batch.size, -1, n_vocab)).view(batch.size, -1).topk(
-                k, sorted=False, largest=True)
+                    k, sorted=False, largest=True)
 
             # previous indices into the beam and current token indices
             pdxs = beam[t] / n_vocab

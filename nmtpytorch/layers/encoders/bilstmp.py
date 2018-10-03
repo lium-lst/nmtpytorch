@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import torch.nn as nn
+from torch import nn
 from torch.nn import functional as F
 
 from ..ff import FF

@@ -3,7 +3,7 @@ from functools import total_ordering
 
 
 @total_ordering
-class Metric(object):
+class Metric:
     """A Metric object to represent evaluation metrics.
 
     Arguments:

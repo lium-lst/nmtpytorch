@@ -20,7 +20,7 @@ class DataSource(UserString):
         return "DataSource('{}')".format(self.data)
 
 
-class Topology(object):
+class Topology:
     """A simple object that parses the direction string provided through the
         experiment configuration file.
 
