@@ -36,6 +36,8 @@ class MultitaskAtt(nn.Module):
             # ------------- Options for text encoder (bidir RNN)
             'te_emb_dim': 128,              # Source and target embedding sizes
             'te_enc_dim': 128,              # Encoder hidden size
+            'te_emb_spec_dim': 64,              # Source and target embedding sizes
+            'te_enc_spec_dim': 64,              # Encoder hidden size
             'te_enc_type': 'gru',           # Encoder type (gru|lstm)
             'te_dropout_emb': 0,            # Simple dropout to source embeddings
             'te_dropout_ctx': 0,            # Simple dropout to source encodings
@@ -383,7 +385,7 @@ class MultitaskAtt(nn.Module):
                 if the relevant modality does not require a mask.
         """
 
-        enc_ids = kwargs.get('enc_ids', None)
+        task_id = kwargs.get('task_id', None)
 
         #logger.info("encode: batch is {}".format(batch))
         if enc_ids is None:
@@ -393,7 +395,7 @@ class MultitaskAtt(nn.Module):
             for e in enc_ids:
                 #logger.info("encoding batch {} with {} ".format(batch[e].shape, e))
                 #the encoders() return a tuple (values, mask) where mask can be None if sent have same length
-                enc_results[e] = self.encs[e](batch[e])
+                enc_results[e] = self.encs[e](batch, task_id)
                 #logger.info("enc_res[{}] size is {}".format(e, enc_results[e][0].shape))
 
         assert(enc_results), "For some reason, the encoding results are empty!"
@@ -441,8 +443,8 @@ class MultitaskAtt(nn.Module):
             enc_results = self.encode(batch, enc_ids=val_task.srcs)
             dec_results = self.decode(enc_results, batch, val_task.trgs)
         else:
-            enc_ids, dec_ids, aux_enc_ids = self.scheduler.get_encs_and_decs()
-            enc_results = self.encode(batch, enc_ids=enc_ids)
+            enc_ids, dec_ids, _ = self.scheduler.get_encs_and_decs()
+            enc_results = self.encode(batch, enc_ids=enc_ids, dec_ids=dec_ids)
             dec_results = self.decode(enc_results, batch, dec_ids)
             if self.use_mpn:
                 # i.e. use MPN setup
@@ -509,11 +511,15 @@ class MultitaskAtt(nn.Module):
     ######
     # Functions to create a text encoder and decoder with default parameters
     ######
-    def create_text_encoder(self, id):
-        return TextEncoder(
+    def create_text_spec_encoder(self):
+        return TextSpecEncoder(
+            topology=self.topology,
+            specialization=self.opts.model['specialization'],
             input_size=self.opts.model['te_emb_dim'],
             hidden_size=self.opts.model['te_enc_dim'],
-            n_vocab=self.n_svocabs[id],
+            input_spec_size=self.opts.model['te_emb_spec_dim'],
+            hidden_spec_size=self.opts.model['te_enc_spec_dim'],
+            n_vocabs=self.n_svocabs,
             rnn_type=self.opts.model['te_enc_type'],
             dropout_emb=self.opts.model['te_dropout_emb'],
             dropout_ctx=self.opts.model['te_dropout_ctx'],

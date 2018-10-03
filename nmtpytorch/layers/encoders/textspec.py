@@ -38,20 +38,27 @@ class TextSpecEncoder(nn.Module):
             that may further be used in attention and/or decoder. `None`
             is returned if batch contains only sentences with same lengths.
     """
-    def __init__(self, input_size, hidden_size, n_vocab, rnn_type,
-                 num_layers=1, bidirectional=True,
+    def __init__(self, topology, specialization,
+                input_size, hidden_size, input_spec_size, hidden_spec_size,
+                n_vocabs, rnn_type, num_layers=1, bidirectional=True,
                  dropout_rnn=0, dropout_emb=0, dropout_ctx=0,
                  emb_maxnorm=None, emb_gradscale=False):
         super().__init__()
 
+        self.topology = topology
+        self.specialization = specialization
         self.rnn_type = rnn_type.upper()
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.input_spec_size = input_spec_size
+        self.hidden_spec_size = hidden_spec_size
         self.n_vocab = n_vocab
         self.num_layers = num_layers
         self.bidirectional = bidirectional
         self.emb_maxnorm = emb_maxnorm
         self.emb_gradscale = emb_gradscale
+        
+        self.embs = ModuleDict()
 
         # For dropout btw layers, only effective if num_layers > 1
         self.dropout_rnn = dropout_rnn
@@ -71,13 +78,34 @@ class TextSpecEncoder(nn.Module):
             self.do_ctx = nn.Dropout(self.dropout_ctx)
 
         # Create embedding layer
-        self.emb = nn.Embedding(self.n_vocab, self.input_size,
+        
+        # depending on specialization
+        if self.specialization == 'source':
+            for l in self.topology.srcs.values():
+                self.embs[l] = nn.Embedding(self.n_vocab, self.input_spec_size,
                                 padding_idx=0, max_norm=self.emb_maxnorm,
                                 scale_grad_by_freq=self.emb_gradscale)
+        elif self.specialization == 'target':
+            for l in self.topology.trgs.values():
+                self.embs[l] = nn.Embedding(self.n_vocab, self.input_spec_size,
+                                padding_idx=0, max_norm=self.emb_maxnorm,
+                                scale_grad_by_freq=self.emb_gradscale)
+        else: # both
+            for l1 in self.topology.srcs.values():
+                for l2 in self.topology.trgs.values():
+                    # NOTE: we might want to avoid autoencoder specialization
+                    #if l1.split('_')[0] != l2.split('_')[0]:
+                    self.embs[l1+'-'+l2] = nn.Embedding(self.n_vocab, self.input_spec_size,
+                                    padding_idx=0, max_norm=self.emb_maxnorm,
+                                    scale_grad_by_freq=self.emb_gradscale)
+
+        self.embs['common'] = nn.Embedding(self.n_vocab, self.input_size,
+                                    padding_idx=0, max_norm=self.emb_maxnorm,
+                                    scale_grad_by_freq=self.emb_gradscale)
 
         # Create fused/cudnn encoder according to the requested type
         RNN = getattr(nn, self.rnn_type)
-        self.enc = RNN(self.input_size, self.hidden_size,
+        self.enc = RNN(self.input_size+self.input_spec_size, self.hidden_size,
                        self.num_layers, bias=True, batch_first=False,
                        dropout=self.dropout_rnn,
                        bidirectional=self.bidirectional)
