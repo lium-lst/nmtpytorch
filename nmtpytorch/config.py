@@ -59,12 +59,11 @@ def expand_env_vars(data):
 def resolve_path(value):
     if isinstance(value, list):
         return [resolve_path(elem) for elem in value]
-    elif isinstance(value, dict):
+    if isinstance(value, dict):
         return {k: resolve_path(v) for k, v in value.items()}
-    elif isinstance(value, str) and value.startswith(('~', '/', '../', './')):
+    if isinstance(value, str) and value.startswith(('~', '/', '../', './')):
         return pathlib.Path(value).expanduser().resolve()
-    else:
-        return value
+    return value
 
 
 def _parse_value(value):
@@ -78,15 +77,14 @@ def _parse_value(value):
     if str(value).capitalize().startswith(('False', 'True', 'None')):
         return eval(str(value).capitalize(), {}, {})
 
-    else:
-        # Detect strings, floats and ints
-        try:
-            # If this fails, this is a string
-            result = literal_eval(value)
-        except Exception as ve:
-            result = value
+    # Detect strings, floats and ints
+    try:
+        # If this fails, this is a string
+        result = literal_eval(value)
+    except Exception:
+        result = value
 
-        return result
+    return result
 
 
 class Options:
@@ -121,8 +119,8 @@ class Options:
         self.filename = filename
         self.sections = []
 
-        with open(self.filename) as f:
-            data = expand_env_vars(f.read().strip())
+        with open(self.filename) as fhandle:
+            data = expand_env_vars(fhandle.read().strip())
 
         # Read the defaults first
         self.__parser.read_dict({'train': TRAIN_DEFAULTS})
@@ -147,36 +145,38 @@ class Options:
             setattr(self, section, opts)
 
     def __repr__(self):
-        s = ""
+        repr_ = ""
         for section in self.sections:
             opts = getattr(self, section)
-            s += "-" * (len(section) + 2)
-            s += "\n[{}]\n".format(section)
-            s += "-" * (len(section) + 2)
-            s += '\n'
+            repr_ += "-" * (len(section) + 2)
+            repr_ += "\n[{}]\n".format(section)
+            repr_ += "-" * (len(section) + 2)
+            repr_ += '\n'
             for key, value in opts.items():
                 if isinstance(value, list):
-                    s += "{:>20}:\n".format(key)
+                    repr_ += "{:>20}:\n".format(key)
                     for elem in value:
-                        s += "{:>22}\n".format(elem)
+                        repr_ += "{:>22}\n".format(elem)
                 elif isinstance(value, dict):
-                    s += "{:>20}:\n".format(key)
-                    for k, v in value.items():
-                        s += "{:>22}:{}\n".format(k, v)
+                    repr_ += "{:>20}:\n".format(key)
+                    for kkey, vvalue in value.items():
+                        repr_ += "{:>22}:{}\n".format(kkey, vvalue)
                 else:
-                    s += "{:>20}:{}\n".format(key, value)
-        s += "-" * 70
-        s += "\n"
-        return s
+                    repr_ += "{:>20}:{}\n".format(key, value)
+        repr_ += "-" * 70
+        repr_ += "\n"
+        return repr_
 
     def to_dict(self):
         """Serializes the instance as dict."""
-        d = {'filename': self.filename,
-             'sections': self.sections}
+        dict_ = {
+            'filename': self.filename,
+            'sections': self.sections,
+        }
         for section in self.sections:
-            d[section] = copy.deepcopy(getattr(self, section))
+            dict_[section] = copy.deepcopy(getattr(self, section))
 
-        return d
+        return dict_
 
     def __getitem__(self, key):
         return getattr(self, key)
