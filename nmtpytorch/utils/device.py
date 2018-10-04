@@ -15,6 +15,7 @@ class DeviceManager:
         'NoDevFiles': 'Make sure you requested a GPU resource from your cluster.',
         'NoSMI': 'nvidia-smi is not installed. Are you on the correct node?',
         'EnvVar': 'Please set CUDA_VISIBLE_DEVICES explicitly.',
+        'NoMultiGPU': 'Multi-GPU not supported for now.',
         'NotEnoughGPU': 'You requested {} GPUs while you have access to only {}.',
     }
 
@@ -56,6 +57,10 @@ class DeviceManager:
 
             # How many GPUs do we have access to?
             self.cuda_dev_ids = [int(de) for de in self.cuda_dev_ids.split(',')]
+
+            # FIXME: Remove this once DataParallel works.
+            if self.req_n_gpu > 1 or len(self.cuda_dev_ids) > 1:
+                raise RuntimeError(self.__errors['NoMultiGPU'])
 
             if self.req_n_gpu > len(self.cuda_dev_ids):
                 raise RuntimeError(
