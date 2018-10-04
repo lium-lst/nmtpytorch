@@ -12,9 +12,9 @@ class Cleanup:
         self.temp_files = set()
         self.processes = set()
 
-    def register_tmp_file(self, f):
+    def register_tmp_file(self, tmp_file):
         """Add new temp file to global set."""
-        self.temp_files.add(pathlib.Path(f))
+        self.temp_files.add(pathlib.Path(tmp_file))
 
     def register_proc(self, pid):
         """Add new process to global set."""
@@ -26,40 +26,42 @@ class Cleanup:
 
     def __call__(self):
         """Cleanup registered temp files and kill PIDs."""
-        for f in filter(lambda x: x.exists(), self.temp_files):
-            f.unlink()
+        for tmp_file in filter(lambda x: x.exists(), self.temp_files):
+            tmp_file.unlink()
 
-        for p in self.processes:
+        for proc in self.processes:
             try:
-                os.kill(p, signal.SIGTERM)
-            except ProcessLookupError as oe:
+                os.kill(proc, signal.SIGTERM)
+            except ProcessLookupError:
                 pass
 
     def __repr__(self):
-        s = "Cleanup Manager\n"
+        repr_ = "Cleanup Manager\n"
         if len(self.processes) > 0:
-            s += "Tracking Processes\n"
-            for p in self.processes:
-                s += " {}\n".format(p)
+            repr_ += "Tracking Processes\n"
+            for proc in self.processes:
+                repr_ += " {}\n".format(proc)
 
         if len(self.temp_files) > 0:
-            s += "Tracking Temporary Files\n"
-            for p in self.temp_files:
-                s += " {}\n".format(p)
+            repr_ += "Tracking Temporary Files\n"
+            for tmp_file in self.temp_files:
+                repr_ += " {}\n".format(tmp_file)
 
-        return s
+        return repr_
 
     @staticmethod
     def register_exception_handler(logger, quit_on_exception=False):
         """Setup exception handler."""
 
-        def exception_handler(exctype, val, tb):
+        def exception_handler(exctype, val, trace):
             """Let Python call this when an exception is uncaught."""
-            logger.info(''.join(traceback.format_exception(exctype, val, tb)))
+            logger.info(
+                ''.join(traceback.format_exception(exctype, val, trace)))
 
-        def exception_handler_quits(exctype, val, tb):
+        def exception_handler_quits(exctype, val, trace):
             """Let Python call this when an exception is uncaught."""
-            logger.info(''.join(traceback.format_exception(exctype, val, tb)))
+            logger.info(
+                ''.join(traceback.format_exception(exctype, val, trace)))
             sys.exit(1)
 
         if quit_on_exception:
