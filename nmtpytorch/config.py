@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import copy
 import pathlib
+from difflib import get_close_matches
 
 from collections import defaultdict
 
@@ -23,6 +25,7 @@ TRAIN_DEFAULTS = {
     'lr_decay_factor': 0.1,      # Check torch.optim.lr_scheduler
     'lr_decay_patience': 10,     #
     'lr_decay_min': 0.000001,    #
+    'model_type': '',            # Name of model class to train
     'momentum': 0.0,             # momentum for SGD
     'nesterov': False,           # Enable Nesterov for SGD
     'disp_freq': 30,             # Training display frequency (/batch)
@@ -39,6 +42,7 @@ TRAIN_DEFAULTS = {
     'eval_zero': False,          # Evaluate once before starting training
                                  # Useful when using pretrained_file
     'save_best_metrics': True,   # Save best models for each eval_metric
+    'save_path': '',             # Path to root experiment folder
     'checkpoint_freq': 5000,     # Periodic checkpoint frequency
     'n_checkpoints': 5,          # Number of checkpoints to keep
     'tensorboard_dir': '',       # Enable TB and give global log folder
@@ -115,7 +119,7 @@ class Options:
         return overrides
 
     def __init__(self, filename, overrides=None):
-        self.__parser = ConfigParser(interpolation=ExtendedInterpolation())
+        self._parser = ConfigParser(interpolation=ExtendedInterpolation())
         self.filename = filename
         self.sections = []
 
@@ -123,19 +127,20 @@ class Options:
             data = expand_env_vars(fhandle.read().strip())
 
         # Read the defaults first
-        self.__parser.read_dict({'train': TRAIN_DEFAULTS})
+        self._parser.read_dict({'train': TRAIN_DEFAULTS})
 
-        self.__parser.read_string(data)
+        # Read the config
+        self._parser.read_string(data)
 
         if overrides is not None:
             # ex: train.batch_size:32
             self.overrides = self.parse_overrides(overrides)
 
-        for section in self.__parser.sections():
+        for section in self._parser.sections():
             opts = {}
             self.sections.append(section)
 
-            for key, value in self.__parser[section].items():
+            for key, value in self._parser[section].items():
                 opts[key] = resolve_path(_parse_value(value))
 
             if section in self.overrides:
@@ -143,6 +148,22 @@ class Options:
                     opts[key] = value
 
             setattr(self, section, opts)
+
+        # Sanity check for [train]
+        train_keys = list(self.train.keys())
+        def_keys = list(TRAIN_DEFAULTS.keys())
+        assert len(train_keys) == len(set(train_keys)), \
+            "Duplicate arguments found in config's [train] section."
+
+        invalid_keys = set(train_keys).difference(set(TRAIN_DEFAULTS))
+        for key in invalid_keys:
+            match = get_close_matches(key, def_keys, n=1)
+            msg = "{}:train: Unknown option '{}'.".format(self.filename, key)
+            if match:
+                msg += "  Did you mean '{}' ?".format(match[0])
+            print(msg)
+        if invalid_keys:
+            sys.exit(1)
 
     def __repr__(self):
         repr_ = ""
