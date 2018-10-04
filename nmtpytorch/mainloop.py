@@ -106,8 +106,8 @@ class MainLoop:
         self.print(self.optim)
 
         # Create TensorBoard logger if possible and requested
-        self.tboardoard = TensorBoard(self.model, self.tensorboard_dir,
-                                      self.exp_id, self.subfolder)
+        self.tboard = TensorBoard(self.model, self.tensorboard_dir,
+                                  self.exp_id, self.subfolder)
         self.print(self.tboard)
 
         # Shift-by-1 and reseed to reproduce batch orders independently
