@@ -6,7 +6,7 @@ from torch.utils.data.sampler import BatchSampler, SequentialSampler
 from . import (ImageFolderDataset, TextDataset, OneHotDataset, NumpyDataset,
                KaldiDataset, NumpySequenceDataset, ShelveDataset)
 from .collate import get_collate
-from ..samplers import BucketBatchSampler
+from ..samplers import BucketBatchSampler, ApproximateBucketBatchSampler
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -27,16 +27,22 @@ class MultimodalDataset(Dataset):
         bucket_order (str, optional): ``ascending`` or ``descending`` to
             perform length-based curriculum learning. Default is ``None``
             which shuffles bucket order.
+        sampler_type(str, optional): 'bucket' or 'approximate' (Default: 'bucket')
         kwargs (dict): Argument dictionary for datasets.
     """
     def __init__(self, data, mode, batch_size, vocabs, topology,
-                 bucket_by, max_len=None, bucket_order=None, **kwargs):
+                 bucket_by, max_len=None, bucket_order=None,
+                 sampler_type='bucket', **kwargs):
         self.datasets = {}
         self.mode = mode
         self.vocabs = vocabs
         self.batch_size = batch_size
         self.topology = topology
         self.bucket_by = bucket_by
+        if sampler_type == 'approximate':
+            gen_sampler = ApproximateBucketBatchSampler
+        elif sampler_type == 'bucket':
+            gen_sampler = BucketBatchSampler
 
         # Disable filtering if not training
         self.max_len = max_len if self.mode == 'train' else None
@@ -96,7 +102,7 @@ class MultimodalDataset(Dataset):
         self.collate_fn = get_collate(self.keys)
         if self.bucket_by is not None:
             self.sort_lens = self.datasets[self.bucket_by].lengths
-            self.sampler = BucketBatchSampler(
+            self.sampler = gen_sampler(
                 batch_size=self.batch_size,
                 sort_lens=self.sort_lens,
                 max_len=self.max_len,
