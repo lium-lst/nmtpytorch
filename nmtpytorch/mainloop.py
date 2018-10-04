@@ -106,9 +106,9 @@ class MainLoop:
         self.print(self.optim)
 
         # Create TensorBoard logger if possible and requested
-        self.tb = TensorBoard(self.model, self.tensorboard_dir,
-                              self.exp_id, self.subfolder)
-        self.print(self.tb)
+        self.tboardoard = TensorBoard(self.model, self.tensorboard_dir,
+                                      self.exp_id, self.subfolder)
+        self.print(self.tboard)
 
         # Shift-by-1 and reseed to reproduce batch orders independently
         # from model initialization etc.
@@ -168,7 +168,7 @@ class MainLoop:
 
             if self.monitor.uctr % self.disp_freq == 0:
                 # Send statistics
-                self.tb.log_scalar(
+                self.tboard.log_scalar(
                     'train_LOSS', self.loss_meter.batch_loss, self.monitor.uctr)
 
                 msg = "Epoch {} - update {:10d} => loss: {:.3f}".format(
@@ -177,8 +177,7 @@ class MainLoop:
                 for key, value in self.net.aux_loss.items():
                     val = value.item()
                     msg += ' [{}: {:.3f}]'.format(key, val)
-                    self.tb.log_scalar('train_' + key.upper(),
-                                       val, self.monitor.uctr)
+                    self.tboard.log_scalar('train_' + key.upper(), val, self.monitor.uctr)
                 self.print(msg)
 
             # Do validation?
@@ -273,7 +272,7 @@ class MainLoop:
                                               int(len(hyps) / beam_time)))
 
         # Log metrics to tensorboard
-        self.tb.log_metrics(results, self.monitor.uctr, suffix='val_')
+        self.tboard.log_metrics(results, self.monitor.uctr, suffix='val_')
 
         # Add new scores to history
         self.monitor.update_scores(results)
@@ -314,4 +313,4 @@ class MainLoop:
 
         self.print('Training finished on %s' % time.strftime('%d-%m-%Y %H:%M'))
         # Close tensorboard
-        self.tb.close()
+        self.tboard.close()
