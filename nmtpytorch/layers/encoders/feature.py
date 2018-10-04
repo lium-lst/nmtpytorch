@@ -86,7 +86,7 @@ class FeatureEncoder(nn.Module):
         # Get the mask
         mask = proj.ne(0).float().sum(2).ne(0).float()
 
-        if mask.eq(0).nonzero().size():
+        if mask.eq(0).nonzero().numel() > 0:
             # padded with zeros
             slens, sidxs = mask.sum(0).sort(descending=True)
             old_idxs = torch.sort(sidxs)[1]
