@@ -50,6 +50,7 @@ class NMT(nn.Module):
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
                                         # the batches will be sorted
             'bucket_order': None,       #
+            'sampler_type': 'bucket',   # bucket or approximate
         }
 
     def __init__(self, opts):
@@ -178,7 +179,8 @@ class NMT(nn.Module):
             vocabs=self.vocabs, topology=self.topology,
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model['max_len'],
-            bucket_order=self.opts.model['bucket_order'])
+            bucket_order=self.opts.model['bucket_order'],
+            sampler_type=self.opts.model['sampler_type'])
         logger.info(dataset)
         return dataset
 
