@@ -44,11 +44,6 @@ class Translator:
             weights, _, opts = load_pt_file(model_file)
             opts = Options.from_dict(opts, override_list=self.override)
 
-            if 'att_temp' not in opts.model:
-                logger.info("INFO: Model does not support 'att_temp'")
-            else:
-                opts.model['att_temp'] = self.att_temp
-
             # Create model instance
             instance = getattr(models, opts.train['model_type'])(opts=opts)
 

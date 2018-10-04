@@ -50,8 +50,6 @@ if __name__ == '__main__':
                               help='Maximum sequence length to produce (Default: 200)')
     parser_trans.add_argument('-a', '--lp-alpha', type=float, default=0.,
                               help='Apply length-penalty (Default: 0.)')
-    parser_trans.add_argument('-t', '--att-temp', type=float, default=1.,
-                              help='Temperature for attention (Default: 1.)')
     parser_trans.add_argument('-d', '--device-id', type=str, default='gpu',
                               help='cpu or gpu (Default: gpu)')
     parser_trans.add_argument('models', type=str, nargs='+',
