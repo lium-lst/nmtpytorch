@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state
-from ..attention import Attention, HierarchicalAttention
+from ..attention import get_attention, HierarchicalAttention
 from .. import Fusion
 from . import ConditionalDecoder
 
@@ -27,10 +27,10 @@ class MultiSourceConditionalDecoder(ConditionalDecoder):
 
         attns = []
         for ctx_name in ctx_names:
+            Attention = get_attention(self.att_type)
             attns.append(Attention(
                 self.ctx_size_dict[ctx_name], self.hidden_size,
                 transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
-                att_type=self.att_type,
                 att_activ=self.att_activ,
                 att_bottleneck=self.att_bottleneck))
         self.attns = nn.ModuleList(attns)
