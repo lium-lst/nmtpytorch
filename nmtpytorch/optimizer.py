@@ -122,21 +122,20 @@ class Optimizer:
                 logger.info('** Learning rate changed -> {}'.format(self.cur_lr))
                 # Signal it back
                 return True
-        else:
-            return False
+        return False
 
     def get_lr(self):
         """Returns current lr for parameters."""
         return self.optim.param_groups[0]['lr']
 
     def __repr__(self):
-        s = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {}".format(
+        repr_ = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {}".format(
             self.name, self.initial_lr, self.weight_decay, self.gclip)
         if self.name == 'sgd':
-            s += ', momentum: {}, nesterov: {}'.format(
+            repr_ += ', momentum: {}, nesterov: {}'.format(
                 self.momentum, self.nesterov)
         if self.lr_decay:
-            s += ', lr_decay: (patience={}, factor={})'.format(
+            repr_ += ', lr_decay: (patience={}, factor={})'.format(
                 self.lr_decay_patience, self.lr_decay_factor)
-        s += ')'
-        return s
+        repr_ += ')'
+        return repr_

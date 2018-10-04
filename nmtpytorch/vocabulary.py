@@ -96,12 +96,12 @@ class Vocabulary:
         results = []
         unk = self.TOKENS["<unk>"]
         for idxs in lidxs:
-            r = []
+            result = []
             for idx in idxs:
                 if idx == self.TOKENS["<eos>"]:
                     break
-                r.append(self._imap.get(idx, unk))
-            results.append(" ".join(r))
+                result.append(self._imap.get(idx, unk))
+            results.append(" ".join(result))
         return results
 
     def __repr__(self):

@@ -105,7 +105,7 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
         # from each model to support ensembling
         idxs = models[0].get_bos(batch.size).to(DEVICE)
 
-        for t in range(max_len):
+        for tstep in range(max_len):
             # Select correct positions from source context
             ctx_dicts = [tile_ctx_dict(cd, tile) for cd in ctx_dicts]
 
@@ -138,34 +138,34 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             #   nll: batch_size x beam_size (x 1)
             # nll becomes: batch_size x beam_size*vocab_size here
             # Reduce (N, K*V) to k-best
-            nll, beam[t] = nll.unsqueeze_(2).add(log_p.view(
+            nll, beam[tstep] = nll.unsqueeze_(2).add(log_p.view(
                 batch.size, -1, n_vocab)).view(batch.size, -1).topk(
                     k, sorted=False, largest=True)
 
             # previous indices into the beam and current token indices
-            pdxs = beam[t] / n_vocab
-            beam[t].remainder_(n_vocab)
-            idxs = beam[t].view(-1)
+            pdxs = beam[tstep] / n_vocab
+            beam[tstep].remainder_(n_vocab)
+            idxs = beam[tstep].view(-1)
 
             # Compute correct previous indices
             # Mask is needed since we're in flattened regime
-            tile = pdxs.view(-1) + (nk_mask / k) * (k if t else 1)
+            tile = pdxs.view(-1) + (nk_mask / k) * (k if tstep else 1)
 
-            if t > 0:
+            if tstep > 0:
                 # Permute all hypothesis history according to new order
-                beam[:t] = beam[:t].gather(2, pdxs.repeat(t, 1, 1))
+                beam[:tstep] = beam[:tstep].gather(2, pdxs.repeat(tstep, 1, 1))
 
         # Put an explicit <eos> to make idxs_to_sent happy
         beam[max_len - 1] = eos
 
         # Find lengths by summing tokens not in (pad,bos,eos)
-        lp = beam.gt(2).float().sum(0).clamp(min=1)
+        len_penalty = beam.gt(2).float().sum(0).clamp(min=1)
 
         if lp_alpha > 0.:
-            lp = ((5 + lp)**lp_alpha) / 6**lp_alpha
+            len_penalty = ((5 + len_penalty)**lp_alpha) / 6**lp_alpha
 
         # Apply length normalization and get best hyps
-        top_hyps = nll.div_(lp).topk(
+        top_hyps = nll.div_(len_penalty).topk(
             1, sorted=False, largest=True)[1].squeeze(1)
 
         # Get best hyp for each sample in the batch
