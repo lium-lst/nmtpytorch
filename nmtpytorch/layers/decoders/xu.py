@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from ...utils.nn import get_rnn_hidden_state
 from ...utils.device import DEVICE
 from .. import FF
-from ..attention import Attention
+from ..attention import get_attention
 
 
 class XuDecoder(nn.Module):

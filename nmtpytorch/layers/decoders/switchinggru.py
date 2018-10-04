@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from .. import FF
 from ...utils.device import DEVICE
-from ..attention import Attention
+from ..attention import get_attention
 
 
 class SwitchingGRUDecoder(nn.Module):
@@ -27,8 +27,7 @@ class SwitchingGRUDecoder(nn.Module):
         # dict: {en_speech: (encoding_size, att_type)}
         atts = {}
         for name, (enc_size, att_type) in modality_dict.items():
-            atts[name] = Attention(
-                enc_size, self.hidden_size, att_type=att_type)
+            atts[name] = get_attention(att_type)(enc_size, self.hidden_size)
 
         self.atts = nn.ModuleDict(atts)
 

@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 
-from . import FF, Attention, HierarchicalAttention
+from . import FF, HierarchicalAttention, get_attention
 from ..utils.device import DEVICE
 
 
@@ -90,13 +90,14 @@ class ZSpaceAtt(nn.Module):
         # Create an attention layer for each modality
         # TODO: sharing weights between att. mechanisms is possible
         self.att = nn.ModuleDict()
+        # Fetch correct attention class
+        Attention = get_attention(self.att_type)
         for k in self.ctx_size_dict:
             att_in_size = self.ctx_size if self.z_transform else self.ctx_size_dict[k]
             self.att[k] = Attention(
                 att_in_size, self.z_size,
                 transform_ctx=self.att_transform_ctx,
                 mlp_bias=self.mlp_bias,
-                att_type=self.att_type,
                 att_activ=self.att_activ,
                 att_bottleneck=self.att_bottleneck,
                 temp=self.att_temp,

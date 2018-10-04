@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from .. import FF
 from ...utils.device import DEVICE
-from ..attention import Attention
+from ..attention import get_attention
 
 
 class SimpleGRUDecoder(nn.Module):
@@ -40,10 +40,10 @@ class SimpleGRUDecoder(nn.Module):
                                 scale_grad_by_freq=self.emb_gradscale)
 
         # Create attention layer
+        Attention = get_attention(self.att_type)
         self.att = Attention(self.ctx_size_dict[self.ctx_name], self.hidden_size,
                              transform_ctx=self.transform_ctx,
                              mlp_bias=self.mlp_bias,
-                             att_type=self.att_type,
                              att_activ=self.att_activ,
                              att_bottleneck=self.att_bottleneck,
                              temp=self.att_temp)
