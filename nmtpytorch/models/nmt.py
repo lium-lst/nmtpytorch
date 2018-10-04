@@ -9,6 +9,8 @@ from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss
+from ..utils.device import DEVICE
+from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
@@ -220,7 +222,8 @@ class NMT(nn.Module):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
 
-        for batch in data_loader:
+        for batch in pbar(data_loader, unit='batch'):
+            batch.device(DEVICE)
             out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
 

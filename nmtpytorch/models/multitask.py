@@ -10,6 +10,8 @@ from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss
+from ..utils.device import DEVICE
+from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 from ..utils.scheduler import Scheduler
@@ -314,7 +316,8 @@ class Multitask(nn.Module):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
 
-        for batch in data_loader:
+        for batch in pbar(data_loader, unit='batch'):
+            batch.device(DEVICE)
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
                 for d in out:
