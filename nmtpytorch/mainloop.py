@@ -7,7 +7,6 @@ import torch
 from .evaluator import Evaluator
 from .optimizer import Optimizer
 from .monitor import Monitor
-from .utils.device import DEVICE
 from .utils.misc import get_module_groups
 from .utils.misc import load_pt_file, fix_seed
 from .utils.ml_metrics import Loss
@@ -27,6 +26,7 @@ class MainLoop:
         self.model = model
         self.dev_mgr = dev_mgr
         self.epoch_valid = (self.eval_freq == 0)
+        self.loss_meter = Loss()
 
         # Load training and validation data & create iterators
         self.print('Loading dataset(s)')
@@ -86,6 +86,13 @@ class MainLoop:
                 self.print(' -> froze parameter {}.*'.format(name))
 
         self.print(self.model)
+        self.model = self.model.to(self.dev_mgr.dev)
+
+        if self.dev_mgr.req_cpu or len(self.dev_mgr.cuda_dev_ids) == 1:
+            self.net = self.model
+        else:
+            self.net = torch.nn.DataParallel(
+                self.model, device_ids=self.dev_mgr.cuda_dev_ids, dim=1)
 
         # Create optimizer instance
         self.optim = Optimizer(
@@ -107,18 +114,6 @@ class MainLoop:
         # from model initialization etc.
         fix_seed(self.seed + 1)
 
-        # Print memory usage before training
-        #self.print("Memory usage: {}".format(GPUManager.get_mem_usage()))
-
-        if self.dev_mgr.req_multi_gpu:
-            self.net = torch.nn.DataParallel(
-                self.model, device_ids=self.dev_mgr.cuda_dev_ids, dim=1)
-        else:
-            self.net = self.model
-
-        # Move to device
-        self.net.to(DEVICE)
-
     def train_batch(self, batch):
         """Trains a batch."""
         nn_start = time.time()
@@ -127,6 +122,7 @@ class MainLoop:
         self.optim.zero_grad()
 
         # Forward pass with training progress
+        # NOTE: Problematic for multi-gpu
         out = self.net(batch, uctr=self.monitor.uctr, ectr=self.monitor.ectr)
         if 'loss' in out:
             # NOTE: Fix this afterwards so that every model adapts the same style
@@ -161,10 +157,11 @@ class MainLoop:
         nn_sec = 0.0
         eval_sec = 0.0
         total_sec = time.time()
-        self.loss_meter = Loss()
+        self.loss_meter.reset()
 
         for batch in self.train_iterator:
             self.monitor.uctr += 1
+            batch.device(self.dev_mgr.dev)
 
             # Keep stats
             nn_sec += self.train_batch(batch)
@@ -182,7 +179,6 @@ class MainLoop:
                     msg += ' [{}: {:.3f}]'.format(key, val)
                     self.tb.log_scalar('train_' + key.upper(),
                                        val, self.monitor.uctr)
-                #msg += ' (used GPU: {})'.format(GPUManager.get_mem_usage(False))
                 self.print(msg)
 
             # Do validation?
