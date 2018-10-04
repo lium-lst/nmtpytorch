@@ -160,8 +160,8 @@ class MainLoop:
         self.loss_meter.reset()
 
         for batch in self.train_iterator:
-            self.monitor.uctr += 1
             batch.device(self.dev_mgr.dev)
+            self.monitor.uctr += 1
 
             # Keep stats
             nn_sec += self.train_batch(batch)
