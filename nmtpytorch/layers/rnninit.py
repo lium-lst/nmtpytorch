@@ -3,7 +3,6 @@ import torch
 from torch import nn
 
 from . import FF
-from ..utils.device import DEVICE
 
 
 class RNNInitializer(nn.Module):
