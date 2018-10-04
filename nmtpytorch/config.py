@@ -67,40 +67,58 @@ def resolve_path(value):
         return value
 
 
+def _parse_value(value):
+    """Automatic type conversion for configuration values.
+
+    Arguments:
+        value(str): A string to parse.
+    """
+
+    # Check for boolean or None
+    if str(value).capitalize().startswith(('False', 'True', 'None')):
+        return eval(str(value).capitalize(), {}, {})
+
+    else:
+        # Detect strings, floats and ints
+        try:
+            # If this fails, this is a string
+            result = literal_eval(value)
+        except Exception as ve:
+            result = value
+
+        return result
+
+
 class Options:
-    @staticmethod
-    def __parse_value(value):
-        """Automatic type conversion for configuration values.
-
-        Arguments:
-            value(str): A string to parse.
-        """
-
-        # Check for boolean or None
-        if str(value).capitalize().startswith(('False', 'True', 'None')):
-            return eval(str(value).capitalize(), {}, {})
-
-        else:
-            # Detect strings, floats and ints
-            try:
-                # If this fails, this is a string
-                result = literal_eval(value)
-            except Exception as ve:
-                result = value
-
-            return result
-
     @classmethod
-    def from_dict(cls, dict_):
+    def from_dict(cls, dict_, override_list=None):
         """Loads object from dict."""
         obj = cls.__new__(cls)
         obj.__dict__.update(dict_)
+
+        # Test time overrides are possible as well
+        if override_list is not None:
+            overrides = obj.parse_overrides(override_list)
+            for section, ov_dict in overrides.items():
+                for key, value in ov_dict.items():
+                    if key in obj.__dict__[section]:
+                        obj.__dict__[section][key] = value
+
         return obj
+
+    @classmethod
+    def parse_overrides(cls, override_list):
+        overrides = defaultdict(dict)
+        for opt in override_list:
+            section, keyvalue = opt.split('.', 1)
+            key, value = keyvalue.split(':')
+            value = resolve_path(value)
+            overrides[section][key] = _parse_value(value)
+        return overrides
 
     def __init__(self, filename, overrides=None):
         self.__parser = ConfigParser(interpolation=ExtendedInterpolation())
         self.filename = filename
-        self.overrides = defaultdict(dict)
         self.sections = []
 
         with open(self.filename) as f:
@@ -113,18 +131,14 @@ class Options:
 
         if overrides is not None:
             # ex: train.batch_size:32
-            for opt in overrides:
-                section, keyvalue = opt.split('.', 1)
-                key, value = keyvalue.split(':')
-                value = resolve_path(value)
-                self.overrides[section][key] = self.__parse_value(value)
+            self.overrides = self.parse_overrides(overrides)
 
         for section in self.__parser.sections():
             opts = {}
             self.sections.append(section)
 
             for key, value in self.__parser[section].items():
-                opts[key] = resolve_path(self.__parse_value(value))
+                opts[key] = resolve_path(_parse_value(value))
 
             if section in self.overrides:
                 for (key, value) in self.overrides[section].items():
