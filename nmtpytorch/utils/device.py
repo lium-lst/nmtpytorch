@@ -66,8 +66,9 @@ class DeviceManager:
             # Set master device
             self.dev = torch.device('cuda:{}'.format(self.cuda_dev_ids[0]))
 
-            global DEVICE
+            global DEVICE, DEVICE_IDS
             DEVICE = self.dev
+            DEVICE_IDS = self.cuda_dev_ids
 
     def get_cuda_mem_usage(self, name=True):
         if self.req_cpu:
