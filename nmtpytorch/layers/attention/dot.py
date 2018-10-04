@@ -6,18 +6,20 @@ from torch import nn
 from ...utils.nn import get_activation_fn
 
 
-class Attention(nn.Module):
-    """Attention layer for seq2seq NMT."""
+class DotAttention(nn.Module):
+    """Attention layer with dot product."""
     def __init__(self, ctx_dim, hid_dim, att_bottleneck='ctx',
-                 transform_ctx=True, att_activ='tanh', att_type='mlp',
-                 mlp_bias=False, temp=1., ctx2hid=True):
+                 transform_ctx=True, att_activ='tanh', temp=1., ctx2hid=True,
+                 mlp_bias=None):
+        # NOTE:
+        # mlp_bias here to not break models that pass mlp_bias to all types
+        # of attentions
         super().__init__()
 
         self.ctx_dim = ctx_dim
         self.hid_dim = hid_dim
         self._ctx2hid = ctx2hid
         self.temperature = temp
-        self.att_type = att_type
         self.activ = get_activation_fn(att_activ)
 
         # The common dimensionality for inner formulation
@@ -25,14 +27,6 @@ class Attention(nn.Module):
             self.mid_dim = att_bottleneck
         else:
             self.mid_dim = getattr(self, '{}_dim'.format(att_bottleneck))
-
-        if self.att_type == 'mlp':
-            self.mlp = nn.Linear(self.mid_dim, 1, bias=False)
-            self._scores = self._mlp_scores
-        elif self.att_type == 'dot':
-            self._scores = self._dot_scores
-        else:
-            raise Exception('Unknown attention type {}'.format(att_type))
 
         # Adaptor from RNN's hidden dim to mid_dim
         self.hid2ctx = nn.Linear(self.hid_dim, self.mid_dim, bias=False)
@@ -48,12 +42,6 @@ class Attention(nn.Module):
             self.ctx2hid = nn.Linear(self.ctx_dim, self.hid_dim, bias=False)
         else:
             self.ctx2hid = lambda x: x
-
-        if mlp_bias:
-            self.bias = nn.Parameter(torch.Tensor(self.mid_dim))
-            self.bias.data.zero_()
-        else:
-            self.register_parameter('bias', None)
 
     def forward(self, hid, ctx, ctx_mask=None):
         r"""Computes attention probabilities and final context using
@@ -77,9 +65,14 @@ class Attention(nn.Module):
         Notes:
             This will only work when `T==1` for now.
         """
-        # scores -> SxB
-        scores = self._scores(self.ctx2ctx(ctx),    # SxBxC
-                              self.hid2ctx(hid))    # TxBxC
+        # SxBxC
+        ctx_ = self.ctx2ctx(ctx)
+        # TxBxC
+        hid_ = self.hid2ctx(hid)
+
+        # shuffle dims to prepare for batch mat-mult -> SxB
+        scores = torch.bmm(hid_.permute(1, 0, 2), ctx_.permute(1, 2, 0)).div(
+            self.temperature).squeeze(1).t()
 
         # Normalize attention scores correctly -> S*B
         if ctx_mask is not None:
@@ -90,14 +83,3 @@ class Attention(nn.Module):
 
         # Transform final context vector to H for further decoders
         return alpha, self.ctx2hid((alpha.unsqueeze(-1) * ctx).sum(0))
-
-    def _dot_scores(self, ctx_, hid_):
-        # shuffle dims to prepare for batch mat-mult
-        return torch.bmm(hid_.permute(1, 0, 2), ctx_.permute(1, 2, 0)).div(
-            self.temperature).squeeze(1).t()
-
-    def _mlp_scores(self, ctx_, hid_):
-        inner_sum = ctx_ + hid_
-        if self.bias is not None:
-            inner_sum += self.bias
-        return self.mlp(self.activ(inner_sum)).div(self.temperature).squeeze(-1)
