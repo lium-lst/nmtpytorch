@@ -21,7 +21,7 @@ class ShelveDataset(Dataset):
     """
 
     def __init__(self, fname, key=None, norm_and_scale=False):
-        self.path = Path('{}.dat'.format(fname, 'dat'))
+        self.path = Path('{}.dat'.format(fname))
         if not self.path.exists():
             raise RuntimeError('{} does not exist.'.format(self.path))
 
