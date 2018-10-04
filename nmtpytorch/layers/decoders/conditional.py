@@ -54,6 +54,7 @@ class ConditionalDecoder(nn.Module):
         self.dec_init_activ = dec_init_activ
         self.att_bottleneck = att_bottleneck
         self.att_activ = att_activ
+        self.att_type = att_type
         self.att_temp = att_temp
         self.transform_ctx = transform_ctx
         self.mlp_bias = mlp_bias
@@ -67,7 +68,7 @@ class ConditionalDecoder(nn.Module):
                                 scale_grad_by_freq=self.emb_gradscale)
 
         # Create attention layer
-        Attention = get_attention(att_type)
+        Attention = get_attention(self.att_type)
         self.att = Attention(
             self.ctx_size_dict[self.ctx_name],
             self.hidden_size,
