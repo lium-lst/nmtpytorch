@@ -306,7 +306,7 @@ class Multitask(nn.Module):
             enc_results = self.encode(batch, enc_ids=val_task.srcs)
             dec_results = self.decode(enc_results, batch, val_task.trgs)
         else:
-            enc_ids, dec_ids = self.scheduler.get_encs_and_decs()
+            enc_ids, dec_ids, aux_ = self.scheduler.get_encs_and_decs()
             #logger.info("enc results: {}".format(enc_results))
             enc_results = self.encode(batch, enc_ids=enc_ids)
             dec_results = self.decode(enc_results, batch, dec_ids)
