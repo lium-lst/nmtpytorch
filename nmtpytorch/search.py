@@ -79,6 +79,8 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
     nll_storage = torch.zeros(max_batch_size, device=DEVICE)
 
     for batch in pbar(data_loader, unit='batch'):
+        batch.device(DEVICE)
+
         # Always use the initial storage
         beam = beam_storage.narrow(1, 0, batch.size).zero_()
 
