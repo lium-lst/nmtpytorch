@@ -2,18 +2,17 @@
 from ..utils.device import DEVICE
 
 
-class Batch:
-    def __init__(self, batch_size, data_dict):
-        self.size = batch_size
-        self.data = {k: v.to(DEVICE) for k, v in data_dict.items()}
-
-    def __getitem__(self, key):
-        return self.data[key]
+class Batch(dict):
+    """A custom dictionary that does on-the-fly device conversion."""
+    def __init__(self, data_dict, size):
+        self.size = size
+        self.update({str(k): v.to(DEVICE) for k, v in data_dict.items()})
 
     def __repr__(self):
-        s = "Batch(size={}, device={})\n".format(self.size, DEVICE)
-        for key in self.data:
-            s += "  {:10s} -> {}\n".format(str(key), self.data[key].shape)
+        s = "Batch(size={})\n".format(self.size)
+        for data_source, tensor in self.items():
+            s += "  {:10s} -> {} - {}\n".format(
+                data_source, tensor.shape, tensor.device)
         return s
 
 
@@ -23,8 +22,8 @@ def get_collate(data_sources):
 
     def collate_fn(batch):
         return Batch(
-            len(batch),
             {ds: ds.to_torch([elem[ds] for elem in batch]) for ds in data_sources},
+            len(batch),
         )
 
     return collate_fn
