@@ -63,6 +63,12 @@ class BiLSTMp(nn.Module):
                 self.ctx_size, self.proj_size, activ=self.proj_activ))
 
     def forward(self, x):
+        # Generate a mask to detect padded sequences
+        mask = x.ne(0).float().sum(2).ne(0).float()
+
+        assert not mask.eq(0).nonzero().numel(), \
+            "BiLSTMp requires all-equal frames at input!"
+
         # Pad with <eos> zero
         hs = F.pad(x, self.pad_tuple)
 
