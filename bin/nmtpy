@@ -74,15 +74,15 @@ if __name__ == '__main__':
     ##############
     parser_test = subparsers.add_parser('test', help='test help')
     parser_test.add_argument('-b', '--batch-size', type=int, default=64,
-                              help='Batch size for beam-search')
+                             help='Batch size for beam-search')
     parser_test.add_argument('-d', '--device-id', type=str, default='gpu',
-                              help='cpu or gpu (Default: gpu)')
+                             help='cpu or gpu (Default: gpu)')
     parser_test.add_argument('models', type=str, nargs='+',
-                              help="Saved model/checkpoint file(s)")
+                             help="Saved model/checkpoint file(s)")
     parser_test.add_argument('-tid', '--task-id', type=str, default=None,
-                              help='Task to perform, e.g. en_src:Text, pt_src:Text -> fr_tgt:Text')
+                             help='Task to perform, e.g. en_src:Text, pt_src:Text -> fr_tgt:Text')
     parser_test.add_argument('-x', '--override', nargs="*", default=[],
-                              help="(section).key:value overrides for config")
+                             help="(section).key:value overrides for config")
 
     group = parser_test.add_mutually_exclusive_group(required=True)
     group.add_argument('-s', '--splits', type=str,
