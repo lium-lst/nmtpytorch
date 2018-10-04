@@ -4,7 +4,6 @@ from torch import nn
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state
-from ...utils.device import DEVICE
 from .. import FF
 from ..attention import get_attention
 
@@ -51,7 +50,6 @@ class XuDecoder(nn.Module):
         self.prev2out = prev2out
         self.tied_emb = tied_emb
         self.dec_init = dec_init
-        self.att_type = att_type
         self.ctx_name = ctx_name
         self.mlp_bias = mlp_bias
         self.att_temp = att_temp
@@ -70,10 +68,10 @@ class XuDecoder(nn.Module):
                                 scale_grad_by_freq=self.emb_gradscale)
 
         # Create attention layer
+        Attention = get_attention(att_type)
         self.att = Attention(self.ctx_size_dict[self.ctx_name], self.hidden_size,
                              transform_ctx=self.transform_ctx,
                              mlp_bias=self.mlp_bias,
-                             att_type=self.att_type,
                              att_activ=self.att_activ,
                              att_bottleneck=self.att_bottleneck,
                              temp=self.att_temp, ctx2hid=False)
@@ -122,7 +120,7 @@ class XuDecoder(nn.Module):
 
     def _rnn_init_zero(self, ctx, ctx_mask):
         return torch.zeros(
-            ctx.shape[1], self.hidden_size * self.n_states, device=DEVICE)
+            ctx.shape[1], self.hidden_size * self.n_states, device=ctx.device)
 
     def _rnn_init_mean_ctx(self, ctx, ctx_mask):
         mean_ctx = ctx.mean(dim=0)
@@ -181,7 +179,7 @@ class XuDecoder(nn.Module):
     def forward(self, ctx_dict, y):
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab, device=DEVICE)
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=y.device)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

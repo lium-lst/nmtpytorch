@@ -4,8 +4,6 @@ from torch import nn
 import torch.nn.functional as F
 
 from .. import FF
-from ...utils.device import DEVICE
-
 
 # Decoder without attention that uses a single input vector.
 # Layer contributed by @loicbarrault
@@ -91,7 +89,7 @@ class VectorDecoder(nn.Module):
     def forward(self, ctx_dict, y):
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab, device=DEVICE)
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=y.device)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

@@ -65,6 +65,7 @@ class SwitchingGRUDecoder(nn.Module):
         but passed for compatibility with beam search."""
         self.alphas = []
         batch_size = next(iter(sources.values()))[0].shape[1]
+        # NOTE: Non-scatter aware, fix this
         return torch.zeros(batch_size, self.hidden_size, device=DEVICE)
 
     def f_next(self, sources, y, h):
@@ -108,7 +109,7 @@ class SwitchingGRUDecoder(nn.Module):
 
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab, device=DEVICE)
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=y.device)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)
