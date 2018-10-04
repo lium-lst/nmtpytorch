@@ -35,7 +35,7 @@ class ApproximateBucketBatchSampler(BucketBatchSampler):
 
     def __init__(self, batch_size, sort_lens, max_len=None,
                  store_indices=False, order=None):
-        assert self.order in (None, 'ascending', 'descending'), \
+        assert order in (None, 'ascending', 'descending'), \
             "order should be None, 'ascending' or 'descending'"
 
         self.batch_size = batch_size
@@ -95,6 +95,8 @@ class ApproximateBucketBatchSampler(BucketBatchSampler):
         if n_remove_from_last > 0:
             logger.info('Removed {} samples to balance buckets.'.format(
                 n_remove_from_last))
+
+        self.stats = {k: len(self.buckets[k]) for k in sorted(self.buckets)}
 
         for len_ in self.buckets:
             # Convert bucket to numpy array

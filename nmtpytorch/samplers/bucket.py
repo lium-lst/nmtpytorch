@@ -72,6 +72,8 @@ class BucketBatchSampler(Sampler):
         # Pre-compute how many times a bucket will be sampled
         self.bucket_idxs = []
 
+        self.stats = {k: len(self.buckets[k]) for k in sorted(self.buckets)}
+
         for len_ in self.buckets:
             # Convery bucket to numpy array
             np_bucket = np.array(self.buckets[len_])
