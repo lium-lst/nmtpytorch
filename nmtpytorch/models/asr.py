@@ -45,6 +45,8 @@ class ASR(NMT):
                                             # which dataset batches will be sorted
             'bucket_order': None,           # Can be 'ascending' or 'descending'
                                             # for curriculum learning
+                                            # NOTE: Noisy LSTM because of unhandled paddings
+            'sampler_type': 'bucket',       # bucket or approximate
             'direction': None,              # Network directionality, i.e. en->de
             'lstm_forget_bias': False,      # Initialize forget gate bias to 1 for LSTM
             'lstm_bias_zero': False,        # Use zero biases for LSTM
