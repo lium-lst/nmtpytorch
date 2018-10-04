@@ -11,6 +11,9 @@ class Batch(dict):
         super().__init__(*args, **kwargs)
         self.size = next(iter(self.values())).size(1)
 
+    def device(self, device):
+        self.update({k: v.to(device) for k, v in self.items()})
+
     def __repr__(self):
         s = "Batch(size={})\n".format(self.size)
         for data_source, tensor in self.items():
