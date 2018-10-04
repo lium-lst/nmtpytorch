@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
-from ..utils.device import DEVICE
+
+# This will eventually disappear as this only provides .size
+# which can be inferred if we guarantee that batch_dim is always at
+# a given position regardless of input/output feature/tensor types.
 
 
 class Batch(dict):
-    """A custom dictionary that does on-the-fly device conversion."""
-    def __init__(self, data_dict, size):
-        self.size = size
-        self.update({str(k): v.to(DEVICE) for k, v in data_dict.items()})
+    """A custom dictionary representing a batch."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.size = next(iter(self.values())).size(1)
 
     def __repr__(self):
         s = "Batch(size={})\n".format(self.size)
         for data_source, tensor in self.items():
             s += "  {:10s} -> {} - {}\n".format(
-                data_source, tensor.shape, tensor.device)
+                str(data_source), tensor.shape, tensor.device)
         return s
 
 
@@ -23,7 +26,6 @@ def get_collate(data_sources):
     def collate_fn(batch):
         return Batch(
             {ds: ds.to_torch([elem[ds] for elem in batch]) for ds in data_sources},
-            len(batch),
         )
 
     return collate_fn
