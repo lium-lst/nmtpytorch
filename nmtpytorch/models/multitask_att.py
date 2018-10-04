@@ -108,15 +108,12 @@ class MultitaskAtt(nn.Module):
             'vd_dropout_emb': 0,           # Simple dropout to source embeddings
             'vd_dropout_out': 0,           # Simple dropout to decoder output
             'vd_loss_type': 'SmoothL1',    # Loss type (MSE_loss | SmoothL1)
-            # ------------- Options for pyramid encoder
+            # ------------- Options for BiLSTMp speech encoder
             'se_feat_dim': 43,              # Speech features dimensionality
             'se_enc_dim': 256,              # Encoder hidden size
-            'se_enc_type': 'gru',           # Encoder type (gru|lstm)
             'se_dropout': 0,                # Generic dropout overall the architecture
-            'se_enc_subsample': (),         # Tuple of subsampling factors
-                                            # Also defines # of subsampling layers
-            'se_n_sub_layers': 1,           # Number of stacked RNNs in each subsampling block
-            'se_n_base_encoders': 1,        # Number of stacked encoders
+            'se_enc_layers': '1_1_2_2_1_1', # Subsampling & layer architecture
+            'se_proj_dim': 320,             # Intra-LSTM projection layer dim
             # ------------- Options for the shared z-space
             'z_size': 256,                  # size of hidden state of z-space
             'z_len': 10,                    # how many latent states to produce
@@ -219,7 +216,7 @@ class MultitaskAtt(nn.Module):
                 "For MPN, there must be at least two different encoders defined in the overall topology."
             self.mm_loss = MaxMargin(
                 margin=self.opts.model['margin'],
-                sim_function=self.opts.model['sim_function'],
+                # sim_function=self.opts.model['sim_function'],
                 max_violation=self.opts.model['max_violation'])
 
         # Latent space options init
@@ -691,15 +688,12 @@ class MultitaskAtt(nn.Module):
     # Functions to create a speech encoder and decoder with default parameters
     ######
     def create_speech_encoder(self, id):
-        # FIXME:Adapt encoder args
         return BiLSTMp(
             input_size=self.opts.model['se_feat_dim'],
             hidden_size=self.opts.model['se_enc_dim'],
-            rnn_type=self.opts.model['se_enc_type'],
-            dropout=self.opts.model['se_dropout'],
-            subsample=self.opts.model['se_enc_subsample'],
-            num_sub_layers=self.opts.model['se_n_sub_layers'],
-            num_base_layers=self.opts.model['se_n_base_encoders'])
+            proj_size=self.opts.model['se_proj_dim'],
+            layers=self.opts.model['se_enc_layers'],
+            dropout=self.opts.model['se_dropout'])
 
     def create_speech_ff(self, id):
         ''' Only used to create an additional non-linearity between
