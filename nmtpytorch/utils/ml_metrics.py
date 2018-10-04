@@ -12,6 +12,9 @@ from .device import DEVICE
 class Loss:
     """Accumulates and computes correctly training and validation losses."""
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self._loss = 0
         self._denom = 0
         self.batch_loss = 0
