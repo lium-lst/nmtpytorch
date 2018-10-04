@@ -42,7 +42,7 @@ class Translator:
         # Create model instances and move them to device
         for model_file in self.models:
             weights, _, opts = load_pt_file(model_file)
-            opts = Options.from_dict(opts)
+            opts = Options.from_dict(opts, override_list=self.override)
 
             if 'att_temp' not in opts.model:
                 logger.info("INFO: Model does not support 'att_temp'")

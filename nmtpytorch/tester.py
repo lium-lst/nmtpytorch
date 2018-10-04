@@ -32,7 +32,7 @@ class Tester:
         torch.set_grad_enabled(False)
 
         weights, _, opts = load_pt_file(self.model_file)
-        opts = Options.from_dict(opts)
+        opts = Options.from_dict(opts, override_list=self.override)
         instance = getattr(models, opts.train['model_type'])(opts=opts)
 
         if instance.supports_beam_search:
