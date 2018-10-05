@@ -68,8 +68,9 @@ class DeviceManager:
             else:
                 self.cuda_dev_ids = self.cuda_dev_ids[:self.req_n_gpu]
 
-            # Set master device
-            self.dev = torch.device('cuda:{}'.format(self.cuda_dev_ids[0]))
+            # Set master device (is always cuda:0 since we force env.var
+            # restriction)
+            self.dev = torch.device('cuda:0')
 
             global DEVICE, DEVICE_IDS
             DEVICE = self.dev
