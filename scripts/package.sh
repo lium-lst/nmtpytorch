@@ -13,6 +13,7 @@ echo "Preparing $VER"
 echo "__version__ = '${VER}'" > nmtpytorch/__init__.py
 
 git commit nmtpytorch/__init__.py -m "bump version to ${VER}"
+git push origin master
 git tag -a "v${VER}" -m "Version ${VER}"
 git push origin --tags
 
