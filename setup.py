@@ -23,7 +23,7 @@ long_description = long_description.replace(
 setuptools.setup(
     name='nmtpytorch',
     version=get_nmtpytorch_version(),
-    description='Neural Machine Translation Framework in Pytorch',
+    description='Sequence-to-Sequence Framework in Pytorch',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/lium-lst/nmtpytorch',
