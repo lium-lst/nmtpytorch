@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)](https://www.python.org/downloads/release/python-360/)
 
+Click [here](https://join.slack.com/t/nmtpy/shared_invite/enQtNDQ5NTY2ODU1MzI5LTBkMzZjNjYyZDZiYjk0NjNmYzRmMzY2MWVjZWYyMDRhNTFiOTljY2UyYWVjODUyZWQ1YWExMWEzZmU2MmFkZmY) to join to our Slack channel for questions.
+
 `nmtpytorch` allows training of various end-to-end neural architectures including
 but not limited to neural machine translation, image captioning and automatic
 speech recognition systems. The initial codebase was in `Theano` and was
