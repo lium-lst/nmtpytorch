@@ -1,10 +1,9 @@
 ## Release Notes
 
 ### v3.0.0 (05/10/2018)
-Major release that brings Pytorch 0.4 support. Care has not been taken
-to continue supporting earlier Pytorch releases, so move on :)
+Major release that brings support for **Pytorch 0.4** and drops support for **0.3**.
 
-Training and testing on CPUs are now supported thanks to easier device
+Training and testing on **CPUs** are now supported thanks to easier device
 semantics of Pytorch 0.4: just give `-d cpu` to `nmtpy` to switch to CPU mode.
 NOTE: Training on CPUs is only logical for debugging, otherwise it's very slow.
   - NOTE: `device_id` is no longer a configuration option. It should be removed
