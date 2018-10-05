@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import BiLSTMp, ConditionalDecoder, FF
-from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
-from ..utils.ml_metrics import Loss
-from ..datasets import MultimodalDataset
-from ..metrics import Metric
+from . import NMT
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -18,7 +14,7 @@ logger = logging.getLogger('nmtpytorch')
 # ASR with ESPNet style BiLSTMp encoder
 
 
-class ASR(nn.Module):
+class ASR(NMT):
     supports_beam_search = True
 
     def set_defaults(self):
@@ -49,6 +45,8 @@ class ASR(nn.Module):
                                             # which dataset batches will be sorted
             'bucket_order': None,           # Can be 'ascending' or 'descending'
                                             # for curriculum learning
+                                            # NOTE: Noisy LSTM because of unhandled paddings
+            'sampler_type': 'bucket',       # bucket or approximate
             'direction': None,              # Network directionality, i.e. en->de
             'lstm_forget_bias': False,      # Initialize forget gate bias to 1 for LSTM
             'lstm_bias_zero': False,        # Use zero biases for LSTM
@@ -59,7 +57,8 @@ class ASR(nn.Module):
         }
 
     def __init__(self, opts):
-        super().__init__()
+        # Don't call NMT init as it's too different from ASR
+        nn.Module.__init__(self)
 
         # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
@@ -95,29 +94,12 @@ class ASR(nn.Module):
         # NOTE: This should come from config or elsewhere
         self.val_refs = self.opts.data['val_set'][self.tl]
 
-    def __repr__(self):
-        s = super().__repr__() + '\n'
-        for vocab in self.vocabs.values():
-            s += "{}\n".format(vocab)
-        s += "{}\n".format(get_n_params(self))
-        return s
-
-    def set_model_options(self, model_opts):
-        self.set_defaults()
-        for opt, value in model_opts.items():
-            if opt in self.defaults:
-                # Override defaults from config
-                self.defaults[opt] = value
-            else:
-                logger.info('Warning: unused model option: {}'.format(opt))
-        return self.defaults
-
     def reset_parameters(self):
-        # Use kaiming_normal for everything as it is a sane default
+        # Use kaiming normal for everything as it is a sane default
         # Do not touch biases for now
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
-                nn.init.kaiming_normal(param.data)
+                nn.init.kaiming_normal_(param.data)
 
         if self.opts.model['lstm_bias_zero'] or \
                 self.opts.model['lstm_forget_bias']:
@@ -172,22 +154,6 @@ class ASR(nn.Module):
                                activ=self.opts.model['adaptation_activ'],
                                bias=False)
 
-    def load_data(self, split, batch_size, mode='train'):
-        """Loads the requested dataset split."""
-        dataset = MultimodalDataset(
-            data=self.opts.data['{}_set'.format(split)],
-            mode=mode, batch_size=batch_size,
-            vocabs=self.vocabs, topology=self.topology,
-            bucket_by=self.opts.model['bucket_by'],
-            max_len=self.opts.model['max_len'],
-            bucket_order=self.opts.model['bucket_order'])
-        logger.info(dataset)
-        return dataset
-
-    def get_bos(self, batch_size):
-        """Returns a representation for <bos> embeddings for decoding."""
-        return torch.LongTensor(batch_size).fill_(self.trg_vocab['<bos>'])
-
     def encode(self, batch, **kwargs):
         if self.opts.model['adaptation']:
             if self.opts.model['adaptation_type'] == 'self':
@@ -208,26 +174,3 @@ class ASR(nn.Module):
         if self.opts.model['dec_init'] == 'feats':
             d['feats'] = (batch['feats'], None)
         return d
-
-    def forward(self, batch, **kwargs):
-        # Get loss dict
-        result = self.dec(self.encode(batch), batch[self.tl])
-        result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
-        return result
-
-    def test_performance(self, data_loader, dump_file=None):
-        """Computes test set loss over the given DataLoader instance."""
-        loss = Loss()
-
-        for batch in data_loader:
-            batch.to_gpu(volatile=True)
-            out = self.forward(batch)
-            loss.update(out['loss'], out['n_items'])
-
-        return [
-            Metric('LOSS', loss.get(), higher_better=False),
-        ]
-
-    def get_decoder(self, task_id=None):
-        """Compatibility function for multi-tasking architectures."""
-        return self.dec

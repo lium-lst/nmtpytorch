@@ -3,7 +3,7 @@
 import pathlib
 
 
-class TensorBoard(object):
+class TensorBoard:
     def __init__(self, model, log_dir, exp_id, subfolder,
                  send_metrics=True, send_activations=False,
                  send_gradients=False):

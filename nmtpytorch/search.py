@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import torch
-from torch.autograd import Variable
 
 from .utils.misc import pbar
 from .utils.topology import Topology
+from .utils.device import DEVICE
 
 
 def tile_ctx_dict(ctx_dict, idxs):
@@ -17,7 +17,7 @@ def tile_ctx_dict(ctx_dict, idxs):
 
 def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
                 lp_alpha=0., suppress_unk=False):
-    """An efficient GPU implementation for beam-search algorithm.
+    """An efficient implementation for beam-search algorithm.
 
     Arguments:
         models (list of Model): Model instance(s) derived from `nn.Module`
@@ -73,13 +73,13 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
     n_vocab = len(vocab)
 
     # Tensorized beam that will shrink and grow up to max_batch_size
-    beam_storage = torch.zeros((max_len, max_batch_size, k)).long().cuda()
-    mask = torch.arange(max_batch_size * k).long().cuda()
-    nll_storage = torch.zeros(max_batch_size).cuda()
+    beam_storage = torch.zeros(
+        max_len, max_batch_size, k, dtype=torch.long, device=DEVICE)
+    mask = torch.arange(max_batch_size * k, device=DEVICE)
+    nll_storage = torch.zeros(max_batch_size, device=DEVICE)
 
     for batch in pbar(data_loader, unit='batch'):
-        # Send to GPU
-        batch.to_gpu(volatile=True)
+        batch.device(DEVICE)
 
         # Always use the initial storage
         beam = beam_storage.narrow(1, 0, batch.size).zero_()
@@ -101,13 +101,11 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
 
         # Start with <bos> tokens
         # FIXME: idxs should not change except for informed <bos> embeddings
-        idxs = models[0].get_bos(batch.size).cuda()
+        # In case of different <bos> possibility, these should be asked
+        # from each model to support ensembling
+        idxs = models[0].get_bos(batch.size).to(DEVICE)
 
-        for t in range(max_len):
-            # Fetch embs for the next iteration (N*K, E)
-            # y_ts = [m.dec.emb(Variable(idxs, volatile=True).cuda()) for m in models]
-            y_t = Variable(idxs, volatile=True).cuda()
-
+        for tstep in range(max_len):
             # Select correct positions from source context
             ctx_dicts = [tile_ctx_dict(cd, tile) for cd in ctx_dicts]
 
@@ -115,8 +113,8 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             # log_p: batch_size x vocab_size (t = 0)
             #        batch_size*beam_size x vocab_size (t > 0)
             log_ps, h_ts = zip(
-                *[f_next(cd, dec.emb(y_t), h_t[tile]) for
-                    f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
+                *[f_next(cd, dec.emb(idxs), h_t[tile]) for
+                  f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
 
             # Do the actual averaging of log-probabilities
             log_p = sum(log_ps).data
@@ -140,38 +138,38 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             #   nll: batch_size x beam_size (x 1)
             # nll becomes: batch_size x beam_size*vocab_size here
             # Reduce (N, K*V) to k-best
-            nll, beam[t] = nll.unsqueeze_(2).add(log_p.view(
+            nll, beam[tstep] = nll.unsqueeze_(2).add(log_p.view(
                 batch.size, -1, n_vocab)).view(batch.size, -1).topk(
-                k, sorted=False, largest=True)
+                    k, sorted=False, largest=True)
 
             # previous indices into the beam and current token indices
-            pdxs = beam[t] / n_vocab
-            beam[t].remainder_(n_vocab)
-            idxs = beam[t].view(-1)
+            pdxs = beam[tstep] / n_vocab
+            beam[tstep].remainder_(n_vocab)
+            idxs = beam[tstep].view(-1)
 
             # Compute correct previous indices
             # Mask is needed since we're in flattened regime
-            tile = pdxs.view(-1) + (nk_mask / k) * (k if t else 1)
+            tile = pdxs.view(-1) + (nk_mask / k) * (k if tstep else 1)
 
-            if t > 0:
+            if tstep > 0:
                 # Permute all hypothesis history according to new order
-                beam[:t] = beam[:t].gather(2, pdxs.repeat(t, 1, 1))
+                beam[:tstep] = beam[:tstep].gather(2, pdxs.repeat(tstep, 1, 1))
 
         # Put an explicit <eos> to make idxs_to_sent happy
         beam[max_len - 1] = eos
 
         # Find lengths by summing tokens not in (pad,bos,eos)
-        lp = beam.gt(2).float().sum(0).clamp(min=1)
+        len_penalty = beam.gt(2).float().sum(0).clamp(min=1)
 
         if lp_alpha > 0.:
-            lp = ((5 + lp)**lp_alpha) / 6**lp_alpha
+            len_penalty = ((5 + len_penalty)**lp_alpha) / 6**lp_alpha
 
         # Apply length normalization and get best hyps
-        top_hyps = nll.div_(lp).topk(
+        top_hyps = nll.div_(len_penalty).topk(
             1, sorted=False, largest=True)[1].squeeze(1)
 
         # Get best hyp for each sample in the batch
-        hyps = beam[:, range(batch.size), top_hyps].t().cpu()
+        hyps = beam[:, range(batch.size), top_hyps].t().to('cpu')
         results.extend(vocab.list_of_idxs_to_sents(hyps.tolist()))
 
     # Recover order of the samples if necessary

@@ -10,6 +10,7 @@ class DataSource(UserString):
         self._type = _type
         self.src = src
         self.trg = trg
+        self.side = 'src' if self.src else 'trg'
 
         # Assign the method that knows how to create a tensor for a batch
         # of this type
@@ -20,7 +21,7 @@ class DataSource(UserString):
         return "DataSource('{}')".format(self.data)
 
 
-class Topology(object):
+class Topology:
     """A simple object that parses the direction string provided through the
         experiment configuration file.
 

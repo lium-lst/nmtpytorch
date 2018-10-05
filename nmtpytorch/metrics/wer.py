@@ -4,7 +4,7 @@ import editdistance
 from .metric import Metric
 
 
-class WERScorer(object):
+class WERScorer:
     def compute(self, refs, hyps, language=None, lowercase=False):
         if isinstance(hyps, str):
             # hyps is a file

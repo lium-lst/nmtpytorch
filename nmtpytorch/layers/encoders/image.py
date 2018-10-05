@@ -2,7 +2,6 @@
 from collections import OrderedDict
 
 import torch
-from torch.autograd import Variable
 from torchvision import models
 from torchvision.models.vgg import cfg as vgg_cfg
 
@@ -50,7 +49,7 @@ resnet_layers = {
 }
 
 
-class ImageEncoder(object):
+class ImageEncoder:
     CFG_MAP = {
         # ResNet variants
         'resnet18': resnet_layers,
@@ -219,7 +218,7 @@ class ImageEncoder(object):
             "You need to first call ImageEncoder.setup()"
 
         # Dummy test to detect output number filters
-        x = Variable(torch.zeros(1, 3, 224, 224), volatile=True)
+        x = torch.zeros(1, 3, 224, 224, requires_grad=False)
 
         # Returns (1, n_channel, w, h)
         self.cnn.eval()

@@ -1,7 +1,8 @@
 import os
-import numpy
 import struct
 import functools
+
+import numpy
 
 ERROR_BINARY = "Binary mode header ('\0B') not found when reading a matrix."
 ERROR_READ_MAT = "Unknown matrix format '{}'. Supported ones: DM(float64), FM(float32)."

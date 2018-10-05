@@ -8,7 +8,7 @@ from ..utils.misc import listify, get_meteor_jar
 from .metric import Metric
 
 
-class METEORScorer(object):
+class METEORScorer:
     def __init__(self):
         self.jar = str(get_meteor_jar())
         self.__cmdline = ["java", "-Xmx2G", "-jar", self.jar,

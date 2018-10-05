@@ -5,7 +5,7 @@ from pathlib import Path
 from .misc import get_temp_file, fopen
 
 
-class FilterChain(object):
+class FilterChain:
     """A sequential filter chain to post-process list of tokens.
 
         Arguments:
@@ -32,7 +32,7 @@ class FilterChain(object):
         'c2w': lambda s: s.replace(' ', '').replace('<s>', ' ').strip(),
         # Filters out fillers from compound splitted sentences
         'de-compound': lambda s: (s.replace(" @@ ", "").replace(" @@", "")
-                                   .replace(" @", "").replace("@ ", "")),
+                                  .replace(" @", "").replace("@ ", "")),
         'lower': lambda s: s.lower(),
         'upper': lambda s: s.upper(),
     }

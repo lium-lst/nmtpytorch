@@ -6,17 +6,22 @@ import torch
 from sklearn.metrics import coverage_error
 from sklearn.metrics import label_ranking_average_precision_score as lrap
 
+from .device import DEVICE
 
-class Loss(object):
+
+class Loss:
     """Accumulates and computes correctly training and validation losses."""
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self._loss = 0
         self._denom = 0
         self.batch_loss = 0
 
     def update(self, loss, n_items):
         # Store last batch loss
-        self.batch_loss = loss.data.cpu()[0]
+        self.batch_loss = loss.item()
         # Add it to cumulative loss
         self._loss += self.batch_loss
         # Normalize batch loss w.r.t n_items
@@ -28,7 +33,7 @@ class Loss(object):
         return self._loss / self._denom
 
 
-class CoverageError(object):
+class CoverageError:
     def __init__(self):
         self._cov = 0
         self._n_items = 0
@@ -41,7 +46,7 @@ class CoverageError(object):
         return self._cov / self._n_items
 
 
-class LRAPScore(object):
+class LRAPScore:
     def __init__(self):
         self._lrap = 0
         self._n_items = 0
@@ -54,11 +59,11 @@ class LRAPScore(object):
         return self._lrap / self._n_items
 
 
-class MeanReciprocalRank(object):
+class MeanReciprocalRank:
     """Computes the mean reciprocal rank (MRR) metric for a batch along with
     per time-step MRR statistics that accumulate."""
     def __init__(self, n_classes):
-        self.denom = torch.arange(1, 1 + n_classes).cuda()
+        self.denom = torch.arange(1, 1 + n_classes, device=DEVICE, dtype=torch.float)
         self._mrr_per_timestep = defaultdict(float)
         self._per_timestep_counts = defaultdict(int)
 

@@ -2,13 +2,15 @@
 import logging
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import TextEncoder, ConditionalDecoder
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
-from ..utils.ml_metrics import MeanReciprocalRank, Loss
+from ..utils.ml_metrics import Loss
+from ..utils.device import DEVICE
+from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
@@ -48,6 +50,7 @@ class NMT(nn.Module):
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
                                         # the batches will be sorted
             'bucket_order': None,       #
+            'sampler_type': 'bucket',   # bucket or approximate
         }
 
     def __init__(self, opts):
@@ -121,7 +124,7 @@ class NMT(nn.Module):
     def reset_parameters(self):
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
-                nn.init.kaiming_normal(param.data)
+                nn.init.kaiming_normal_(param.data)
 
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
@@ -176,7 +179,8 @@ class NMT(nn.Module):
             vocabs=self.vocabs, topology=self.topology,
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model['max_len'],
-            bucket_order=self.opts.model['bucket_order'])
+            bucket_order=self.opts.model['bucket_order'],
+            sampler_type=self.opts.model['sampler_type'])
         logger.info(dataset)
         return dataset
 
@@ -208,7 +212,7 @@ class NMT(nn.Module):
                 and target modalities.
 
         Returns:
-            Variable:
+            Tensor:
                 A scalar loss normalized w.r.t batch size and token counts.
         """
         # Get loss dict
@@ -219,17 +223,14 @@ class NMT(nn.Module):
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
-        mrr = MeanReciprocalRank(self.n_trg_vocab)
 
-        for batch in data_loader:
-            batch.to_gpu(volatile=True)
+        for batch in pbar(data_loader, unit='batch'):
+            batch.device(DEVICE)
             out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
-            mrr.update(batch[self.tl][1:].data, out['logps'])
 
         return [
             Metric('LOSS', loss.get(), higher_better=False),
-            Metric('MRR', mrr.normalized_mrr(), higher_better=True),
         ]
 
     def get_decoder(self, task_id=None):

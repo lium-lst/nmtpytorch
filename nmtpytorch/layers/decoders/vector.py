@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 from .. import FF
-
 
 # Decoder without attention that uses a single input vector.
 # Layer contributed by @loicbarrault
@@ -55,7 +54,7 @@ class VectorDecoder(nn.Module):
         if self.tied_emb:
             self.out2prob.weight = self.emb.weight
 
-        self.nll_loss = nn.NLLLoss(size_average=False, ignore_index=0)
+        self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
 
     def f_init(self, ctx_dict):
         """Returns the initial h_0 for the decoder."""
@@ -90,7 +89,7 @@ class VectorDecoder(nn.Module):
     def forward(self, ctx_dict, y):
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=y.device)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

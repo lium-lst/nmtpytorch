@@ -3,8 +3,11 @@ import time
 import logging
 from pathlib import Path
 
+import torch
+
 from .utils.misc import load_pt_file
 from .utils.data import make_dataloader
+from .utils.device import DEVICE
 
 from . import models
 from .config import Options
@@ -12,7 +15,7 @@ from .config import Options
 logger = logging.getLogger('nmtpytorch')
 
 
-class Tester(object):
+class Tester:
     """Tester for models without beam-search."""
 
     def __init__(self, **kwargs):
@@ -25,8 +28,11 @@ class Tester(object):
 
         self.model_file = self.models[0]
 
+        # Disable gradient tracking
+        torch.set_grad_enabled(False)
+
         weights, _, opts = load_pt_file(self.model_file)
-        opts = Options.from_dict(opts)
+        opts = Options.from_dict(opts, override_list=self.override)
         instance = getattr(models, opts.train['model_type'])(opts=opts)
 
         if instance.supports_beam_search:
@@ -36,8 +42,8 @@ class Tester(object):
         instance.setup(is_train=False)
         # Load weights
         instance.load_state_dict(weights, strict=True)
-        # Move to GPU
-        instance.cuda()
+        # Move to device
+        instance.to(DEVICE)
         # Switch to eval mode
         instance.train(False)
 

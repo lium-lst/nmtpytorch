@@ -10,7 +10,7 @@ import subprocess
 from ...utils.misc import get_meteor_jar
 
 
-class Meteor(object):
+class Meteor:
     def __init__(self, language, norm=False):
         self.jar = str(get_meteor_jar())
         self.meteor_cmd = ['java', '-jar', '-Xmx2G', self.jar,
@@ -44,7 +44,7 @@ class Meteor(object):
         eval_line = 'EVAL'
         self.lock.acquire()
         for i in imgIds:
-            assert(len(res[i]) == 1)
+            assert len(res[i]) == 1
 
             hypothesis_str = res[i][0].replace('|||', '').replace('  ', ' ')
             score_line = ' ||| '.join(

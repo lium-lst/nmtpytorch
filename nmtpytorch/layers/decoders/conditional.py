@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from ...utils.nn import get_rnn_hidden_state
-from .. import FF, Attention
+from .. import FF
+from ..attention import get_attention
 
 
 class ConditionalDecoder(nn.Module):
@@ -52,9 +52,9 @@ class ConditionalDecoder(nn.Module):
         self.dec_init = dec_init
         self.dec_init_size = dec_init_size
         self.dec_init_activ = dec_init_activ
-        self.att_type = att_type
         self.att_bottleneck = att_bottleneck
         self.att_activ = att_activ
+        self.att_type = att_type
         self.att_temp = att_temp
         self.transform_ctx = transform_ctx
         self.mlp_bias = mlp_bias
@@ -68,13 +68,15 @@ class ConditionalDecoder(nn.Module):
                                 scale_grad_by_freq=self.emb_gradscale)
 
         # Create attention layer
-        self.att = Attention(self.ctx_size_dict[self.ctx_name], self.hidden_size,
-                             transform_ctx=self.transform_ctx,
-                             mlp_bias=self.mlp_bias,
-                             att_type=self.att_type,
-                             att_activ=self.att_activ,
-                             att_bottleneck=self.att_bottleneck,
-                             temp=self.att_temp)
+        Attention = get_attention(self.att_type)
+        self.att = Attention(
+            self.ctx_size_dict[self.ctx_name],
+            self.hidden_size,
+            transform_ctx=self.transform_ctx,
+            mlp_bias=self.mlp_bias,
+            att_activ=self.att_activ,
+            att_bottleneck=self.att_bottleneck,
+            temp=self.att_temp)
 
         # Decoder initializer FF (for 'mean_ctx' or auxiliary 'feats')
         if self.dec_init in ('mean_ctx', 'feats'):
@@ -103,7 +105,7 @@ class ConditionalDecoder(nn.Module):
         if self.tied_emb:
             self.out2prob.weight = self.emb.weight
 
-        self.nll_loss = nn.NLLLoss(size_average=False, ignore_index=0)
+        self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
 
     def _lstm_pack_states(self, h):
         return torch.cat(h, dim=-1)
@@ -114,8 +116,8 @@ class ConditionalDecoder(nn.Module):
 
     def _rnn_init_zero(self, ctx_dict):
         ctx, _ = ctx_dict[self.ctx_name]
-        h_0 = torch.zeros(ctx.shape[1], self.hidden_size * self.n_states)
-        return Variable(h_0).cuda()
+        return torch.zeros(
+            ctx.shape[1], self.hidden_size * self.n_states, device=ctx.device)
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         ctx, ctx_mask = ctx_dict[self.ctx_name]
@@ -165,15 +167,16 @@ class ConditionalDecoder(nn.Module):
         ground-truth target token indices `y`. Only called during training.
 
         Arguments:
-            ctxs(Variable): A variable of `S*B*ctx_dim` representing the source
+            ctxs(Tensor): A tensor of `S*B*ctx_dim` representing the source
                 annotations in an order compatible with ground-truth targets.
-            y(Variable): A variable of `T*B` containing ground-truth target
+            y(Tensor): A tensor of `T*B` containing ground-truth target
                 token indices for the given batch.
         """
 
         loss = 0.0
+
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=y.device)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

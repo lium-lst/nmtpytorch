@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
+
+from ...utils.nn import get_activation_fn
 
 # Code contributed by @jlibovicky
 
@@ -22,7 +24,7 @@ class CoAttention(nn.Module):
 
         self.mlp_hid = nn.Conv2d(ctx_1_dim + ctx_2_dim, bottleneck, 1)
         self.mlp_out = nn.Conv2d(bottleneck, 1, 1, bias=mlp_bias)
-        self.activ = getattr(F, att_activ)
+        self.activ = get_activation_fn(att_activ)
 
         self.project_1_to_2 = nn.Linear(ctx_1_dim + ctx_2_dim, bottleneck)
         self.project_2_to_1 = nn.Linear(ctx_1_dim + ctx_2_dim, bottleneck)

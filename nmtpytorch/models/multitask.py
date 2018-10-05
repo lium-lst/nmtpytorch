@@ -2,7 +2,7 @@
 import logging
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..layers import TextEncoder, ImageEncoder, VectorDecoder
 from ..layers import ZSpace
@@ -10,9 +10,10 @@ from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss
+from ..utils.device import DEVICE
+from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
-from ..utils.nn import ModuleDict
 from ..utils.scheduler import Scheduler
 
 logger = logging.getLogger('nmtpytorch')
@@ -171,13 +172,13 @@ class Multitask(nn.Module):
     def reset_parameters(self):
         for name, param in self.named_parameters():
             if param.requires_grad and 'bias' not in name:
-                nn.init.kaiming_normal(param.data)
+                nn.init.kaiming_normal_(param.data)
 
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
 
         # create encoders
-        self.encs = ModuleDict()
+        self.encs = nn.ModuleDict()
         self.encs_type = {}
         enc_switcher = {
             "Text": self.create_text_encoder,
@@ -199,7 +200,7 @@ class Multitask(nn.Module):
             z_type=self.z_type, activ=self.z_activ)
 
         # create decoders
-        self.decs = ModuleDict()
+        self.decs = nn.ModuleDict()
         self.dec_types = {}
         dec_switcher = {
             "Text": self.create_text_decoder,
@@ -292,7 +293,7 @@ class Multitask(nn.Module):
                 and target modalities.
 
         Returns:
-            Variable:
+            Tensor:
                 A scalar loss normalized w.r.t batch size and token counts.
         """
         #uctr = kwargs['uctr']
@@ -305,7 +306,7 @@ class Multitask(nn.Module):
             enc_results = self.encode(batch, enc_ids=val_task.srcs)
             dec_results = self.decode(enc_results, batch, val_task.trgs)
         else:
-            enc_ids, dec_ids = self.scheduler.get_encs_and_decs()
+            enc_ids, dec_ids, aux_ = self.scheduler.get_encs_and_decs()
             #logger.info("enc results: {}".format(enc_results))
             enc_results = self.encode(batch, enc_ids=enc_ids)
             dec_results = self.decode(enc_results, batch, dec_ids)
@@ -314,21 +315,16 @@ class Multitask(nn.Module):
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
-        #mrr = {}
-        #for d in self.decs:
-        #    mrr[d] = MeanReciprocalRank(self.n_tvocabs[d])
 
-        for batch in data_loader:
-            batch.to_gpu(volatile=True)
+        for batch in pbar(data_loader, unit='batch'):
+            batch.device(DEVICE)
             for taskid in self.val_tasks:
                 out = self.forward(batch, val_task=self.val_tasks[taskid])
-                for d in out.keys():
+                for d in out:
                     loss.update(out[d]['loss'], out[d]['n_items'])
-                #mrr[d].update(batch[d][1:].data, out[d]['logps'])
 
         return [
             Metric('LOSS', loss.get(), higher_better=False),
-            #Metric('MRR', mrr.normalized_mrr(), higher_better=True),
         ]
 
     ######

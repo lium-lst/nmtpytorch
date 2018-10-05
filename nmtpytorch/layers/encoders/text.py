@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import torch.nn as nn
+from torch import nn
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from ...utils.data import sort_batch
@@ -26,15 +26,15 @@ class TextEncoder(nn.Module):
             per embedding w.r.t. to its frequency in the batch.
 
     Input:
-        x (Variable): A variable of shape (n_timesteps, n_samples)
+        x (Tensor): A tensor of shape (n_timesteps, n_samples)
             including the integer token indices for the given batch.
 
     Output:
-        hs (Variable): A variable of shape (n_timesteps, n_samples, hidden)
+        hs (Tensor): A tensor of shape (n_timesteps, n_samples, hidden)
             that contains encoder hidden states for all timesteps. If
             bidirectional, `hs` is doubled in size in the last dimension
             to contain both directional states.
-        mask (Variable): A binary mask of shape (n_timesteps, n_samples)
+        mask (Tensor): A binary mask of shape (n_timesteps, n_samples)
             that may further be used in attention and/or decoder. `None`
             is returned if batch contains only sentences with same lengths.
     """
@@ -83,7 +83,7 @@ class TextEncoder(nn.Module):
                        bidirectional=self.bidirectional)
 
     def forward(self, x):
-        if (x == 0).nonzero().size():
+        if (x == 0).nonzero().numel():
             return self.forward_mixed_len_batches(x)
         else:
             return self.forward_same_len_batches(x)

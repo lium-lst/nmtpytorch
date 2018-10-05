@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
-from ...utils.nn import ModuleDict
 from .. import FF
-from ..attention import Attention
+from ...utils.device import DEVICE
+from ..attention import get_attention
 
 
 class SwitchingGRUDecoder(nn.Module):
@@ -28,10 +27,9 @@ class SwitchingGRUDecoder(nn.Module):
         # dict: {en_speech: (encoding_size, att_type)}
         atts = {}
         for name, (enc_size, att_type) in modality_dict.items():
-            atts[name] = Attention(
-                enc_size, self.hidden_size, att_type=att_type)
+            atts[name] = get_attention(att_type)(enc_size, self.hidden_size)
 
-        self.atts = ModuleDict(atts)
+        self.atts = nn.ModuleDict(atts)
 
         # Create target embeddings
         self.emb = nn.Embedding(self.n_vocab, self.input_size, padding_idx=0)
@@ -56,7 +54,7 @@ class SwitchingGRUDecoder(nn.Module):
             self.out2prob.weight = self.emb.weight
 
         # Final loss
-        self.nll_loss = nn.NLLLoss(size_average=False, ignore_index=0)
+        self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
 
         # Attention
         self.alphas = []
@@ -65,10 +63,10 @@ class SwitchingGRUDecoder(nn.Module):
     def f_init(self, sources):
         """Returns the initial h_0 for the decoder. `sources` is not used
         but passed for compatibility with beam search."""
-        batch_size = next(iter(sources.values()))[0].shape[1]
         self.alphas = []
-        h_0 = torch.zeros(batch_size, self.hidden_size)
-        return Variable(h_0).cuda()
+        batch_size = next(iter(sources.values()))[0].shape[1]
+        # NOTE: Non-scatter aware, fix this
+        return torch.zeros(batch_size, self.hidden_size, device=DEVICE)
 
     def f_next(self, sources, y, h):
         # Get hidden states from the first decoder (purely cond. on LM)
@@ -103,15 +101,15 @@ class SwitchingGRUDecoder(nn.Module):
         ground-truth target token indices `y`. Only called during training.
 
         Arguments:
-            sources(Variable): A variable of `S*B*ctx_dim` representing the source
+            sources(Tensor): A tensor of `S*B*ctx_dim` representing the source
                 annotations in an order compatible with ground-truth targets.
-            y(Variable): A variable of `T*B` containing ground-truth target
+            y(Tensor): A tensor of `T*B` containing ground-truth target
                 token indices for the given batch.
         """
 
         loss = 0.0
         logps = None if self.training else torch.zeros(
-            y.shape[0] - 1, y.shape[1], self.n_vocab).cuda()
+            y.shape[0] - 1, y.shape[1], self.n_vocab, device=y.device)
 
         # Convert token indices to embeddings -> T*B*E
         y_emb = self.emb(y)

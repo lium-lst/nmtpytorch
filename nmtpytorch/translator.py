@@ -5,10 +5,13 @@ import time
 import logging
 from pathlib import Path
 
+import torch
+
 from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 from .utils.data import make_dataloader
 from .utils.topology import Topology
+from .utils.device import DEVICE
 
 from . import models
 from .config import Options
@@ -17,7 +20,7 @@ from .search import beam_search
 logger = logging.getLogger('nmtpytorch')
 
 
-class Translator(object):
+class Translator:
     """A utility class to pack translation related features."""
 
     def __init__(self, **kwargs):
@@ -33,15 +36,13 @@ class Translator(object):
         # Store each model instance
         self.instances = []
 
-        # Create model instances and move them to GPU
+        # Disable gradient tracking
+        torch.set_grad_enabled(False)
+
+        # Create model instances and move them to device
         for model_file in self.models:
             weights, _, opts = load_pt_file(model_file)
-            opts = Options.from_dict(opts)
-
-            if 'att_temp' not in opts.model:
-                logger.info("INFO: Model does not support 'att_temp'")
-            else:
-                opts.model['att_temp'] = self.att_temp
+            opts = Options.from_dict(opts, override_list=self.override)
 
             # Create model instance
             instance = getattr(models, opts.train['model_type'])(opts=opts)
@@ -55,8 +56,8 @@ class Translator(object):
             instance.setup(is_train=False)
             # Load weights
             instance.load_state_dict(weights, strict=True)
-            # Move to GPU
-            instance.cuda()
+            # Move to device
+            instance.to(DEVICE)
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)

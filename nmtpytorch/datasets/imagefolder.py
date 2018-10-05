@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 import torch
-import torch.utils.data as data
+from torch.utils import data
 from torchvision import transforms
 
 

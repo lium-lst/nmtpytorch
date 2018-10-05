@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import torch.nn as nn
+from torch import nn
 
 from ..layers.speech import BiRNNPv1
 from ..layers import CTCDecoder

@@ -6,7 +6,7 @@ from .utils.filterchain import FilterChain
 from .utils.misc import get_language
 
 
-class Evaluator(object):
+class Evaluator:
     def __init__(self, refs, beam_metrics, filters=''):
         # metrics: list of upper-case beam-search metrics
         self.kwargs = {}

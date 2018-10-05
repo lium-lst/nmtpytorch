@@ -5,7 +5,7 @@ from ..utils.misc import listify
 from .metric import Metric
 
 
-class SACREBLEUScorer(object):
+class SACREBLEUScorer:
     """SACREBLEUScorer class."""
     def __init__(self):
         self.__cmdline = ["sacrebleu", "--short"]

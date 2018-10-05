@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.autograd import Variable
 
 from ..utils.nn import get_rnn_hidden_state

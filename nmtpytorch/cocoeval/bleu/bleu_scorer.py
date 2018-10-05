@@ -87,7 +87,7 @@ def cook_test(test, ref_len_counts, eff=None, n=4):
     return result
 
 
-class BleuScorer(object):
+class BleuScorer:
     """Bleu scorer.
     """
 
@@ -148,7 +148,7 @@ class BleuScorer(object):
         return self._testlen
 
     def retest(self, new_test):
-        if type(new_test) is str:
+        if isinstance(new_test, str):
             new_test = [new_test]
         assert len(new_test) == len(self.crefs), new_test
         self.ctest = []
@@ -171,7 +171,7 @@ class BleuScorer(object):
     def __iadd__(self, other):
         '''add an instance (e.g., from another sentence).'''
 
-        if type(other) is tuple:
+        if isinstance(other, tuple):
             # avoid creating new BleuScorer instances
             self.cook_append(other[0], other[1])
         else:

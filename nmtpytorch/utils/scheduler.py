@@ -8,7 +8,7 @@ from .topology import Topology
 logger = logging.getLogger('nmtpytorch')
 
 
-class Scheduler(object):
+class Scheduler:
     def __init__(self, topology, schedule_type_enc=None, schedule_type_dec=None,
                  droptask_prob=1, droptask_e_delay=None, manual_schedule=None):
 
@@ -44,10 +44,11 @@ class Scheduler(object):
             self.enc_ids = self.topology.srcs
             self.dec_ids = self.topology.trgs
 
-    def powerset(opts):
+    def powerset(self, opts):
         """Utility function for generating the modified powerset of
         randomization options: e.g. powerset([1,2,3]) ->
         () (1,) (2,) (3,) (1,2) (1,3) (2,3) (don't allow all to be dropped!)"""
+        pass
 
     def _inc_counter(self):
         self.batch_ctr += 1

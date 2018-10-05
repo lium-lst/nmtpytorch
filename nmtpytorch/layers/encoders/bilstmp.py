@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-import torch.nn as nn
+import logging
+from torch import nn
 from torch.nn import functional as F
 
 from ..ff import FF
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class BiLSTMp(nn.Module):
@@ -19,14 +22,14 @@ class BiLSTMp(nn.Module):
             factor for each LSTM.
         dropout (float, optional): Use dropout (Default: 0.)
     Input:
-        x (Variable): A variable of shape (n_timesteps, n_samples, n_feats)
+        x (Tensor): A tensor of shape (n_timesteps, n_samples, n_feats)
             that includes acoustic features of dimension ``n_feats`` per
             each timestep (in the first dimension).
 
     Output:
-        hs (Variable): A variable of shape (n_timesteps, n_samples, hidden * 2)
+        hs (Tensor): A tensor of shape (n_timesteps, n_samples, hidden * 2)
             that contains encoder hidden states for all timesteps.
-        mask (Variable): `None` since this layer expects all equal frame inputs.
+        mask (Tensor): `None` since this layer expects all equal frame inputs.
     """
     def __init__(self, input_size, hidden_size, proj_size, layers,
                  proj_activ='tanh', dropout=0):
@@ -63,6 +66,12 @@ class BiLSTMp(nn.Module):
                 self.ctx_size, self.proj_size, activ=self.proj_activ))
 
     def forward(self, x):
+        # Generate a mask to detect padded sequences
+        mask = x.ne(0).float().sum(2).ne(0).float()
+
+        if mask.eq(0).nonzero().numel() > 0:
+            logger.info("WARNING: Non-homogeneous batch in BiLSTMp.")
+
         # Pad with <eos> zero
         hs = F.pad(x, self.pad_tuple)
 
@@ -76,5 +85,5 @@ class BiLSTMp(nn.Module):
         if self.dropout > 0:
             hs = self.do(hs)
 
-        # No mask is returned as batch contains elements of all same lengths
+        # No mask is returned as batch should contain same-length sequences
         return hs, None

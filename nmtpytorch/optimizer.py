@@ -3,11 +3,11 @@ import logging
 
 import torch.optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.nn.utils.clip_grad import clip_grad_norm
+from torch.nn.utils import clip_grad_norm_
 
 logger = logging.getLogger('nmtpytorch')
 
-# Setup optimizer (should always come after model.cuda())
+# Setup optimizer (should always come after model.to())
 # iterable of dicts for per-param options where each dict
 # is {'params' : [p1, p2, p3...]}.update(generic optimizer args)
 # Example:
@@ -17,7 +17,7 @@ logger = logging.getLogger('nmtpytorch')
     # ], lr=1e-2, momentum=0.9)
 
 
-class Optimizer(object):
+class Optimizer:
     # Class dict to map lowercase identifiers to actual classes
     methods = {
         'adadelta':   torch.optim.Adadelta,
@@ -111,7 +111,7 @@ class Optimizer(object):
 
     def _step(self, closure=None):
         """Gradient clipping aware step()."""
-        clip_grad_norm(self.params, self.gclip)
+        clip_grad_norm_(self.params, self.gclip)
         self.optim.step(closure)
 
     def lr_step(self, metric):
@@ -122,21 +122,20 @@ class Optimizer(object):
                 logger.info('** Learning rate changed -> {}'.format(self.cur_lr))
                 # Signal it back
                 return True
-        else:
-            return False
+        return False
 
     def get_lr(self):
         """Returns current lr for parameters."""
         return self.optim.param_groups[0]['lr']
 
     def __repr__(self):
-        s = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {}".format(
+        repr_ = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {}".format(
             self.name, self.initial_lr, self.weight_decay, self.gclip)
         if self.name == 'sgd':
-            s += ', momentum: {}, nesterov: {}'.format(
+            repr_ += ', momentum: {}, nesterov: {}'.format(
                 self.momentum, self.nesterov)
         if self.lr_decay:
-            s += ', lr_decay: (patience={}, factor={})'.format(
+            repr_ += ', lr_decay: (patience={}, factor={})'.format(
                 self.lr_decay_patience, self.lr_decay_factor)
-        s += ')'
-        return s
+        repr_ += ')'
+        return repr_

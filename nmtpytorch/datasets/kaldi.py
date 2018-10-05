@@ -2,9 +2,9 @@
 from pathlib import Path
 from tqdm import tqdm
 
-import numpy as np
 import torch
 from torch.utils.data import Dataset
+from torch.nn.utils.rnn import pad_sequence
 
 from ..utils.kaldi import readMatrixShape, readMatrixByOffset
 
@@ -64,8 +64,8 @@ class KaldiDataset(Dataset):
 
     @staticmethod
     def to_torch(batch):
-        # Move batch dimension to middle
-        return torch.from_numpy(np.array(batch, dtype='float32')).transpose(0, 1)
+        return pad_sequence(
+            [torch.FloatTensor(x) for x in batch], batch_first=False)
 
     def __getitem__(self, idx):
         """Read segment features from the actual .ark file."""

@@ -20,7 +20,7 @@ def my_lcs(string, sub):
     my_lcs only gives length of the longest common subsequence,
     not the actual LCS
     """
-    if(len(string) < len(sub)):
+    if len(string) < len(sub):
         sub, string = string, sub
 
     lengths = [[0 for i in range(0, len(sub) + 1)] for j
@@ -28,7 +28,7 @@ def my_lcs(string, sub):
 
     for j in range(1, len(sub) + 1):
         for i in range(1, len(string) + 1):
-            if(string[i - 1] == sub[j - 1]):
+            if string[i - 1] == sub[j - 1]:
                 lengths[i][j] = lengths[i - 1][j - 1] + 1
             else:
                 lengths[i][j] = max(lengths[i - 1][j], lengths[i][j - 1])
@@ -36,7 +36,7 @@ def my_lcs(string, sub):
     return lengths[len(string)][len(sub)]
 
 
-class Rouge(object):
+class Rouge:
     """Class for computing ROUGE-L score for a set of candidate sentences
     for the MS COCO test set."""
     def __init__(self):
@@ -52,8 +52,8 @@ class Rouge(object):
         :returns score: int (ROUGE-L score for the candidate evaluated
             against references)
         """
-        assert(len(candidate) == 1)
-        assert(len(refs) > 0)
+        assert len(candidate) == 1
+        assert len(refs) > 0
         prec = []
         rec = []
 
@@ -71,7 +71,7 @@ class Rouge(object):
         prec_max = max(prec)
         rec_max = max(rec)
 
-        if(prec_max != 0 and rec_max != 0):
+        if prec_max != 0 and rec_max != 0:
             score = ((1 + self.beta**2) * prec_max * rec_max)
             score /= float(rec_max + self.beta ** 2 * prec_max)
         else:
@@ -98,10 +98,10 @@ class Rouge(object):
             score.append(self.calc_score(hypo, ref))
 
             # Sanity check.
-            assert(type(hypo) is list)
-            assert(len(hypo) == 1)
-            assert(type(ref) is list)
-            assert(len(ref) > 0)
+            assert isinstance(hypo, list)
+            assert isinstance(ref, list)
+            assert len(hypo) == 1
+            assert len(ref) > 0
 
         average_score = np.mean(np.array(score))
         return average_score, np.array(score)

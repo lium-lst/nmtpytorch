@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+
+from ...utils.nn import get_activation_fn
 
 
 # Libovický, J., & Helcl, J. (2017). Attention Strategies for Multi-Source
@@ -15,7 +16,7 @@ class HierarchicalAttention(nn.Module):
     def __init__(self, ctx_dims, hid_dim, mid_dim, att_activ='tanh'):
         super().__init__()
 
-        self.activ = getattr(F, att_activ)
+        self.activ = get_activation_fn(att_activ)
         self.ctx_dims = ctx_dims
         self.hid_dim = hid_dim
         self.mid_dim = mid_dim
@@ -31,7 +32,7 @@ class HierarchicalAttention(nn.Module):
             p(ctx).unsqueeze(0) for p, ctx
             in zip(self.ctx_projs, contexts)], dim=0)
         energies = self.mlp(self.activ(dec_state_proj + ctx_projected))
-        att_dist = F.softmax(energies, dim=0)
+        att_dist = nn.functional.softmax(energies, dim=0)
 
         ctxs_cat = torch.cat([c.unsqueeze(0) for c in contexts])
         joint_context = (att_dist * ctxs_cat).sum(0)

@@ -2,7 +2,7 @@
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state
-from ..attention import Attention, HierarchicalAttention
+from ..attention import HierarchicalAttention, get_attention
 from .. import Fusion
 from . import ConditionalDecoder
 
@@ -28,10 +28,10 @@ class ConditionalMMDecoder(ConditionalDecoder):
         del self.att
 
         # Visual attention over convolutional feature maps
+        Attention = get_attention(self.att_type)
         self.img_att = Attention(
             self.ctx_size_dict[self.aux_ctx_name], self.hidden_size,
             transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
-            att_type=self.att_type,
             att_activ=self.att_activ,
             att_bottleneck=self.att_bottleneck)
 

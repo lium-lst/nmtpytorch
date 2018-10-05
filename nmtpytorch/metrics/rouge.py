@@ -3,7 +3,7 @@ from .metric import Metric
 from ..cocoeval import Rouge
 
 
-class ROUGEScorer(object):
+class ROUGEScorer:
     def compute(self, refs, hyps, language=None, lowercase=False):
         if isinstance(hyps, str):
             # hyps is a file

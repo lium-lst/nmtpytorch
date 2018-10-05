@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import torch
-import torch.nn as nn
-from torch.autograd import Variable
+from torch import nn
 
-from . import FF, Attention, HierarchicalAttention
-from ..utils.nn import ModuleDict
+from . import FF, HierarchicalAttention, get_attention
+from ..utils.device import DEVICE
 
 
 # TODO: allow for returning a sequence of z states (will require mask)
@@ -43,7 +42,7 @@ class ZSpaceAtt(nn.Module):
             {modality : encoder_result}.
 
     Output:
-        z (Variable): A sequence of z_len-dimensional vectors of shape z_size.
+        z (Tensor): A sequence of z_len-dimensional vectors of shape z_size.
     """
 
     def __init__(self, ctx_size_dict, z_size, z_len=10, z_transform=None, z_in_size=256,
@@ -76,7 +75,7 @@ class ZSpaceAtt(nn.Module):
         # Each layer maps ctx_size_dict[k] to z_in_size (==ctx_size)
         # z_transform tells the kind of (non-)linearity to use
         if self.z_transform:
-            self.z_transforms = ModuleDict()
+            self.z_transforms = nn.ModuleDict()
             for k in self.ctx_size_dict:
                 self.z_transforms[k] = FF(
                     self.ctx_size_dict[k], self.z_in_size, activ=z_transform)
@@ -90,14 +89,15 @@ class ZSpaceAtt(nn.Module):
 
         # Create an attention layer for each modality
         # TODO: sharing weights between att. mechanisms is possible
-        self.att = ModuleDict()
+        self.att = nn.ModuleDict()
+        # Fetch correct attention class
+        Attention = get_attention(self.att_type)
         for k in self.ctx_size_dict:
             att_in_size = self.ctx_size if self.z_transform else self.ctx_size_dict[k]
             self.att[k] = Attention(
                 att_in_size, self.z_size,
                 transform_ctx=self.att_transform_ctx,
                 mlp_bias=self.mlp_bias,
-                att_type=self.att_type,
                 att_activ=self.att_activ,
                 att_bottleneck=self.att_bottleneck,
                 temp=self.att_temp,
@@ -133,14 +133,13 @@ class ZSpaceAtt(nn.Module):
 
     def _rnn_init_zero(self, ctx_dict):
         # * self.n_states) # <-- ?? was used in cond_decoder.py
-        h_0 = torch.zeros(self.ctx_size, self.z_size)
-        return Variable(h_0).cuda()
+        return torch.zeros(self.ctx_size, self.z_size, device=DEVICE)
 
     def _rnn_init_mean_ctx(self, ctx_dict):
         # NOTE: averaging the mean of all modalities
         # NOTE: all ctx should have the same size at this point
         key = next(iter(ctx_dict))
-        res = torch.autograd.Variable(torch.zeros(ctx_dict[key][0].shape[1:])).cuda()
+        res = torch.zeros(ctx_dict[key][0].shape[1:], device=DEVICE)
         for e in ctx_dict.keys():
             ctx, ctx_mask = ctx_dict[e]
             if ctx_mask is None:
@@ -191,7 +190,7 @@ class ZSpaceAtt(nn.Module):
         summ = None
         for e in att_ctx_dict.keys():
             if summ is None:
-                summ = torch.autograd.Variable(torch.zeros(att_ctx_dict[e].shape)).cuda()
+                summ = torch.zeros(att_ctx_dict[e].shape, device=DEVICE)
             summ += att_ctx_dict[e]
         return None, summ
 

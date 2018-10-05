@@ -2,9 +2,9 @@
 import operator
 from functools import reduce
 
-from . import FF
-
 import torch
+
+from . import FF
 
 
 class Fusion(torch.nn.Module):

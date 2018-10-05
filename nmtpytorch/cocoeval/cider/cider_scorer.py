@@ -2,10 +2,11 @@
 # Tsung-Yi Lin <tl483@cornell.edu>
 # Ramakrishna Vedantam <vrama91@vt.edu>
 
+import math
 import copy
 from collections import defaultdict
+
 import numpy as np
-import math
 
 
 def precook(s, n=4, out=False):
@@ -48,7 +49,7 @@ def cook_test(test, n=4):
     return precook(test, n, True)
 
 
-class CiderScorer(object):
+class CiderScorer:
     """CIDEr scorer."""
 
     def copy(self):
@@ -88,7 +89,7 @@ class CiderScorer(object):
     def __iadd__(self, other):
         '''add an instance (e.g., from another sentence).'''
 
-        if type(other) is tuple:
+        if isinstance(other, tuple):
             # avoid creating new CiderScorer instances
             self.cook_append(other[0], other[1])
         else:
@@ -105,8 +106,7 @@ class CiderScorer(object):
         '''
         for refs in self.crefs:
             # refs, k ref captions of one image
-            for ngram in set([ngram for ref in refs for
-                             (ngram, count) in ref.items()]):
+            for ngram in set([ngram for ref in refs for (ngram, count) in ref.items()]):
                 self.document_frequency[ngram] += 1
             # maxcounts[ngram] = max(maxcounts.get(ngram,0), count)
 
@@ -163,7 +163,7 @@ class CiderScorer(object):
                 if (norm_hyp[n] != 0) and (norm_ref[n] != 0):
                     val[n] /= (norm_hyp[n] * norm_ref[n])
 
-                assert(not math.isnan(val[n]))
+                assert not math.isnan(val[n])
                 # vrama91: added a length based gaussian penalty
                 val[n] *= np.e**(-(delta**2) / (2 * self.sigma**2))
             return val
@@ -194,7 +194,7 @@ class CiderScorer(object):
         # compute idf
         self.compute_doc_freq()
         # assert to check document frequency
-        assert(len(self.ctest) >= max(self.document_frequency.values()))
+        assert len(self.ctest) >= max(self.document_frequency.values())
         # compute cider score
         score = self.compute_cider()
         return np.mean(np.array(score)), np.array(score)

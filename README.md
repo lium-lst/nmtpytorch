@@ -39,9 +39,8 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 
 ## Installation
 
-`nmtpytorch` currently requires `python>=3.6`, `torch==0.3.1` and a GPU to work.
-We are not planning to support Python 2.x but it will be updated to work with the
-newer versions of `torch` and also on CPU.
+`nmtpytorch` currently requires `python>=3.6` and `torch==0.4.1`.
+We are not planning to support Python 2.x.
 
 ### pip
 
@@ -53,10 +52,8 @@ $ pip install nmtpytorch
 ```
 
 This will automatically fetch and install the dependencies as well. For the `torch`
-dependency it will specifically install the `torch 0.3.1` package from `PyPI` that
-ships `CUDA 8.0` within. If instead you want to use a newer version of `CUDA`,
-you can uninstall the `torch` package manually afterwards and install another `0.3.1`
-package from [here](https://pytorch.org/get-started/previous-versions/).
+dependency it will specifically install the `torch 0.4.1` package from `PyPI` that
+ships `CUDA 9.0` within.
 
 ### conda
 
@@ -68,10 +65,6 @@ $ conda update --all
 $ git clone https://github.com/lium-lst/nmtpytorch.git
 $ conda env create -f nmtpytorch/environment.yml
 ```
-
-Unlike the `pip` method, this environment explicitly installs the `CUDA 9.0`
-version of `torch 0.3.1` and enables editable mode similar to the development
-mode explained below.
 
 ### Development Mode
 

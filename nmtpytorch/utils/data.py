@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
 import torch
+import logging
 from torch.utils.data import DataLoader
 import numpy as np
 
 from ..utils.misc import fopen, pbar
 
+logger = logging.getLogger('nmtpytorch')
+
 
 def make_dataloader(dataset, pin_memory=False, num_workers=0):
+    if num_workers != 0:
+        logger.info('Forcing num_workers to 0 since it fails with torch 0.4')
+        num_workers = 0
+
     return DataLoader(
         dataset, batch_sampler=dataset.sampler,
         collate_fn=dataset.collate_fn,
@@ -21,15 +28,6 @@ def sort_batch(seqbatch):
     slens, sidxs = torch.sort(olens, descending=True)
     oidxs = torch.sort(sidxs)[1]
     return (oidxs, sidxs, slens.data.tolist(), omask.float())
-
-
-def pad_data(seqs):
-    """Pads sequences with zero for minibatch processing."""
-    lengths = [len(s) for s in seqs]
-    max_len = max(lengths)
-    out = torch.LongTensor(
-        [s + [0] * (max_len - len_) for s, len_ in zip(seqs, lengths)]).t()
-    return out
 
 
 def pad_video_sequence(seqs):

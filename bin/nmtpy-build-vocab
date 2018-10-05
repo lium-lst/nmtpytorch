@@ -23,7 +23,8 @@ def freqs_to_dict(token_freqs, min_freq=0, max_items=0, exclude_symbols=False):
     tokendict = OrderedDict()
     if not exclude_symbols:
         for key, value in Vocabulary.TOKENS.items():
-            tokendict[key] = value
+            # Second value is the count information
+            tokendict[key] = "{} 0".format(value)
 
     # Sort in descending order of frequency
     sorted_idx = np.argsort(freqs)
@@ -38,15 +39,13 @@ def freqs_to_dict(token_freqs, min_freq=0, max_items=0, exclude_symbols=False):
 
     # Start inserting from index offset
     offset = len(tokendict)
-    token_freqs = [-1 for key in tokendict]
-    for ii, (token, freq) in enumerate(sorted_tokens):
-        tokendict[token] = ii + offset
-        token_freqs.append(int(freq))
+    for iidx, (token, freq) in enumerate(sorted_tokens):
+        tokendict[token] = '{} {}'.format(iidx + offset, int(freq))
 
-    return tokendict, np.array(token_freqs)
+    return tokendict
 
 
-def get_freqs(fname, cumul_dict=None):
+def get_freqs(filename, cumul_dict=None):
     # We'll first count frequencies
     if cumul_dict is not None:
         # Let's accumulate frequencies
@@ -55,18 +54,18 @@ def get_freqs(fname, cumul_dict=None):
         token_freqs = OrderedDict()
 
     print("Reading file %s" % filename)
-    with open(filename) as f:
-        for line in pbar(f, unit='lines'):
+    with open(filename) as fhandle:
+        for line in pbar(fhandle, unit='lines'):
             line = line.strip()
             if line:
                 # Collect frequencies
-                for w in line.split(' '):
-                    if w not in token_freqs:
-                        token_freqs[w] = 0
-                    token_freqs[w] += 1
+                for word in line.split(' '):
+                    if word not in token_freqs:
+                        token_freqs[word] = 0
+                    token_freqs[word] += 1
 
     # Remove already available special tokens
-    for key in Vocabulary.TOKENS.keys():
+    for key in Vocabulary.TOKENS:
         if key in token_freqs:
             print('Removing ', key)
             del token_freqs[key]
@@ -76,18 +75,16 @@ def get_freqs(fname, cumul_dict=None):
 
 def write_dict(fname, vocab):
     print("Dumping vocabulary (%d tokens) to %s..." % (len(vocab), fname))
-    with open(fname, 'w') as f:
-        json.dump(vocab, f, ensure_ascii=False, indent=1)
+    with open(fname, 'w') as fhandle:
+        json.dump(vocab, fhandle, ensure_ascii=False, indent=2)
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(prog='build-vocab')
     parser.add_argument('-o', '--output-dir', type=str, default='.',
                         help='Output directory')
     parser.add_argument('-s', '--single', type=str, default=None,
                         help='Name of the combined vocabulary file')
-    parser.add_argument('-f', '--freqs', action='store_true',
-                        help='Create another file containing the frequencies.')
     parser.add_argument('-m', '--min-freq', type=int, default=0,
                         help='Filter out tokens occuring < m times')
     parser.add_argument('-M', '--max-items', type=int, default=0,
@@ -107,7 +104,6 @@ if __name__ == '__main__':
     # In case it is needed
     all_freqs = OrderedDict()
 
-
     for filename in args.files:
         filename = pathlib.Path(filename).expanduser()
         suffix = ".vocab{}".format(filename.suffix)
@@ -121,7 +117,7 @@ if __name__ == '__main__':
             # Get frequencies
             freqs = get_freqs(filename)
             # Build dictionary from frequencies
-            tokendict, tokenfreqs = freqs_to_dict(
+            tokendict = freqs_to_dict(
                 freqs, args.min_freq, args.max_items, args.exclude_symbols)
 
             if args.min_freq > 0:
@@ -133,9 +129,10 @@ if __name__ == '__main__':
 
     if args.single:
         vocab_fname = pathlib.Path(args.single)
-        tokendict, tokenfreqs = freqs_to_dict(
+        tokendict = freqs_to_dict(
             all_freqs, args.min_freq, args.max_items, args.exclude_symbols)
         write_dict(vocab_fname, tokendict)
 
-    if args.freqs:
-        np.save(str(vocab_fname) + '.freqs.npy', tokenfreqs)
+
+if __name__ == '__main__':
+    sys.exit(main())
