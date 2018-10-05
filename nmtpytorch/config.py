@@ -103,8 +103,7 @@ class Options:
             overrides = obj.parse_overrides(override_list)
             for section, ov_dict in overrides.items():
                 for key, value in ov_dict.items():
-                    if key in obj.__dict__[section]:
-                        obj.__dict__[section][key] = value
+                    obj.__dict__[section][key] = value
 
         return obj
 
