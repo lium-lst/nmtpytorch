@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+import logging
 from torch import nn
 from torch.nn import functional as F
 
 from ..ff import FF
+
+logger = logging.getLogger('nmtpytorch')
 
 
 class BiLSTMp(nn.Module):
@@ -66,8 +69,8 @@ class BiLSTMp(nn.Module):
         # Generate a mask to detect padded sequences
         mask = x.ne(0).float().sum(2).ne(0).float()
 
-        assert not mask.eq(0).nonzero().numel(), \
-            "BiLSTMp requires all-equal frames at input!"
+        if mask.eq(0).nonzero().numel() > 0:
+            logger.info("WARNING: Non-homogeneous batch in BiLSTMp.")
 
         # Pad with <eos> zero
         hs = F.pad(x, self.pad_tuple)
@@ -82,5 +85,5 @@ class BiLSTMp(nn.Module):
         if self.dropout > 0:
             hs = self.do(hs)
 
-        # No mask is returned as batch contains elements of all same lengths
+        # No mask is returned as batch should contain same-length sequences
         return hs, None
