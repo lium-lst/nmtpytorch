@@ -42,6 +42,10 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 `nmtpytorch` currently requires `python>=3.6` and `torch==0.4.1`.
 We are not planning to support Python 2.x.
 
+**IMPORTANT:** After installing `nmtpytorch`, you **need** to run `nmtpy-install-extra`
+to download METEOR related files into your `${HOME}/.nmtpy` folder.
+This step is only required once.
+
 ### pip
 
 You can install `nmtpytorch` from `PyPI` using `pip` (or `pip3` depending on your
@@ -71,12 +75,6 @@ $ conda env create -f nmtpytorch/environment.yml
 For continuous development and testing, it is sufficient to run `python setup.py develop`
 in the root folder of your GIT checkout. From now on, all modifications to the source
 tree are directly taken into account without requiring reinstallation.
-
-### METEOR Installation
-
-After the above installation steps, you finally need to run `nmtpy-install-extra`
-in order to fetch and store METEOR related files in your `${HOME}/.nmtpy` folder.
-This step is only required once.
 
 ## Documentation
 
