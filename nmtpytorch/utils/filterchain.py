@@ -19,6 +19,9 @@ class FilterChain:
             'de-compond': Stitches back German compound splittings
             'c2w': Stitches back space delimited characters to words.
                 Necessary for word-level BLEU, etc. when using CharNMT.
+            'lower': Lowercase.
+            'upper': Uppercase.
+            'de-hyphen': De-hyphenate 'foo @-@ bar' constructs of Moses.
     """
     FILTERS = {
         'de-bpe': lambda s: s.replace("@@ ", "").replace("@@", ""),
@@ -33,6 +36,8 @@ class FilterChain:
         # Filters out fillers from compound splitted sentences
         'de-compound': lambda s: (s.replace(" @@ ", "").replace(" @@", "")
                                   .replace(" @", "").replace("@ ", "")),
+        # de-hyphenate when -a given to Moses tokenizer
+        'de-hyphen': lambda s: re.sub('\s*@-@\s*', '-', s),
         'lower': lambda s: s.lower(),
         'upper': lambda s: s.upper(),
     }
