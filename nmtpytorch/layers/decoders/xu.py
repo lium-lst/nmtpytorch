@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -130,7 +131,7 @@ class XuDecoder(nn.Module):
 
     def f_init(self, ctx_dict):
         """Returns the initial h_0, c_0 for the decoder."""
-        self.alphas = []
+        self.history = defaultdict(list)
         return self._init_func(*ctx_dict[self.ctx_name])
 
     def f_next(self, ctx_dict, y, h):
@@ -138,10 +139,10 @@ class XuDecoder(nn.Module):
         h_c = self._rnn_unpack_states(h)
 
         # Apply attention
-        self.alpha_t, z_t = self.att(
+        img_alpha_t, z_t = self.att(
             h_c[0].unsqueeze(0), *ctx_dict[self.ctx_name])
         # Save reg loss terms
-        self.alphas.append(self.alpha_t.unsqueeze(0))
+        self.history['alpha_img'].append(img_alpha_t.unsqueeze(0))
 
         if self.selector:
             z_t *= self.ff_selector(h_c[0])
