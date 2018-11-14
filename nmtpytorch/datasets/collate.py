@@ -9,7 +9,10 @@ class Batch(dict):
     """A custom dictionary representing a batch."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.size = next(iter(self.values())).size(1)
+        dim1s = set([x.size(1) for x in self.values()])
+        assert len(dim1s) == 1, \
+            "Incompatible batch dimension (1) between modalities."
+        self.size = dim1s.pop()
 
     def device(self, device):
         self.update({k: v.to(device) for k, v in self.items()})
