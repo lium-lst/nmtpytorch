@@ -1,8 +1,10 @@
 from .sat import ShowAttendAndTell
 from .nmt import NMT
-from .amnmt import AttentiveMNMT
+
+# Raw images
+from .amnmtraw import AttentiveRawMNMT
+# Spatial features + NMT
 from .amnmtfeats import AttentiveMNMTFeatures
-from .mnmtdecinit import MNMTDecinit
 
 # Speech models
 from .asr import ASR
@@ -15,3 +17,4 @@ from .multitask_att import MultitaskAtt
 # Backward-compatibility with older models
 ##########################################
 ASRv2 = ASR
+AttentiveMNMT = AttentiveRawMNMT
