@@ -26,6 +26,7 @@ class MainLoop:
         self.model = model
         self.dev_mgr = dev_mgr
         self.epoch_valid = (self.eval_freq == 0)
+        self.oom_count = 0
         self.loss_meter = Loss()
 
         # Load training and validation data & create iterators
@@ -158,26 +159,34 @@ class MainLoop:
         eval_sec = 0.0
         total_sec = time.time()
         self.loss_meter.reset()
+        self.oom_count = 0
 
         for batch in self.train_iterator:
             batch.device(self.dev_mgr.dev)
             self.monitor.uctr += 1
 
-            # Keep stats
-            nn_sec += self.train_batch(batch)
+            try:
+                nn_sec += self.train_batch(batch)
+            except RuntimeError as e:
+                if self.handle_oom and 'out of memory' in e.args[0]:
+                    torch.cuda.empty_cache()
+                    self.oom_count += 1
+                else:
+                    raise e
 
             if self.monitor.uctr % self.disp_freq == 0:
                 # Send statistics
                 self.tboard.log_scalar(
                     'train_LOSS', self.loss_meter.batch_loss, self.monitor.uctr)
 
-                msg = "Epoch {} - update {:10d} => loss: {:.3f}".format(
+                msg = "Epoch {} - update {:10d} => loss: {:>7.3f}".format(
                     self.monitor.ectr, self.monitor.uctr,
                     self.loss_meter.batch_loss)
                 for key, value in self.net.aux_loss.items():
                     val = value.item()
                     msg += ' [{}: {:.3f}]'.format(key, val)
                     self.tboard.log_scalar('train_' + key.upper(), val, self.monitor.uctr)
+                msg += ' (#OOM: {})'.format(self.oom_count)
                 self.print(msg)
 
             # Do validation?
