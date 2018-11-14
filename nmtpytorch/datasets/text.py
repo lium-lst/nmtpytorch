@@ -23,7 +23,7 @@ class TextDataset(Dataset):
             "<bos>" marker will be prepended to sentences.
     """
 
-    def __init__(self, fname, vocab, bos=False):
+    def __init__(self, fname, vocab, bos=False, **kwargs):
         self.path = Path(fname)
         self.vocab = vocab
         self.bos = bos
@@ -45,7 +45,8 @@ class TextDataset(Dataset):
 
     @staticmethod
     def to_torch(batch):
-        return pad_sequence([torch.tensor(b, dtype=torch.long) for b in batch])
+        return pad_sequence(
+            [torch.tensor(b, dtype=torch.long) for b in batch], batch_first=False)
 
     def __getitem__(self, idx):
         return self.data[idx]
