@@ -55,7 +55,7 @@ class Translator:
             # Setup layers
             instance.setup(is_train=False)
             # Load weights
-            instance.load_state_dict(weights, strict=True)
+            instance.load_state_dict(weights, strict=False)
             # Move to device
             instance.to(DEVICE)
             # Switch to eval mode
@@ -128,12 +128,13 @@ class Translator:
         start = time.time()
         hyps = beam_search(self.instances, loader, task_id=self.task_id,
                            beam_size=self.beam_size, max_len=self.max_len,
-                           lp_alpha=self.lp_alpha, suppress_unk=self.suppress_unk)
+                           lp_alpha=self.lp_alpha, suppress_unk=self.suppress_unk,
+                           n_best=self.n_best)
         up_time = time.time() - start
         logger.info('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
 
-        return self.filter(hyps)
+        return hyps
 
     def dump(self, hyps, split):
         """Writes the results into output.
@@ -146,18 +147,29 @@ class Translator:
             suffix += ".lp_{:.1f}".format(self.lp_alpha)
         if self.suppress_unk:
             suffix += ".no_unk"
-        if self.n_models > 1:
-            suffix += ".ens{}".format(self.n_models)
         suffix += ".beam{}".format(self.beam_size)
-
+        if self.n_best:
+            suffix += ".nbest"
         if split == 'new':
             output = "{}{}".format(self.output, suffix)
         else:
             output = "{}.{}{}".format(self.output, split, suffix)
 
-        with open(output, 'w') as f:
+        f = open(output, 'w')
+        if self.n_best:
+            for idx, (cands, scores) in enumerate(hyps):
+                cands = self.filter(cands)
+                sorted_cs = sorted(
+                    zip(cands, scores), key=lambda x:x[1], reverse=True)
+                for cand, score in sorted_cs:
+                    # cands is a list of n sents, scores as well
+                    f.write('{} ||| {} ||| {:.5f}\n'.format(idx, cand, score))
+        else:
+            # Post-process strings if requested
+            hyps = self.filter(hyps)
             for line in hyps:
                 f.write(line + '\n')
+        f.close()
 
     def __call__(self):
         """Dumps the hypotheses for each of the requested split/file."""
