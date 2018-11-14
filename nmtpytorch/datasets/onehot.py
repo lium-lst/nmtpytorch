@@ -17,7 +17,7 @@ class OneHotDataset(Dataset):
         vocab (Vocabulary): A ``Vocabulary`` instance for the attributes.
     """
 
-    def __init__(self, fname, vocab):
+    def __init__(self, fname, vocab, **kwargs):
         self.path = Path(fname)
         self.vocab = vocab
 
