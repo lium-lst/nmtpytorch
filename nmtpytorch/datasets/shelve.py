@@ -20,7 +20,7 @@ class ShelveDataset(Dataset):
             the image features?
     """
 
-    def __init__(self, fname, key=None, norm_and_scale=False):
+    def __init__(self, fname, key=None, norm_and_scale=False, **kwargs):
         self.path = Path('{}.dat'.format(fname))
         if not self.path.exists():
             raise RuntimeError('{} does not exist.'.format(self.path))
