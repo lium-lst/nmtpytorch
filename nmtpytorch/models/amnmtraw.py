@@ -11,7 +11,7 @@ from .nmt import NMT
 logger = logging.getLogger('nmtpytorch')
 
 
-class AttentiveMNMT(NMT):
+class AttentiveRawMNMT(NMT):
     """An end-to-end sequence-to-sequence NMT model with visual attention over
     convolutional features using raw image files as input.
     """
