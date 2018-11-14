@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import logging
 
+import torch
 from torch import nn
 
 from ..layers import BiLSTMp, ConditionalDecoder, FF
+from ..datasets import MultimodalDataset
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from . import NMT
@@ -20,6 +22,7 @@ class ASR(NMT):
     def set_defaults(self):
         self.defaults = {
             'feat_dim': 43,                 # Speech features dimensionality
+            'feat_transform': None,         # A FF to speech features: None, linear, tanh..
             'emb_dim': 300,                 # Decoder embedding dim
             'enc_dim': 320,                 # Encoder hidden size
             'enc_layers': '1_1_2_2_1_1',    # layer configuration
@@ -47,13 +50,19 @@ class ASR(NMT):
                                             # for curriculum learning
                                             # NOTE: Noisy LSTM because of unhandled paddings
             'sampler_type': 'bucket',       # bucket or approximate
+            'sched_sampling': 0,            # Scheduled sampling ratio
+            'bos_type': 'emb',          #
+            'bos_activ': None,          #
+            'bos_dim': None,            #
             'direction': None,              # Network directionality, i.e. en->de
             'lstm_forget_bias': False,      # Initialize forget gate bias to 1 for LSTM
             'lstm_bias_zero': False,        # Use zero biases for LSTM
+            'center_feats': False,          # 0-center features
             'adaptation': False,            # Enable/disable AM adaptation
-            'adaptation_type': 'early',     # Early: shift feats, late: shift encodings
+            'adaptation_type': 'early',     # Kept for backward-compatibility
             'adaptation_dim': None,         # Input dim for auxiliary feat vectors
             'adaptation_activ': None,       # Non-linearity for adaptation FF
+            'io_bias': 0.1,                 # bias for IO adaptation
         }
 
     def __init__(self, opts):
@@ -142,35 +151,66 @@ class ASR(NMT):
             transform_ctx=self.opts.model['att_transform_ctx'],
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
-            dropout_out=self.opts.model['dropout'])
+            dropout_out=self.opts.model['dropout'],
+            sched_sample=self.opts.model['sched_sampling'],
+            bos_type=self.opts.model['bos_type'],
+            bos_dim=self.opts.model['bos_dim'],
+            bos_activ=self.opts.model['bos_activ'])
 
         if self.opts.model['adaptation']:
-            if self.opts.model['adaptation_type'] == 'late':
-                out_dim = self.opts.model['enc_dim']
-            else:
-                out_dim = self.opts.model['feat_dim']
-            self.vis_proj = FF(self.opts.model['adaptation_dim'],
-                               out_dim,
-                               activ=self.opts.model['adaptation_activ'],
-                               bias=False)
+            out_dim = self.opts.model['feat_dim']
+            if self.opts.model['adaptation_type'].startswith('early'):
+                # Simple single layer
+                self.vis_proj = FF(self.opts.model['adaptation_dim'],
+                                   out_dim,
+                                   activ=self.opts.model['adaptation_activ'],
+                                   bias=False)
+            elif self.opts.model['adaptation_type'] == 'deep':
+                # 3 layers of 512d with sigmoid NL and one output layer
+                activ = self.opts.model['adaptation_activ']
+                self.vis_proj = nn.Sequential(
+                    FF(self.opts.model['adaptation_dim'], 256, activ=activ),
+                    FF(256, 256, activ=activ),
+                    FF(256, 256, activ=activ),
+                    FF(256, out_dim, activ=None),
+                )
+            elif self.opts.model['adaptation_type'] == 'io':
+                self.emb_cat = nn.Embedding(3, out_dim, padding_idx=2)
+
+        if self.opts.model['feat_transform']:
+            self.feat_transform = FF(self.opts.model['feat_dim'],
+                                     self.opts.model['feat_dim'], bias=False,
+                                     activ=self.opts.model['feat_transform'])
+
+    def load_data(self, split, batch_size, mode='train'):
+        """Loads the requested dataset split."""
+        dataset = MultimodalDataset(
+            data=self.opts.data['{}_set'.format(split)],
+            mode=mode, batch_size=batch_size,
+            vocabs=self.vocabs, topology=self.topology,
+            bucket_by=self.opts.model['bucket_by'],
+            max_len=self.opts.model['max_len'],
+            bucket_order=self.opts.model['bucket_order'],
+            sampler_type=self.opts.model['sampler_type'],
+            center=self.opts.model['center_feats'])
+        logger.info(dataset)
+        return dataset
 
     def encode(self, batch, **kwargs):
-        if self.opts.model['adaptation']:
-            if self.opts.model['adaptation_type'] == 'self':
-                dynamic_shift = self.vis_proj(batch[self.src].mean(0))
-                speech_enc = self.speech_enc(batch[self.src] + dynamic_shift)
-            else:
-                dynamic_shift = self.vis_proj(batch['feats'])
-                if self.opts.model['adaptation_type'] == 'early':
-                    speech_enc = self.speech_enc(batch[self.src] + dynamic_shift)
-                elif self.opts.model['adaptation_type'] == 'late':
-                    ctx, mask = self.speech_enc(batch[self.src])
-                    ctx.add_(dynamic_shift)
-                    speech_enc = (ctx, mask)
-        else:
-            speech_enc = self.speech_enc(batch[self.src])
+        # Speech features -> x
+        x = batch[self.src]
+        if self.opts.model['feat_transform']:
+            x = self.feat_transform(x)
 
-        d = {str(self.src): speech_enc}
-        if self.opts.model['dec_init'] == 'feats':
+        if self.opts.model['adaptation']:
+            if self.opts.model['adaptation_type'] == 'io':
+                x *= (torch.sigmoid(self.emb_cat(batch['io'])) + self.opts.model['io_bias'])
+            elif self.opts.model['adaptation_type'] == 'early_mul':
+                x *= (torch.sigmoid(self.vis_proj(batch['feats'])) + self.opts.model['io_bias'])
+            else:
+                x += self.vis_proj(batch['feats'])
+
+        d = {str(self.src): self.speech_enc(x)}
+        if 'feats' in batch:
             d['feats'] = (batch['feats'], None)
         return d
