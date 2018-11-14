@@ -46,7 +46,7 @@ class ConditionalMMDecoder(ConditionalDecoder):
         self.img_alpha_t, img_z_t = self.img_att(
             h1.unsqueeze(0), *ctx_dict[self.aux_ctx_name])
         # Save for reg loss terms
-        self.alphas.append(self.img_alpha_t.unsqueeze(0))
+        self.history['alpha_img'].append(self.img_alpha_t.unsqueeze(0))
 
         # Context will double dimensionality if fusion_type is concat
         # z_t should be compatible with hidden_size
