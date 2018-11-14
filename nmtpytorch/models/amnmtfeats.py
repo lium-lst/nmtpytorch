@@ -79,20 +79,15 @@ class AttentiveMNMTFeatures(NMT):
             mode=mode, batch_size=batch_size,
             vocabs=self.vocabs, topology=self.topology,
             bucket_by=self.opts.model['bucket_by'],
-            max_len=self.opts.model.get('max_len', None))
+            max_len=self.opts.model.get('max_len', None),
+            order_file=self.opts.data[split + '_set'].get('ord', None))
         logger.info(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):
         # Let's start with a None mask by assuming that
         # we have a fixed-length feature collection
-        feats_mask = None
-
-        # Be it Numpy or NumpySequence, they return
-        # (n_samples, feat_dim, t) by default
-        # Convert it to (t, n_samples, feat_dim)
-        feats = batch['image'].view(
-            (*batch['image'].shape[:2], -1)).permute(2, 0, 1)
+        feats, feats_mask = batch['image'], None
 
         if self.opts.model['img_sequence']:
             # Let's create mask in this case
@@ -107,7 +102,8 @@ class AttentiveMNMTFeatures(NMT):
         result = super().forward(batch)
 
         if self.training and self.opts.model['alpha_c'] > 0:
-            alpha_loss = (1 - torch.cat(self.dec.alphas).sum(0)).pow(2).sum(0)
+            alpha_loss = (
+                1 - torch.cat(self.dec.history['alpha_img']).sum(0)).pow(2).sum(0)
             self.aux_loss['alpha_reg'] = alpha_loss.mean().mul(
                 self.opts.model['alpha_c'])
 
