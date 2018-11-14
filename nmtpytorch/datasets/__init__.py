@@ -8,9 +8,6 @@ from .numpy_sequence import NumpySequenceDataset
 from .label import LabelDataset
 from .shelve import ShelveDataset
 
-# Should always be at the end
-from .multimodal import MultimodalDataset
-
 # Second the selector function
 def get_dataset(type_):
     return {
@@ -25,3 +22,5 @@ def get_dataset(type_):
     }[type_.lower()]
 
 
+# Should always be at the end
+from .multimodal import MultimodalDataset
