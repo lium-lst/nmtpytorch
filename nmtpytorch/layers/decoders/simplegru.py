@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -74,6 +75,7 @@ class SimpleGRUDecoder(nn.Module):
 
     def f_init(self, ctx_dict):
         """Returns the initial h_0 for the decoder."""
+        self.history = defaultdict(list)
         # reset attentional state
         self.h3 = None
 
@@ -103,7 +105,8 @@ class SimpleGRUDecoder(nn.Module):
         h1 = self.dec0(y, h)
 
         # Apply attention
-        self.alpha_t, z_t = self.att(h1.unsqueeze(0), *ctx_dict[self.ctx_name])
+        alpha_t, z_t = self.att(h1.unsqueeze(0), *ctx_dict[self.ctx_name])
+        self.history['alpha_txt'].append(alpha_t)
 
         # Concatenate attented source and hidden state
         h2 = torch.cat((h1, z_t), dim=-1)
