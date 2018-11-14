@@ -3,9 +3,10 @@ import time
 import logging
 from pathlib import Path
 
+import numpy as np
 import torch
 
-from .utils.misc import load_pt_file
+from .utils.misc import load_pt_file, pbar
 from .utils.data import make_dataloader
 from .utils.device import DEVICE
 
@@ -41,7 +42,7 @@ class Tester:
         # Setup layers
         instance.setup(is_train=False)
         # Load weights
-        instance.load_state_dict(weights, strict=True)
+        instance.load_state_dict(weights, strict=False)
         # Move to device
         instance.to(DEVICE)
         # Switch to eval mode
@@ -64,6 +65,28 @@ class Tester:
             self.instance.opts.data['new_set'] = input_dict
             self.splits = ['new']
 
+    def extract_encodings(self, instance, split):
+        dataset = instance.load_data(split, self.batch_size, mode='eval')
+        loader = make_dataloader(dataset)
+        n_samples = len(dataset)
+        feats = []
+        ord_feats = []
+        logger.info('Starting extraction')
+        import ipdb
+        for batch in pbar(loader, unit='batch'):
+            batch.device(DEVICE)
+            out, _ = list(instance.encode(batch).values())[0]
+            feats.append(out.data.cpu().transpose(0, 1))
+        for feat in feats:
+            # this is a batch
+            ord_feats.extend([f for f in feat])
+        idxs = zip(range(n_samples), loader.batch_sampler.orig_idxs)
+        idxs = sorted(idxs, key=lambda x: x[1])
+        ord_feats = [ord_feats[i[0]].numpy() for i in idxs]
+        np.save('{}_{}.encodings.npy'.format(self.model_file, split), ord_feats)
+        up_time = time.time() - start
+        logger.info('Took {:.3f} seconds'.format(up_time))
+
     def test(self, instance, split):
         dataset = instance.load_data(split, self.batch_size, mode='eval')
         loader = make_dataloader(dataset)
@@ -79,6 +102,9 @@ class Tester:
 
     def __call__(self):
         for input_ in self.splits:
-            results = self.test(self.instance, input_)
-            for res in results:
-                print('  {}: {:.5f}'.format(res.name, res.score))
+            if self.mode == 'eval':
+                results = self.test(self.instance, input_)
+                for res in results:
+                    print('  {}: {:.5f}'.format(res.name, res.score))
+            elif self.mode == 'enc':
+                self.extract_encodings(self.instance, input_)
