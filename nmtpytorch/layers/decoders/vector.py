@@ -19,7 +19,7 @@ class VectorDecoder(ConditionalDecoder):
     def f_next(self, ctx_dict, y, h):
         """Applies one timestep of recurrence."""
         # Get hidden states from the decoder
-        h1_c1 = self.dec0(y, h)
+        h1_c1 = self.dec0(y, self._rnn_unpack_states(h))
         h1 = get_rnn_hidden_state(h1_c1)
 
         # Project hidden state to embedding size
@@ -33,4 +33,4 @@ class VectorDecoder(ConditionalDecoder):
         log_p = F.log_softmax(self.out2prob(logit), dim=-1)
 
         # Return log probs and new hidden states
-        return log_p, h1
+        return log_p, self._rnn_pack_states(h1_c1)
