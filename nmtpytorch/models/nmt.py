@@ -32,7 +32,7 @@ class NMT(nn.Module):
             'n_encoders': 1,            # Number of stacked encoders
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
-            'dec_variant': 'cond',      # 'cond' or 'simplegru' for now
+            'dec_variant': 'cond',      # (cond|simplegru|vector)
             'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
             'dec_init_size': None,      # feature vector dimensionality for
             'dec_init_activ': 'tanh',   # Decoder initialization activation func
