@@ -27,6 +27,7 @@ class NMT(nn.Module):
             'emb_gradscale': False,     # Scale embedding gradients w.r.t. batch frequency
             'enc_dim': 256,             # Encoder hidden size
             'enc_type': 'gru',          # Encoder type (gru|lstm)
+            'enc_lnorm': False,         # Add layer-normalization to encoder output
             'n_encoders': 1,            # Number of stacked encoders
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
@@ -49,8 +50,12 @@ class NMT(nn.Module):
             'max_len': 80,              # Reject sentences where 'bucket_by' length > 80
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
                                         # the batches will be sorted
-            'bucket_order': None,       #
+            'bucket_order': None,       # Curriculum: ascending/descending/None
             'sampler_type': 'bucket',   # bucket or approximate
+            'sched_sampling': 0,        # Scheduled sampling ratio
+            'bos_type': 'emb',          # 'emb': default learned emb
+            'bos_activ': None,          #
+            'bos_dim': None,            #
         }
 
     def __init__(self, opts):
@@ -123,7 +128,8 @@ class NMT(nn.Module):
 
     def reset_parameters(self):
         for name, param in self.named_parameters():
-            if param.requires_grad and 'bias' not in name:
+            # Skip 1-d biases and scalars
+            if param.requires_grad and param.dim() > 1:
                 nn.init.kaiming_normal_(param.data)
 
     def setup(self, is_train=True):
@@ -141,7 +147,8 @@ class NMT(nn.Module):
             dropout_rnn=self.opts.model['dropout_enc'],
             num_layers=self.opts.model['n_encoders'],
             emb_maxnorm=self.opts.model['emb_maxnorm'],
-            emb_gradscale=self.opts.model['emb_gradscale'])
+            emb_gradscale=self.opts.model['emb_gradscale'],
+            layer_norm=self.opts.model['enc_lnorm'])
 
         ################
         # Create Decoder
@@ -165,7 +172,11 @@ class NMT(nn.Module):
             att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'],
             emb_maxnorm=self.opts.model['emb_maxnorm'],
-            emb_gradscale=self.opts.model['emb_gradscale'])
+            emb_gradscale=self.opts.model['emb_gradscale'],
+            sched_sample=self.opts.model['sched_sampling'],
+            bos_type=self.opts.model['bos_type'],
+            bos_dim=self.opts.model['bos_dim'],
+            bos_activ=self.opts.model['bos_activ'])
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
@@ -202,7 +213,10 @@ class NMT(nn.Module):
                 elements are encodings and masks. The mask can be ``None``
                 if the relevant modality does not require a mask.
         """
-        return {str(self.sl): self.enc(batch[self.sl])}
+        d = {str(self.sl): self.enc(batch[self.sl])}
+        if 'feats' in batch:
+            d['feats'] = (batch['feats'], None)
+        return d
 
     def forward(self, batch, **kwargs):
         """Computes the forward-pass of the network and returns batch loss.
