@@ -21,7 +21,7 @@ class MultiSourceConditionalDecoder(ConditionalDecoder):
                 [self.hidden_size for _ in ctx_names],
                 self.hidden_size, self.hidden_size)
         else:
-            raise NotImplemented("Concatenation and sum work only with two inputs now.")
+            raise NotImplementedError("Concatenation and sum work only with two inputs now.")
             self.fusion = Fusion(
                 fusion_type, len(ctx_names) * self.hidden_size, self.hidden_size)
 

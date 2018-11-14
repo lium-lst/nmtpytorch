@@ -3,7 +3,6 @@ import logging
 
 import torch
 
-from ..layers import TextEncoder, ConditionalMMDecoder
 from ..datasets import MultimodalDataset
 from .nmt import NMT
 

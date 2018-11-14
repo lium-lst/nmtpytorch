@@ -66,13 +66,14 @@ class Tester:
             self.splits = ['new']
 
     def extract_encodings(self, instance, split):
+        """(Experimental) feature extraction mode."""
         dataset = instance.load_data(split, self.batch_size, mode='eval')
         loader = make_dataloader(dataset)
         n_samples = len(dataset)
         feats = []
         ord_feats = []
         logger.info('Starting extraction')
-        import ipdb
+        start = time.time()
         for batch in pbar(loader, unit='batch'):
             batch.device(DEVICE)
             out, _ = list(instance.encode(batch).values())[0]

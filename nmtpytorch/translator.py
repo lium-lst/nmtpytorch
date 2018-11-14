@@ -160,7 +160,7 @@ class Translator:
             for idx, (cands, scores) in enumerate(hyps):
                 cands = self.filter(cands)
                 sorted_cs = sorted(
-                    zip(cands, scores), key=lambda x:x[1], reverse=True)
+                    zip(cands, scores), key=lambda x: x[1], reverse=True)
                 for cand, score in sorted_cs:
                     # cands is a list of n sents, scores as well
                     f.write('{} ||| {} ||| {:.5f}\n'.format(idx, cand, score))
