@@ -136,7 +136,8 @@ class ShowAttendAndTell(NMT):
         result = super().forward(batch)
 
         if self.training and self.opts.model['alpha_c'] > 0:
-            alpha_loss = (1 - torch.cat(self.dec.alphas).sum(0)).pow(2).sum(0)
+            alpha_loss = (
+                1 - torch.cat(self.dec.history['alpha_img']).sum(0)).pow(2).sum(0)
             self.aux_loss['alpha_reg'] = alpha_loss.mean().mul(
                 self.opts.model['alpha_c'])
 
