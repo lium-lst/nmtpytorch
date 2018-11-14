@@ -29,7 +29,8 @@ class ImageFolderDataset(data.Dataset):
         warmup(bool, optional): If ``True``, the images will be read once
             at the beginning to fill the cache.
     """
-    def __init__(self, root, resize=None, crop=None, replicate=1, warmup=False):
+    def __init__(self, root, resize=None, crop=None,
+                 replicate=1, warmup=False, **kwargs):
         self.root = Path(root).expanduser().resolve()
         self.replicate = replicate
 
