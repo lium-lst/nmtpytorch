@@ -42,6 +42,8 @@ if __name__ == '__main__':
                               help='Do not generate <unk> tokens.')
     parser_trans.add_argument('-n', '--disable-filters', action='store_true',
                               help='Disable eval_filters given in config')
+    parser_trans.add_argument('-N', '--n-best', action='store_true',
+                              help='Generate n-best list of beam candidates.')
     parser_trans.add_argument('-b', '--batch-size', type=int, default=16,
                               help='Batch size for beam-search')
     parser_trans.add_argument('-k', '--beam-size', type=int, default=6,
@@ -83,6 +85,9 @@ if __name__ == '__main__':
                              help='Task to perform, e.g. en_src:Text, pt_src:Text -> fr_tgt:Text')
     parser_test.add_argument('-x', '--override', nargs="*", default=[],
                              help="(section).key:value overrides for config")
+    parser_test.add_argument('-m', '--mode', choices=['eval', 'enc'],
+                             default='eval',
+                             help="Perform evaluation or dump encodings.")
 
     group = parser_test.add_mutually_exclusive_group(required=True)
     group.add_argument('-s', '--splits', type=str,
