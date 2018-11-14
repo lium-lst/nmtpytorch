@@ -59,7 +59,7 @@ def get_freqs(filename, cumul_dict=None):
             line = line.strip()
             if line:
                 # Collect frequencies
-                for word in line.split(' '):
+                for word in line.split():
                     if word not in token_freqs:
                         token_freqs[word] = 0
                     token_freqs[word] += 1
