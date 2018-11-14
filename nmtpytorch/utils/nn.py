@@ -10,7 +10,7 @@ def get_rnn_hidden_state(h):
 
 def get_activation_fn(name):
     """Returns a callable activation function from torch."""
-    if name is None:
+    if name in (None, 'linear'):
         return lambda x: x
     elif name in ('sigmoid', 'tanh'):
         return getattr(torch, name)
