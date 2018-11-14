@@ -38,10 +38,10 @@ class BiLSTMp(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.proj_size = proj_size
-        self.layers = [int(i) for i in layers.split('_')]
-        self.n_layers = len(self.layers)
-        self.dropout = dropout
         self.proj_activ = proj_activ
+        self.layers = [int(i) for i in layers.split('_')]
+        self.dropout = dropout
+        self.n_layers = len(self.layers)
 
         # Doubles its size because of concatenation of forw-backw encs
         self.ctx_size = self.hidden_size * 2
@@ -65,7 +65,7 @@ class BiLSTMp(nn.Module):
             self.ffs.append(FF(
                 self.ctx_size, self.proj_size, activ=self.proj_activ))
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         # Generate a mask to detect padded sequences
         mask = x.ne(0).float().sum(2).ne(0).float()
 

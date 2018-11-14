@@ -79,7 +79,7 @@ class FeatureEncoder(nn.Module):
                        dropout=self.dropout_rnn,
                        bidirectional=self.bidirectional)
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         # Embed the video feature vectors using a Linear layer
         proj = self.emb(x.float())
 
