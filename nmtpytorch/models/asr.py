@@ -57,7 +57,6 @@ class ASR(NMT):
             'direction': None,              # Network directionality, i.e. en->de
             'lstm_forget_bias': False,      # Initialize forget gate bias to 1 for LSTM
             'lstm_bias_zero': False,        # Use zero biases for LSTM
-            'center_feats': False,          # 0-center features
             'adaptation': False,            # Enable/disable AM adaptation
             'adaptation_type': 'early',     # Kept for backward-compatibility
             'adaptation_dim': None,         # Input dim for auxiliary feat vectors
@@ -191,8 +190,7 @@ class ASR(NMT):
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model['max_len'],
             bucket_order=self.opts.model['bucket_order'],
-            sampler_type=self.opts.model['sampler_type'],
-            center=self.opts.model['center_feats'])
+            sampler_type=self.opts.model['sampler_type'])
         logger.info(dataset)
         return dataset
 
