@@ -15,8 +15,14 @@ def tile_ctx_dict(ctx_dict, idxs):
     }
 
 
+def check_context_ndims(ctx_dict):
+    for name, (ctx, mask) in ctx_dict.items():
+        assert ctx.dim() == 3, \
+            "{} is not 3D. 1st dim should always be a time dimension.".format(name)
+
+
 def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
-                lp_alpha=0., suppress_unk=False):
+                lp_alpha=0., suppress_unk=False, n_best=False):
     """An efficient implementation for beam-search algorithm.
 
     Arguments:
@@ -33,6 +39,8 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             lp: ((5 + |Y|)^lp_alpha / (5 + 1)^lp_alpha)
         suppress_unk (bool, optional): If `True`, suppresses the log-prob
             of <unk> token.
+        n_best (bool, optional): If `True`, returns n-best list of the beam
+            with the associated scores.
 
     Returns:
         list:
@@ -96,13 +104,14 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
         # Encode source modalities
         ctx_dicts = [encode(batch, **enc_args) for encode in encoders]
 
+        # Sanity check one of the context dictionaries for dimensions
+        check_context_ndims(ctx_dicts[0])
+
         # Get initial decoder state (N*H)
         h_ts = [f_init(ctx_dict) for f_init, ctx_dict in zip(f_inits, ctx_dicts)]
 
-        # Start with <bos> tokens
-        # FIXME: idxs should not change except for informed <bos> embeddings
-        # In case of different <bos> possibility, these should be asked
-        # from each model to support ensembling
+        # we always have <bos> tokens except that the returned embeddings
+        # may differ from one model to another.
         idxs = models[0].get_bos(batch.size).to(DEVICE)
 
         for tstep in range(max_len):
@@ -112,8 +121,9 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             # Get log probabilities and next state
             # log_p: batch_size x vocab_size (t = 0)
             #        batch_size*beam_size x vocab_size (t > 0)
+            # NOTE: get_emb does not exist in some models, fix this.
             log_ps, h_ts = zip(
-                *[f_next(cd, dec.emb(idxs), h_t[tile]) for
+                *[f_next(cd, dec.get_emb(idxs, tstep), h_t[tile]) for
                   f_next, dec, cd, h_t in zip(f_nexts, decs, ctx_dicts, h_ts)])
 
             # Do the actual averaging of log-probabilities
@@ -164,13 +174,20 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
         if lp_alpha > 0.:
             len_penalty = ((5 + len_penalty)**lp_alpha) / 6**lp_alpha
 
-        # Apply length normalization and get best hyps
-        top_hyps = nll.div_(len_penalty).topk(
-            1, sorted=False, largest=True)[1].squeeze(1)
+        # Apply length normalization
+        nll.div_(len_penalty)
 
-        # Get best hyp for each sample in the batch
-        hyps = beam[:, range(batch.size), top_hyps].t().to('cpu')
-        results.extend(vocab.list_of_idxs_to_sents(hyps.tolist()))
+        if n_best:
+            # each elem is sample, then candidate
+            tbeam = beam.permute(1, 2, 0).to('cpu').tolist()
+            scores = nll.to('cpu').tolist()
+            results.extend(
+                [(vocab.list_of_idxs_to_sents(b), s) for b, s in zip(tbeam, scores)])
+        else:
+            # Get best-1 hypotheses
+            top_hyps = nll.topk(1, sorted=False, largest=True)[1].squeeze(1)
+            hyps = beam[:, range(batch.size), top_hyps].t().to('cpu')
+            results.extend(vocab.list_of_idxs_to_sents(hyps.tolist()))
 
     # Recover order of the samples if necessary
     if getattr(data_loader.batch_sampler, 'store_indices', False):
