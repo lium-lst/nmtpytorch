@@ -17,7 +17,7 @@ class FF(nn.Module):
         bias(bool, optional): Enable/disable bias for the layer. (Default: True)
         bias_zero(bool, optional): Start with a 0-vector bias. (Default: True)
         activ(str, optional): A string like 'tanh' or 'relu' to define the
-            non-linearity type. Default is a linear layer.
+            non-linearity type. `None` or `'linear'` is a linear layer (default).
     """
 
     def __init__(self, in_features, out_features, bias=True,
@@ -27,7 +27,9 @@ class FF(nn.Module):
         self.out_features = out_features
         self.use_bias = bias
         self.bias_zero = bias_zero
-        self.activ_type = activ if activ else 'linear'
+        self.activ_type = activ
+        if self.activ_type in (None, 'linear'):
+            self.activ_type = 'linear'
         self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
         self.activ = get_activation_fn(activ)
 
@@ -51,9 +53,11 @@ class FF(nn.Module):
         return self.activ(F.linear(input, self.weight, self.bias))
 
     def __repr__(self):
-        return self.__class__.__name__ + '(' \
+        repr_ = self.__class__.__name__ + '(' \
             + 'in_features=' + str(self.in_features) \
             + ', out_features=' + str(self.out_features) \
             + ', activ=' + str(self.activ_type) \
-            + ', bias=' + str(self.use_bias) \
-            + ', bias_zero=' + str(self.bias_zero) + ')'
+            + ', bias=' + str(self.use_bias)
+        if self.use_bias:
+            repr_ += ', bias_zero=' + str(self.bias_zero)
+        return repr_ + ')'
