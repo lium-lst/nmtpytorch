@@ -23,7 +23,7 @@ class KaldiDataset(Dataset):
             file containing segment lengths.
     """
 
-    def __init__(self, fname):
+    def __init__(self, fname, **kwargs):
         self.data = []
         self.lengths = []
         self.root = Path(fname)

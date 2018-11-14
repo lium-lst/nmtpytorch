@@ -21,7 +21,7 @@ class NumpySequenceDataset(Dataset):
             in memory or not.
     """
 
-    def __init__(self, fname, cache=False):
+    def __init__(self, fname, cache=False, **kwargs):
         self.fname = fname
         self.data = []
         self.lengths = []
