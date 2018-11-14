@@ -4,7 +4,8 @@ import logging
 import torch
 from torch import nn
 
-from ..layers import TextEncoder, ConditionalDecoder
+from ..layers import TextEncoder
+from ..layers.decoders import get_decoder
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
@@ -31,6 +32,7 @@ class NMT(nn.Module):
             'n_encoders': 1,            # Number of stacked encoders
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
+            'dec_variant': 'cond',      # 'cond' or 'simplegru' for now
             'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
             'dec_init_size': None,      # feature vector dimensionality for
             'dec_init_activ': 'tanh',   # Decoder initialization activation func
@@ -153,7 +155,8 @@ class NMT(nn.Module):
         ################
         # Create Decoder
         ################
-        self.dec = ConditionalDecoder(
+        Decoder = get_decoder(self.opts.model['dec_variant'])
+        self.dec = Decoder(
             input_size=self.opts.model['emb_dim'],
             hidden_size=self.opts.model['dec_dim'],
             n_vocab=self.n_trg_vocab,
