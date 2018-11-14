@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -56,14 +57,10 @@ class SwitchingGRUDecoder(nn.Module):
         # Final loss
         self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
 
-        # Attention
-        self.alphas = []
-        self.alpha_t = None
-
     def f_init(self, sources):
         """Returns the initial h_0 for the decoder. `sources` is not used
         but passed for compatibility with beam search."""
-        self.alphas = []
+        self.history = defaultdict(list)
         batch_size = next(iter(sources.values()))[0].shape[1]
         # NOTE: Non-scatter aware, fix this
         return torch.zeros(batch_size, self.hidden_size, device=DEVICE)
@@ -77,7 +74,8 @@ class SwitchingGRUDecoder(nn.Module):
         modality = list(sources.keys())[0]
 
         # Apply modality-specific attention
-        self.alpha_t, z_t = self.atts[modality](h_1.unsqueeze(0), *sources[modality])
+        alpha_t, z_t = self.atts[modality](h_1.unsqueeze(0), *sources[modality])
+        self.history['alpha_{}'.format(modality)].append(alpha_t)
 
         # Run second decoder (h_1 is compatible now as it was returned by GRU)
         h_2 = self.dec1(z_t, h_1)
