@@ -164,7 +164,7 @@ class ConditionalDecoder(nn.Module):
 
     def _rnn_init_feats(self, ctx_dict):
         """Feature based decoder initialization."""
-        return self.ff_dec_init(ctx_dict['feats'][0])
+        return self.ff_dec_init(ctx_dict['feats'][0].squeeze(0))
 
     def get_emb(self, idxs, tstep):
         """Returns time-step based embeddings."""
