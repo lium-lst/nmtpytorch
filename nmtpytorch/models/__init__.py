@@ -1,5 +1,6 @@
 from .sat import ShowAttendAndTell
 from .nmt import NMT
+from .mnmt import MultimodalNMT
 
 # Raw images
 from .amnmtraw import AttentiveRawMNMT
