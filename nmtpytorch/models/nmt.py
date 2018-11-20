@@ -133,6 +133,9 @@ class NMT(nn.Module):
             # Skip 1-d biases and scalars
             if param.requires_grad and param.dim() > 1:
                 nn.init.kaiming_normal_(param.data)
+        # Reset padding embedding to 0
+        with torch.no_grad():
+            self.enc.emb.weight.data[0].fill_(0)
 
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
