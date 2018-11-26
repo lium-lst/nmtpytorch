@@ -4,6 +4,7 @@ import logging
 import torch
 
 from ..datasets import MultimodalDataset
+from ..layers import ConditionalMMDecoder, TextEncoder
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
@@ -32,8 +33,45 @@ class AttentiveMNMTFeatures(NMT):
 
     def setup(self, is_train=True):
         self.ctx_sizes['image'] = self.opts.model['n_channels']
-        # Rest should be dynamically handled by parent setup()
-        super().setup(is_train)
+
+        ########################
+        # Create Textual Encoder
+        ########################
+        self.enc = TextEncoder(
+            input_size=self.opts.model['emb_dim'],
+            hidden_size=self.opts.model['enc_dim'],
+            n_vocab=self.n_src_vocab,
+            rnn_type=self.opts.model['enc_type'],
+            dropout_emb=self.opts.model['dropout_emb'],
+            dropout_ctx=self.opts.model['dropout_ctx'],
+            dropout_rnn=self.opts.model['dropout_enc'],
+            num_layers=self.opts.model['n_encoders'],
+            emb_maxnorm=self.opts.model['emb_maxnorm'],
+            emb_gradscale=self.opts.model['emb_gradscale'])
+
+        # Create Decoder
+        self.dec = ConditionalMMDecoder(
+            input_size=self.opts.model['emb_dim'],
+            hidden_size=self.opts.model['dec_dim'],
+            n_vocab=self.n_trg_vocab,
+            rnn_type=self.opts.model['dec_type'],
+            ctx_size_dict=self.ctx_sizes,
+            ctx_name=str(self.sl),
+            fusion_type=self.opts.model['fusion_type'],
+            tied_emb=self.opts.model['tied_emb'],
+            dec_init=self.opts.model['dec_init'],
+            att_type=self.opts.model['att_type'],
+            att_activ=self.opts.model['att_activ'],
+            transform_ctx=self.opts.model['att_transform_ctx'],
+            mlp_bias=self.opts.model['att_mlp_bias'],
+            att_bottleneck=self.opts.model['att_bottleneck'],
+            dropout_out=self.opts.model['dropout_out'],
+            emb_maxnorm=self.opts.model['emb_maxnorm'],
+            emb_gradscale=self.opts.model['emb_gradscale'])
+
+        # Share encoder and decoder weights
+        if self.opts.model['tied_emb'] == '3way':
+            self.enc.emb.weight = self.dec.emb.weight
 
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
