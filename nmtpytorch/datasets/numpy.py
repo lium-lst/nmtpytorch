@@ -18,9 +18,11 @@ class NumpyDataset(Dataset):
         order_file (str, None): If given, will be used to map sample indices
             to tensors using this list. Useful for tiled or repeated
             experiments.
+        revert (bool, optional): If `True`, the data order will be reverted
+            for adversarial/incongruent experiments during test-time.
     """
 
-    def __init__(self, fname, key=None, order_file=None, **kwargs):
+    def __init__(self, fname, key=None, order_file=None, revert=False, **kwargs):
         self.path = Path(fname)
         if not self.path.exists():
             raise RuntimeError('{} does not exist.'.format(self.path))
@@ -36,6 +38,9 @@ class NumpyDataset(Dataset):
                 self.order = [int(x) for x in orf.read().strip().split('\n')]
         else:
             self.order = list(range(self.data.shape[0]))
+
+        if revert:
+            self.order = self.order[::-1]
 
         # Dataset size
         self.size = len(self.order)
