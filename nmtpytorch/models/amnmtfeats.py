@@ -19,7 +19,6 @@ class AttentiveMNMTFeatures(NMT):
         super().set_defaults()
         self.defaults.update({
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
-            'dec_variant': 'condmm',    # Decoder is multimodal conditional
             'n_channels': 2048,         # depends on the features used
             'alpha_c': 0.0,             # doubly stoch. attention
             'img_sequence': False,      # if true img is sequence of img features,
