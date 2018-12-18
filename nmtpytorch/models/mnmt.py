@@ -15,14 +15,12 @@ class MultimodalNMT(NMT):
         Integration types (feat_fusion argument)
             'encinit':      Initialize RNNs in the encoder
             'decinit':      Initializes first decoder RNN.
-            'encdecinit':   Initializes first decoder RNN.
-            'vbos':         Replace <bos> in decoder with visual features
+            'encdecinit':   Initializes RNNs in the encoder & first decoder RNN.
+            'vbos':         Replace <bos> in decoder with visual features (Not implemented)
             'concat':       Concat the embeddings and features (doubles RNN input)
-            'concat_fuse':  Concat the embeddings and features and project
             'sum':          Sum the embeddings with projected features
             'prepend':      Input sequence: [vis, embs, eos]
             'append':       Input sequence: [embs, vis, eos]
-            'preappend':    Input sequence: [vis, embs, vis, eos]
     """
     def __init__(self, opts):
         super().__init__(opts)
