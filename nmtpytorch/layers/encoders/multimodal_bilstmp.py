@@ -87,8 +87,8 @@ class MultimodalBiLSTMp(BiLSTMp):
         ##############
         if self.feat_fusion == 'init':
             # Tile to 2xBxH for bidirectionality
-            c_0_ = self.ff_init_c0(aux_x).unsqueeze(0).repeat(2, 1, 1)
-            h_0_ = self.ff_init_h0(aux_x).unsqueeze(0).repeat(2, 1, 1)
+            c_0_ = self.ff_init_c0(aux_x).repeat(2, 1, 1)
+            h_0_ = self.ff_init_h0(aux_x).repeat(2, 1, 1)
 
             # Should be a tuple of (h, c) for each layer
             h_0s = [(h_0_, c_0_) for _ in range(self.n_layers)]
