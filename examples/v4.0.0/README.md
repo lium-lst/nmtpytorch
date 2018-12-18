@@ -30,9 +30,12 @@ to construct the vocabularies. You should now be able to train the systems
 accordingly.
 
 **NOTE:** For multimodal systems, you may want to L2-normalize the feature files
-and save the normalized versions, see [WMT18 paper for LIUM-CVC](https://arxiv.org/abs/1809.00151).
-You can use `numpy.linalg.norm` for this.
+and save the normalized versions, see [WMT18 paper for LIUM-CVC](https://arxiv.org/abs/1809.00151):
 
+```python
+x = np.load('foo.npy')
+np.save('foo-l2norm.npy', x / np.linalg.norm(x, axis=-1, keepdims=True))
+```
 
 ### mmt-task-en-fr-nmt.conf
 
