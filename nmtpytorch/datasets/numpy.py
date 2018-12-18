@@ -47,9 +47,11 @@ class NumpyDataset(Dataset):
 
     @staticmethod
     def to_torch(batch):
-        # NOTE: Assumes x.shape == (n, c, *, *, ...)
+        # NOTE: Assumes x.shape == (n, *)
         x = torch.from_numpy(np.array(batch, dtype='float32'))
         # Convert it to (t(=1 if fixed features), n, c)
+        # By default we flatten h*w to first dim for interoperability
+        # Models should further reshape the tensor for their needs
         return x.view(*x.size()[:2], -1).permute(2, 0, 1)
 
     def __getitem__(self, idx):
