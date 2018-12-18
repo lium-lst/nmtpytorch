@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-from torch import nn
-from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
-
-from ...utils.data import sort_batch
+import torch
 
 from . import TextEncoder
+from .. import FF
 
 
 class MultimodalTextEncoder(TextEncoder):
@@ -55,61 +53,68 @@ class MultimodalTextEncoder(TextEncoder):
     """
     def __init__(self, feat_size, feat_fusion, feat_activ=None, **kwargs):
         super().__init__(**kwargs)
-
         self.feat_size = feat_size
         self.feat_fusion = feat_fusion
         self.feat_activ = feat_activ
 
         # LSTM requires the initialization of both c_0 and h_0
+        # FIXME: Not tested at all with LSTMs, probably won't work!
         self.n_init_types = 2 if self.rnn_type == 'LSTM' else 1
 
         ##################################################
         # Create the necessary visual transformation layer
         ##################################################
-        if self.feat_fusion == 'init':
-            # Use single h_0/c_0 for all stacked layers and directions for a
-            # consistent information source.
-            self.ff_vis = FF(
-                self.feat_size,
-                self.hidden_size * self.n_init_types, activ=self.feat_activ)
+        self.plain = self.feat_fusion is None
+        self.init_enc = self.feat_fusion in ('encinit', 'encdecinit')
+        # No-op by default
+        self.merge_op = lambda e, *v: e
+
+        if self.init_enc:
+            self.tile_factor = self.num_layers
+            if self.bidirectional:
+                self.tile_factor *= 2
+            out_dim = self.hidden_size * self.n_init_types
+            inp_dim = self.feat_size
         elif self.feat_fusion in ('concat', 'sum', 'prepend', 'append', 'preappend'):
-            # These does not differentiate between the transformation layer
-            self.ff_vis = FF(
-                self.feat_size, self.input_size,
-                activ=self.feat_activ)
-        elif self.feat_fusion == 'concat_fuse':
-            # Concatenates and fuses back to same input dimension
-            # to avoid doubling RNN input dimensionality
-            self.ff_vis = FF(
-                self.feat_size + self.input_size, self.input_size,
-                activ=self.feat_activ)
-        ###############################################
-        # Set integration func to avoid if-else clutter
-        ###############################################
-        if self.feat_fusion == 'sum':
-            #self.merge_op = lambda e, v:
-            pass
+            out_dim = self.input_size
+            inp_dim = self.feat_size
+            if self.feat_fusion == 'concat':
+                inp_dim += self.input_size
+                self.merge_op = lambda e, v: self.ff_vis(torch.cat(
+                    (e, v.expand(e.shape[0], -1, -1)), dim=-1))
+            elif self.feat_fusion == 'sum':
+                self.merge_op = lambda e, v: e + self.ff_vis(v)
+            elif self.feat_fusion == 'prepend':
+                self.merge_op = lambda e, v: torch.cat((self.ff_vis(v), e), dim=0)
+
+        if not self.plain:
+            self.ff_vis = FF(inp_dim, out_dim, activ=self.feat_activ)
 
     def forward(self, x, v, **kwargs):
-        # Transform the visual vector
-        v = self.ff_vis(v)
+        h0 = None
+        if self.init_enc:
+            h0 = self.ff_vis(v).expand(self.tile_factor, -1, -1).contiguous()
 
-        # Let's do pack/pad all the time to cut down boilerplate code
-        oidxs, sidxs, slens, mask = sort_batch(x)
+        # Compute mask for possible paddings
+        zero_pos = (x == 0)
+        mask = (~zero_pos).long() if zero_pos.nonzero().numel() else None
 
-        # Fetch embeddings for the sorted batch
-        embs = self.emb(x[:, sidxs])
+        # Fetch embeddings
+        embs = self.emb(x)
 
+        # Fuse
+        embs = self.merge_op(embs, v)
+
+        if mask is not None and embs.shape[0] != mask.shape[0]:
+            # prepend, append or preappend will cause this, enlarge the mask
+            mask = torch.cat((mask[0].unsqueeze(0), mask), dim=0)
+
+        # Apply dropout
         if self.dropout_emb > 0:
             embs = self.do_emb(embs)
 
-        # Pack and encode
-        packed_emb = pack_padded_sequence(embs, slens)
+        # Encode
+        hs, _ = self.enc(embs, h0)
 
-        # We ignore last_state since we don't use it
-        packed_hs, _ = self.enc(packed_emb, h0)
-
-        # Get hidden states and revert the order
-        hs = pad_packed_sequence(packed_hs)[0][:, oidxs]
-
+        # Return
         return self.output(hs), mask
