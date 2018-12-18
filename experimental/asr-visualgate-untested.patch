@@ -1,0 +1,248 @@
+diff --git a/nmtpytorch/layers/decoders/conditional_asr.py b/nmtpytorch/layers/decoders/conditional_asr.py
+new file mode 100644
+index 0000000..a3b458f
+--- /dev/null
++++ b/nmtpytorch/layers/decoders/conditional_asr.py
+@@ -0,0 +1,52 @@
++# -*- coding: utf-8 -*-
++import torch
++import torch.nn.functional as F
++
++from ...utils.nn import get_rnn_hidden_state
++from . import ConditionalDecoder
++
++
++class ConditionalASRDecoder(ConditionalDecoder):
++    def __init__(self, vis_gate=False, **kwargs):
++        super().__init__(**kwargs)
++        self.vis_gate = vis_gate
++
++        # NOTE: This wont work with bos=feats or dec_init=feats now
++        # since feats is already a transformed vector
++        assert self.bos_type != 'feats' and self.dec_init != 'feats'
++
++    def f_next(self, ctx_dict, y, h):
++        # Get hidden states from the first decoder (purely cond. on LM)
++        h1_c1 = self.dec0(y, self._rnn_unpack_states(h))
++        h1 = get_rnn_hidden_state(h1_c1)
++
++        # Apply attention
++        self.txt_alpha_t, txt_z_t = self.att(
++            h1.unsqueeze(0), *ctx_dict[self.ctx_name])
++
++        # Get visual features
++        vis = ctx_dict['feats'][0].squeeze(0)
++
++        if self.vis_gate:
++            g = torch.sigmoid(h1)
++            h2_input = g * vis + (1 - g) * txt_z_t
++        else:
++            h2_input = vis + txt_z_t
++
++        # Run second decoder (h1 is compatible now as it was returned by GRU)
++        h2_c2 = self.dec1(h2_input, h1_c1)
++        h2 = get_rnn_hidden_state(h2_c2)
++
++        # This is a bottleneck to avoid going from H to V directly
++        logit = self.hid2out(h2)
++
++        # Apply dropout if any
++        if self.dropout_out > 0:
++            logit = self.do_out(logit)
++
++        # Transform logit to T*B*V (V: vocab_size)
++        # Compute log_softmax over token dim
++        log_p = F.log_softmax(self.out2prob(logit), dim=-1)
++
++        # Return log probs and new hidden states
++        return log_p, self._rnn_pack_states(h2_c2)
+diff --git a/nmtpytorch/models/asr_visual.py b/nmtpytorch/models/asr_visual.py
+new file mode 100644
+index 0000000..fdadf43
+--- /dev/null
++++ b/nmtpytorch/models/asr_visual.py
+@@ -0,0 +1,184 @@
++# -*- coding: utf-8 -*-
++import logging
++
++from torch import nn
++
++from ..layers import BiLSTMp, ConditionalASRDecoder, FF
++from ..datasets import MultimodalDataset
++from ..vocabulary import Vocabulary
++from ..utils.topology import Topology
++from . import NMT
++
++logger = logging.getLogger('nmtpytorch')
++
++
++# ASR with ESPNet style BiLSTMp encoder
++
++
++class VisualASR(NMT):
++    supports_beam_search = True
++
++    def set_defaults(self):
++        self.defaults = {
++            'feat_dim': 43,                 # Speech features dimensionality
++            'feat_transform': None,         # A FF to speech features: None, linear, tanh..
++            'emb_dim': 300,                 # Decoder embedding dim
++            'enc_dim': 320,                 # Encoder hidden size
++            'enc_layers': '1_1_2_2_1_1',    # layer configuration
++            'dec_dim': 320,                 # Decoder hidden size
++            'proj_dim': 300,                # Intra-LSTM projection layer
++            'proj_activ': 'tanh',           # Intra-LSTM projection activation
++            'dec_type': 'gru',              # Decoder type (gru|lstm)
++            'dec_init': 'mean_ctx',         # How to initialize decoder
++                                            # (zero/mean_ctx/feats)
++            'dec_init_size': None,          # feature vector dimensionality for
++                                            # dec_init == 'feats'
++            'dec_init_activ': 'tanh',       # Decoder initialization activation func
++            'att_type': 'mlp',              # Attention type (mlp|dot)
++            'att_temp': 1.,                 # Attention temperature
++            'att_activ': 'tanh',            # Attention non-linearity (all torch nonlins)
++            'att_mlp_bias': False,          # Enables bias in attention mechanism
++            'att_bottleneck': 'hid',        # Bottleneck dimensionality (ctx|hid)
++            'att_transform_ctx': True,      # Transform annotations before attention
++            'dropout': 0,                   # Generic dropout overall the architecture
++            'tied_dec_embs': False,         # Share decoder embeddings
++            'max_len': None,                # Reject samples if len('bucket_by') > max_len
++            'bucket_by': None,              # A key like 'en' to define w.r.t
++                                            # which dataset batches will be sorted
++            'bucket_order': None,           # Can be 'ascending' or 'descending'
++                                            # for curriculum learning
++                                            # NOTE: Noisy LSTM because of unhandled paddings
++            'sampler_type': 'bucket',       # bucket or approximate
++            'sched_sampling': 0,            # Scheduled sampling ratio
++            'bos_type': 'emb',          #
++            'bos_activ': None,          #
++            'bos_dim': None,            #
++            'direction': None,              # Network directionality, i.e. en->de
++            'lstm_forget_bias': False,      # Initialize forget gate bias to 1 for LSTM
++            'lstm_bias_zero': False,        # Use zero biases for LSTM
++            'vis_dim': 2048,                # visual feature dimension
++            'vis_activ': None,              # visual feature non-linearity
++            'vis_gate': False,              # Apply a sequential gating in decoder
++        }
++
++    def __init__(self, opts):
++        # Don't call NMT init as it's too different from ASR
++        nn.Module.__init__(self)
++
++        # opts -> config file sections {.model, .data, .vocabulary, .train}
++        self.opts = opts
++
++        # Vocabulary objects
++        self.vocabs = {}
++
++        # Each auxiliary loss should be stored inside this dictionary
++        # in order to be taken into account by the mainloop for multi-tasking
++        self.aux_loss = {}
++
++        # Setup options
++        self.opts.model = self.set_model_options(opts.model)
++
++        # Parse topology & languages
++        self.topology = Topology(self.opts.model['direction'])
++
++        # Load vocabularies here
++        for name, fname in self.opts.vocabulary.items():
++            self.vocabs[name] = Vocabulary(fname, name=name)
++
++        # Inherently non multi-lingual aware
++        self.src = self.topology.first_src
++
++        self.tl = self.topology.first_trg
++        self.trg_vocab = self.vocabs[self.tl]
++        self.n_trg_vocab = len(self.trg_vocab)
++
++        # Context size is enc_dim because of proj layers
++        self.ctx_sizes = {str(self.src): self.opts.model['enc_dim']}
++
++        # Need to be set for early-stop evaluation
++        # NOTE: This should come from config or elsewhere
++        self.val_refs = self.opts.data['val_set'][self.tl]
++
++    def reset_parameters(self):
++        # Use kaiming normal for everything as it is a sane default
++        # Do not touch biases for now
++        for name, param in self.named_parameters():
++            if param.requires_grad and 'bias' not in name:
++                nn.init.kaiming_normal_(param.data)
++
++        if self.opts.model['lstm_bias_zero'] or \
++                self.opts.model['lstm_forget_bias']:
++            for name, param in self.speech_enc.named_parameters():
++                if 'bias_hh' in name or 'bias_ih' in name:
++                    # Reset bias to 0
++                    param.data.fill_(0.0)
++                    if self.opts.model['lstm_forget_bias']:
++                        # Reset forget gate bias of LSTMs to 1
++                        # the tensor organized as: inp,forg,cell,out
++                        n = param.numel()
++                        param[n // 4: n // 2].data.fill_(1.0)
++
++    def setup(self, is_train=True):
++        self.speech_enc = BiLSTMp(
++            input_size=self.opts.model['feat_dim'],
++            hidden_size=self.opts.model['enc_dim'],
++            proj_size=self.opts.model['proj_dim'],
++            proj_activ=self.opts.model['proj_activ'],
++            dropout=self.opts.model['dropout'],
++            layers=self.opts.model['enc_layers'])
++
++        ################
++        # Create Decoder
++        ################
++        self.dec = ConditionalASRDecoder(
++            input_size=self.opts.model['emb_dim'],
++            hidden_size=self.opts.model['dec_dim'],
++            n_vocab=self.n_trg_vocab,
++            rnn_type=self.opts.model['dec_type'],
++            ctx_size_dict=self.ctx_sizes,
++            ctx_name=str(self.src),
++            tied_emb=self.opts.model['tied_dec_embs'],
++            dec_init=self.opts.model['dec_init'],
++            dec_init_size=self.opts.model['dec_init_size'],
++            dec_init_activ=self.opts.model['dec_init_activ'],
++            att_type=self.opts.model['att_type'],
++            att_temp=self.opts.model['att_temp'],
++            att_activ=self.opts.model['att_activ'],
++            transform_ctx=self.opts.model['att_transform_ctx'],
++            mlp_bias=self.opts.model['att_mlp_bias'],
++            att_bottleneck=self.opts.model['att_bottleneck'],
++            dropout_out=self.opts.model['dropout'],
++            sched_sample=self.opts.model['sched_sampling'],
++            bos_type=self.opts.model['bos_type'],
++            bos_dim=self.opts.model['bos_dim'],
++            bos_activ=self.opts.model['bos_activ'],
++            vis_gate=self.opts.model['vis_gate'])
++
++        self.ff_vis = FF(self.opts.model['vis_dim'],
++                         self.opts.model['dec_dim'], bias_zero=True,
++                         activ=self.opts.model['vis_activ'])
++
++    def load_data(self, split, batch_size, mode='train'):
++        """Loads the requested dataset split."""
++        dataset = MultimodalDataset(
++            data=self.opts.data['{}_set'.format(split)],
++            mode=mode, batch_size=batch_size,
++            vocabs=self.vocabs, topology=self.topology,
++            bucket_by=self.opts.model['bucket_by'],
++            max_len=self.opts.model['max_len'],
++            bucket_order=self.opts.model['bucket_order'],
++            sampler_type=self.opts.model['sampler_type'])
++        logger.info(dataset)
++        return dataset
++
++    def encode(self, batch, **kwargs):
++        # Speech features -> x
++        x = batch[self.src]
++
++        # Transform the visual features and add time dimension so that
++        # tiling works in beam search
++        ctx_dict = {
++            str(self.src): self.speech_enc(x),
++            'feats': (self.ff_vis(batch['feats']).unsqueeze(0), None),
++        }
++        return ctx_dict

@@ -18,9 +18,11 @@ class NumpyDataset(Dataset):
         order_file (str, None): If given, will be used to map sample indices
             to tensors using this list. Useful for tiled or repeated
             experiments.
+        revert (bool, optional): If `True`, the data order will be reverted
+            for adversarial/incongruent experiments during test-time.
     """
 
-    def __init__(self, fname, key=None, order_file=None, **kwargs):
+    def __init__(self, fname, key=None, order_file=None, revert=False, **kwargs):
         self.path = Path(fname)
         if not self.path.exists():
             raise RuntimeError('{} does not exist.'.format(self.path))
@@ -37,14 +39,19 @@ class NumpyDataset(Dataset):
         else:
             self.order = list(range(self.data.shape[0]))
 
+        if revert:
+            self.order = self.order[::-1]
+
         # Dataset size
         self.size = len(self.order)
 
     @staticmethod
     def to_torch(batch):
-        # NOTE: Assumes x.shape == (n, c, *, *, ...)
+        # NOTE: Assumes x.shape == (n, *)
         x = torch.from_numpy(np.array(batch, dtype='float32'))
         # Convert it to (t(=1 if fixed features), n, c)
+        # By default we flatten h*w to first dim for interoperability
+        # Models should further reshape the tensor for their needs
         return x.view(*x.size()[:2], -1).permute(2, 0, 1)
 
     def __getitem__(self, idx):

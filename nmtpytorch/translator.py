@@ -62,6 +62,9 @@ class Translator:
             instance.train(False)
             self.instances.append(instance)
 
+        # Split the string
+        self.splits = self.splits.split(',')
+
         # Do some sanity-check
         self.sanity_check()
 
@@ -76,21 +79,24 @@ class Translator:
             self.filter = FilterChain(eval_filters)
 
         # Can be a comma separated list of hardcoded test splits
-        if self.splits:
-            logger.info('Will translate "{}"'.format(self.splits))
-            self.splits = self.splits.split(',')
-        elif self.source:
-            # Split into key:value's and parse into dict
-            input_dict = {}
-            logger.info('Will translate input configuration:')
+        logger.info('Will translate "{}"'.format(self.splits))
+        if self.source:
+            # We have to have single split name in this case
+            split_set = '{}_set'.format(self.splits[0])
+            input_dict = self.instances[0].opts.data.get(split_set, {})
+            logger.info('Input configuration:')
             for data_source in self.source.split(','):
                 key, path = data_source.split(':', 1)
                 input_dict[key] = Path(path)
                 logger.info(' {}: {}'.format(key, input_dict[key]))
-            self.instances[0].opts.data['new_set'] = input_dict
-            self.splits = ['new']
+            # Overwrite config's set name
+            self.instances[0].opts.data[split_set] = input_dict
 
     def sanity_check(self):
+        if self.source and len(self.splits) > 1:
+            logger.info('You can only give one split name when -S is provided.')
+            sys.exit(1)
+
         eval_filters = set([i.opts.train['eval_filters'] for i in self.instances])
         assert len(eval_filters) < 2, "eval_filters differ between instances."
 
@@ -150,10 +156,7 @@ class Translator:
         suffix += ".beam{}".format(self.beam_size)
         if self.n_best:
             suffix += ".nbest"
-        if split == 'new':
-            output = "{}{}".format(self.output, suffix)
-        else:
-            output = "{}.{}{}".format(self.output, split, suffix)
+        output = "{}.{}{}".format(self.output, split, suffix)
 
         f = open(output, 'w')
         if self.n_best:
@@ -174,6 +177,5 @@ class Translator:
     def __call__(self):
         """Dumps the hypotheses for each of the requested split/file."""
         for input_ in self.splits:
-            # input_ can be a valid split name or 'new' when -S is given
             hyps = self.translate(input_)
             self.dump(hyps, input_)

@@ -66,17 +66,14 @@ if __name__ == '__main__':
 
             # text attention
             tatt = model.dec.txt_alpha_t.data.clone().numpy()
+            iatt, hatt = None, None
 
             # If decoder has .img_alpha_t
             if hasattr(model.dec, 'img_alpha_t'):
                 iatt = model.dec.img_alpha_t.data.clone().numpy()
-            else:
-                iatt = None
 
             if hasattr(model.dec, 'h_att'):
                 hatt = model.dec.h_att.data.clone().numpy()
-            else:
-                hatt = None
 
             top_scores, y_t = logp.data.topk(1, largest=True)
             hyp = y_t.numpy().tolist()
@@ -101,11 +98,12 @@ if __name__ == '__main__':
                 break
 
         for h, sa, ia, ha in zip(hyps, main_att, img_att, hie_att):
-            d = [model.trg_vocab.idxs_to_sent(h), sa]
-            if ia:
-                d.extend(ia)
-            if ha:
-                d.extend(ha)
+            d = {
+                'hyp': model.trg_vocab.idxs_to_sent(h),
+                'pri_att': np.array(sa),
+                'sec_att': np.array(ia) if ia is not None else None,
+                'hie_att': np.array(ha) if ha is not None else None,
+            }
             data.append(d)
 
     # Put into correct order
@@ -118,13 +116,7 @@ if __name__ == '__main__':
             src_lines.append(line.strip())
 
     for d, line in zip(data, src_lines):
-        d.insert(0, line)
+        d['src'] = line
 
-    with open('{}.greedy.pkl'.format(args.split), 'wb') as f:
+    with open(args.output, 'wb') as f:
         pkl.dump(data, f)
-
-    with open('{}.greedy.txt'.format(args.split), 'w') as f:
-        for line in data:
-            f.write(line[0] + '\n')
-
-

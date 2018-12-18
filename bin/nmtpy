@@ -61,13 +61,15 @@ if __name__ == '__main__':
     parser_trans.add_argument('-x', '--override', nargs="*", default=[],
                               help="(section).key:value overrides for config")
 
-    group = parser_trans.add_mutually_exclusive_group(required=True)
     # You can translate a set of splits defined in the .conf file
-    group.add_argument('-s', '--splits', type=str,
-                       help='Comma separated splits from config file')
+    parser_trans.add_argument('-s', '--splits', type=str, required=True,
+                              help='Comma separated splits from config file')
     # Or you can provide another input configuration with -S
-    group.add_argument('-S', '--source', type=str,
-                       help='Comma-separated key:value pairs to provide new inputs.')
+    # With this, the previous -s is solely used for the naming of the output file
+    # and you can only give 1 split with -s that corresponds to new input you
+    # define with -S.
+    parser_trans.add_argument('-S', '--source', type=str, default=None,
+                              help='Comma-separated key:value pairs to provide new inputs.')
     parser_trans.add_argument('-o', '--output', type=str, required=True,
                               help='Output filename prefix')
 
@@ -88,12 +90,10 @@ if __name__ == '__main__':
     parser_test.add_argument('-m', '--mode', choices=['eval', 'enc'],
                              default='eval',
                              help="Perform evaluation or dump encodings.")
-
-    group = parser_test.add_mutually_exclusive_group(required=True)
-    group.add_argument('-s', '--splits', type=str,
-                       help='Comma separated splits from config file')
-    group.add_argument('-S', '--source', type=str,
-                       help='Comma-separated key:value pairs to provide new inputs.')
+    parser_test.add_argument('-s', '--splits', type=str,
+                             help='Comma separated splits from config file')
+    parser_test.add_argument('-S', '--source', type=str,
+                             help='Comma-separated key:value pairs to provide new inputs.')
 
     # Parse command-line arguments first
     args = parser.parse_args()

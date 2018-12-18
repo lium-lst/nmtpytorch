@@ -16,4 +16,5 @@ metric_info = {
     'LOSS': 'min',
     'WER': 'min',
     'CER': 'min',
+    'ACC': 'max',
 }
