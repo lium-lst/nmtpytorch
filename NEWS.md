@@ -1,6 +1,7 @@
 ## Release Notes
 
-This release supports Pytorch >= 0.4.1 including the recent 1.0 release.
+This release supports Pytorch >= 0.4.1 including the recent 1.0 release. The relevant
+`setup.py` and `environment.yml` files will default to `1.0.0` installation.
 
 ### v4.0.0 (18/12/2018)
  - **Critical**: `NumpyDataset` now returns tensors of shape `HxW, N, C` for 3D/4D convolutional features, `1, N, C` for 2D feature files. Models should be adjusted to adapt to this new shaping.

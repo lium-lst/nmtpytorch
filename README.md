@@ -41,7 +41,7 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 
 ## Installation
 
-`nmtpytorch` currently requires `python>=3.6` and `torch==0.4.1`.
+`nmtpytorch` currently requires `python>=3.6` and `torch>=0.4.1`.
 We are not planning to support Python 2.x.
 
 **IMPORTANT:** After installing `nmtpytorch`, you **need** to run `nmtpy-install-extra`
@@ -58,7 +58,7 @@ $ pip install nmtpytorch
 ```
 
 This will automatically fetch and install the dependencies as well. For the `torch`
-dependency it will specifically install the `torch 0.4.1` package from `PyPI` that
+dependency it will specifically install the `torch 1.0.0` package from `PyPI` that
 ships `CUDA 9.0` within.
 
 ### conda
