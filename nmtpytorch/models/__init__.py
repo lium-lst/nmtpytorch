@@ -8,9 +8,12 @@ from .acapt import AttentiveCaptioning
 from .amnmtraw import AttentiveRawMNMT
 # Spatial features + NMT
 from .amnmtfeats import AttentiveMNMTFeatures
+# Filtered attention (LIUMCVC-MMT2018)
+from .amnmtfeats_fa import AttentiveMNMTFeaturesFA
 
 # Speech models
 from .asr import ASR
+from .multimodal_asr import MultimodalASR
 
 # Experimental: requires work/adaptation
 from .multitask import Multitask
@@ -21,3 +24,4 @@ from .multitask_att import MultitaskAtt
 ##########################################
 ASRv2 = ASR
 AttentiveMNMT = AttentiveRawMNMT
+AttentiveEncAttMNMTFeatures = AttentiveMNMTFeaturesFA
