@@ -1,5 +1,31 @@
 ## Release Notes
 
+This release supports Pytorch >= 0.4.1 including the recent 1.0 release.
+
+### v4.0.0 (18/12/2018)
+ - **Critical**: `NumpyDataset` now returns tensors of shape `HxW, N, C` for 3D/4D convolutional features, `1, N, C` for 2D feature files. Models should be adjusted to adapt to this new shaping.
+ - An `order_file` per split (`ord: path/to/txt file with integer per line`) can be given from the configurations to change the feature order of numpy tensors to flexibly revert, shuffle, tile, etc. them.
+ - Better dimension checking to ensure that everything is OK.
+ - Added `LabelDataset` for single label input/outputs with associated `Vocabulary` for integer mapping.
+ - Added `handle_oom=(True|False)` argument for `[train]` section to recover from **GPU out-of-memory (OOM)** errors during training. This is disabled by default, you need to enable it from the experiment configuration file. Note that it is still possible to get an OOM during validation perplexity computation. If you hit that, reduce the `eval_batch_size` parameter.
+ - Added `de-hyphen` post-processing filter to stitch back the aggressive hyphen splitting of Moses during early-stopping evaluations.
+ - Added optional projection layer and layer normalization to `TextEncoder`.
+ - Added `enc_lnorm, sched_sampling` options to `NMT` to enable layer normalization for encoder and use **scheduled sampling** at a given probability.
+ - `ConditionalDecoder` can now be initialized with max-pooled encoder states or the last state as well.
+ - You can now experiment with different decoders for `NMT` by changing the `dec_variant` option.
+ - Collect all attention weights in `self.history` dictionary of the decoders.
+ - Added **n-best** output to `nmtpy translate` with the argument `-N`.
+ - Changed the way `-S` works for `nmtpy translate`. Now you need to give the split name with `-s` all the time but `-S` is used to override the input data sources defined for that split in the configuration file.
+ - Removed decoder-initialized multimodal NMT `MNMTDecInit`. Same functionality exists within the `NMT` model by using the model option `dec_init=feats`.
+ - **New model MultimodalNMT:** that supports encoder initialization, decoder initialization, both, concatenation of embeddings with visual features, prepending and appending. This model covers almost all the models from [LIUM-CVC's WMT17 multimodal systems](https://arxiv.org/abs/1707.04481) except the multiplicative interaction variants such as `trgmul`.
+ - **New model MultimodalASR:** encoder-decoder initialized ASR model. See the [paper](https://arxiv.org/abs/1811.03865)
+ - **New Model AttentiveCaptioning:** Similar but not an exact reproduction of show-attend-and-tell, it uses feature files instead of raw images.
+ - **New model AttentiveMNMTFeaturesFA:** [LIUM-CVC's WMT18 multimodal system](https://arxiv.org/abs/1809.00151) i.e. filtered attention
+ - **New (experimental) model NLI:** A simple LSTM-based NLI baseline for [SNLI](https://nlp.stanford.edu/projects/snli/) dataset:
+    - `direction` should be defined as `direction: pre:Text, hyp:Text -> lb:Label`
+    - `pre, hyp` and `lb` keys point to plain text files with one sentence per line. A vocabulary should be constructed even for the labels to fit the nmtpy architecture.
+    - `acc` should be added to `eval_metrics` to compute accuracy.
+
 ### v3.0.0 (05/10/2018)
 Major release that brings support for **Pytorch 0.4** and drops support for **0.3**.
 
