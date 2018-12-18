@@ -1,0 +1,559 @@
+diff --git a/nmtpytorch/layers/attention/mlpv2.py b/nmtpytorch/layers/attention/mlpv2.py
+new file mode 100644
+index 0000000..e6c7742
+--- /dev/null
++++ b/nmtpytorch/layers/attention/mlpv2.py
+@@ -0,0 +1,65 @@
++# -*- coding: utf-8 -*-
++import torch.nn.functional as F
++from torch import nn
++
++from ...utils.nn import get_activation_fn
++from .. import FF
++
++
++class MLPAttentionv2(nn.Module):
++    """Attention layer with feed-forward layer. Version 2 removes some
++    automatically assumed transformations and delegates those to the
++    relevant encoders/models for a cleaner implementation."""
++    def __init__(self, input_dim, att_dim, att_activ='tanh',
++                 hid2att_activ=None, temp=1.):
++        super().__init__()
++
++        # Gather arguments
++        self.input_dim = input_dim
++        self.att_dim = att_dim
++        self.activ = get_activation_fn(att_activ)
++        self.temperature = temp
++
++        # Adaptor from RNN's hidden dim to att_dim
++        self.hid2att = FF(self.input_dim, self.att_dim,
++                          bias=False, activ=hid2att_activ)
++
++        self.mlp = nn.Linear(self.att_dim, 1, bias=False)
++
++    def forward(self, hid, ctx, ctx_mask=None):
++        r"""Computes attention probabilities and final context using
++        decoder's hidden state and source annotations.
++
++        Arguments:
++            hid(Tensor): A set of decoder hidden states of shape `T*B*H`
++                where `T` == 1, `B` is batch dim and `H` is hidden state dim.
++            ctx(Tensor): A set of annotations of shape `S*B*C` where `S`
++                is the source timestep dim, `B` is batch dim and `A`
++                is attention dim.
++            ctx_mask(FloatTensor): A binary mask of shape `S*B` with zeroes
++                in the padded positions.
++
++        Returns:
++            scores(Tensor): A tensor of shape `S*B` containing normalized
++                attention scores for each position and sample.
++            z_t(Tensor): A tensor of shape `B*H` containing the final
++                attended context vector for this target decoding timestep.
++
++        Notes:
++            This will only work when `T==1` for now.
++        """
++        # inner_sum -> SxBxA + TxBxA
++        # Compute scores- > SxB
++        scores = self.mlp(
++            self.activ(ctx + self.hid2att(hid))).div(self.temperature).squeeze(-1)
++
++        # Normalize attention scores correctly -> S*B
++        if ctx_mask is not None:
++            # Mask out padded positions with -inf so that they get 0 attention
++            scores.masked_fill_((1 - ctx_mask).byte(), -1e8)
++
++        # Compute softmax
++        alpha = F.softmax(scores, dim=0)
++
++        # Return the weighted context vector of dim == given annotations
++        return alpha, (alpha.unsqueeze(-1) * ctx).sum(0)
+diff --git a/nmtpytorch/layers/decoders/conditionalv2.py b/nmtpytorch/layers/decoders/conditionalv2.py
+new file mode 100644
+index 0000000..cd0c175
+--- /dev/null
++++ b/nmtpytorch/layers/decoders/conditionalv2.py
+@@ -0,0 +1,224 @@
++# -*- coding: utf-8 -*-
++from collections import defaultdict
++import random
++
++import torch
++from torch import nn
++import torch.nn.functional as F
++
++from ...utils.nn import get_rnn_hidden_state
++from .. import FF
++from ..attention import get_attention
++
++
++class Conditionalv2Decoder(nn.Module):
++    """A conditional decoder with MLPv2 attention."""
++    def __init__(self, input_size, hidden_size, ctx_size_dict, ctx_name, n_vocab,
++                 rnn_type, att_dim, att_activ='tanh', att_hidactiv=None,
++                 att_temp=1.0, dropout_out=0,
++                 tied_emb=False, dec_init='zero', dec_init_activ='tanh',
++                 dec_init_size=None,
++                 emb_maxnorm=None, emb_gradscale=False, sched_sample=0,
++                 bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False):
++        super().__init__()
++
++        # Normalize case
++        self.rnn_type = rnn_type.upper()
++
++        # Safety checks
++        assert self.rnn_type in ('GRU', 'LSTM'), \
++            "rnn_type '{}' not known".format(rnn_type)
++        assert dec_init in ('zero', 'mean_ctx', 'feats'), \
++            "dec_init '{}' not known".format(dec_init)
++
++        RNN = getattr(nn, '{}Cell'.format(self.rnn_type))
++        # LSTMs have also the cell state
++        self.n_states = 1 if self.rnn_type == 'GRU' else 2
++
++        # Set custom handlers for GRU/LSTM
++        if self.rnn_type == 'GRU':
++            self._rnn_unpack_states = lambda x: x
++            self._rnn_pack_states = lambda x: x
++        elif self.rnn_type == 'LSTM':
++            self._rnn_unpack_states = self._lstm_unpack_states
++            self._rnn_pack_states = self._lstm_pack_states
++
++        # Set decoder initializer
++        self._init_func = getattr(self, '_rnn_init_{}'.format(dec_init))
++
++        # Other arguments
++        self.input_size = input_size
++        self.hidden_size = hidden_size
++        self.ctx_size_dict = ctx_size_dict
++        self.ctx_name = ctx_name
++        self.n_vocab = n_vocab
++        self.tied_emb = tied_emb
++        self.dec_init = dec_init
++        self.dec_init_size = dec_init_size
++        self.dec_init_activ = dec_init_activ
++        self.att_activ = att_activ
++        self.att_hidactiv = att_hidactiv
++        self.att_temp = att_temp
++        self.att_dim = att_dim
++        self.dropout_out = dropout_out
++        self.emb_maxnorm = emb_maxnorm
++        self.emb_gradscale = emb_gradscale
++        self.sched_sample = sched_sample
++        self.bos_type = bos_type
++        self.bos_dim = bos_dim
++        self.bos_activ = bos_activ
++        self.bos_bias = bos_bias
++
++        assert self.bos_type in ('emb', 'feats', 'zero'), "Unknown 'bos_type'"
++
++        if self.bos_type == 'feats':
++            # Learn a <bos> embedding
++            self.ff_bos = FF(self.bos_dim, self.input_size, bias=self.bos_bias,
++                             activ=self.bos_activ)
++
++        # Create target embeddings
++        self.emb = nn.Embedding(self.n_vocab, self.input_size,
++                                padding_idx=0, max_norm=self.emb_maxnorm,
++                                scale_grad_by_freq=self.emb_gradscale)
++
++        # Create attention layer
++        Attention = get_attention('mlpv2')
++        self.att = Attention(
++            input_dim=self.hidden_size,
++            att_dim=self.att_dim,
++            att_activ=self.att_activ,
++            hid2att_activ=self.att_hidactiv,
++            temp=self.att_temp)
++
++        # Decoder initializer FF (for 'mean_ctx' or auxiliary 'feats')
++        if self.dec_init in ('mean_ctx', 'feats'):
++            if self.dec_init == 'mean_ctx':
++                self.dec_init_size = self.ctx_size_dict[self.ctx_name]
++            self.ff_dec_init = FF(
++                self.dec_init_size,
++                self.hidden_size * self.n_states, activ=self.dec_init_activ)
++
++        # Create first decoder layer necessary for attention
++        self.dec0 = RNN(self.input_size, self.hidden_size)
++        self.dec1 = RNN(self.hidden_size, self.hidden_size)
++
++        # Output dropout
++        if self.dropout_out > 0:
++            self.do_out = nn.Dropout(p=self.dropout_out)
++
++        # Output bottleneck: maps hidden states to target emb dim
++        self.hid2out = FF(self.hidden_size, self.input_size,
++                          bias_zero=True, activ='tanh')
++
++        # Final softmax
++        self.out2prob = FF(self.input_size, self.n_vocab)
++
++        # Tie input embedding matrix and output embedding matrix
++        if self.tied_emb:
++            self.out2prob.weight = self.emb.weight
++
++        self.nll_loss = nn.NLLLoss(reduction="sum", ignore_index=0)
++
++    def get_emb(self, idxs, tstep):
++        if tstep == 0:
++            if self.bos_type == 'emb':
++                return self.emb(idxs)
++            elif self.bos_type == 'zero':
++                return torch.zeros(idxs.shape[0], self.input_size, device=idxs.device)
++            else:
++                return self.bos
++        return self.emb(idxs)
++
++    def _lstm_pack_states(self, h):
++        return torch.cat(h, dim=-1)
++
++    def _lstm_unpack_states(self, h):
++        # Split h_t and c_t into two tensors and return a tuple
++        return torch.split(h, self.hidden_size, dim=-1)
++
++    def _rnn_init_zero(self, ctx_dict):
++        ctx, _ = ctx_dict[self.ctx_name]
++        return torch.zeros(
++            ctx.shape[1], self.hidden_size * self.n_states, device=ctx.device)
++
++    def _rnn_init_mean_ctx(self, ctx_dict):
++        ctx, ctx_mask = ctx_dict[self.ctx_name]
++        if ctx_mask is None:
++            return self.ff_dec_init(ctx.mean(0))
++        else:
++            return self.ff_dec_init(ctx.sum(0) / ctx_mask.sum(0).unsqueeze(1))
++
++    def _rnn_init_feats(self, ctx_dict):
++        ctx, _ = ctx_dict['feats']
++        return self.ff_dec_init(ctx)
++
++    def f_init(self, ctx_dict):
++        """Returns the initial h_0 for the decoder."""
++        self.history = defaultdict(list)
++        if self.bos_type == 'feats':
++            self.bos = self.ff_bos(ctx_dict['feats'][0])
++        return self._init_func(ctx_dict)
++
++    def f_next(self, ctx_dict, y, h):
++        # Get hidden states from the first decoder (purely cond. on LM)
++        h1_c1 = self.dec0(y, self._rnn_unpack_states(h))
++        h1 = get_rnn_hidden_state(h1_c1)
++
++        # Apply attention
++        self.txt_alpha_t, txt_z_t = self.att(
++            h1.unsqueeze(0), *ctx_dict[self.ctx_name])
++
++        if not self.training:
++            self.history['alpha_txt'].append(self.txt_alpha_t)
++
++        # Run second decoder (h1 is compatible now as it was returned by GRU)
++        h2_c2 = self.dec1(txt_z_t, h1_c1)
++        h2 = get_rnn_hidden_state(h2_c2)
++
++        # This is a bottleneck to avoid going from H to V directly
++        logit = self.hid2out(h2)
++
++        # Apply dropout if any
++        if self.dropout_out > 0:
++            logit = self.do_out(logit)
++
++        # Transform logit to T*B*V (V: vocab_size)
++        # Compute log_softmax over token dim
++        log_p = F.log_softmax(self.out2prob(logit), dim=-1)
++
++        # Return log probs and new hidden states
++        return log_p, self._rnn_pack_states(h2_c2)
++
++    def forward(self, ctx_dict, y):
++        """Computes the softmax outputs given source annotations `ctxs` and
++        ground-truth target token indices `y`. Only called during training.
++
++        Arguments:
++            ctxs(Tensor): A tensor of `S*B*ctx_dim` representing the source
++                annotations in an order compatible with ground-truth targets.
++            y(Tensor): A tensor of `T*B` containing ground-truth target
++                token indices for the given batch.
++        """
++
++        loss = 0.0
++
++        # Get initial hidden state
++        h = self.f_init(ctx_dict)
++
++        # are we doing scheduled sampling?
++        sched = self.training and (random.random() > (1 - self.sched_sample))
++
++        # Convert token indices to embeddings -> T*B*E
++        # Skip <bos> now
++        bos = self.get_emb(y[0], 0)
++        log_p, h = self.f_next(ctx_dict, bos, h)
++        loss += self.nll_loss(log_p, y[1])
++        y_emb = self.emb(y[1:])
++
++        for t in range(y_emb.shape[0] - 1):
++            emb = self.emb(log_p.argmax(1)) if sched else y_emb[t]
++            log_p, h = self.f_next(ctx_dict, emb, h)
++            self.history['hid'].append(h)
++            loss += self.nll_loss(log_p, y[t + 2])
++
++        return {'loss': loss}
+diff --git a/nmtpytorch/models/nmtv2.py b/nmtpytorch/models/nmtv2.py
+new file mode 100644
+index 0000000..cb7960f
+--- /dev/null
++++ b/nmtpytorch/models/nmtv2.py
+@@ -0,0 +1,252 @@
++# -*- coding: utf-8 -*-
++import logging
++
++import torch
++from torch import nn
++
++from ..layers import TextEncoder, Conditionalv2Decoder
++from ..utils.misc import get_n_params
++from ..vocabulary import Vocabulary
++from ..utils.topology import Topology
++from ..utils.ml_metrics import Loss
++from ..utils.device import DEVICE
++from ..utils.misc import pbar
++from ..datasets import MultimodalDataset
++from ..metrics import Metric
++
++logger = logging.getLogger('nmtpytorch')
++
++
++class NMTv2(nn.Module):
++    """NMT variant that uses MLPv2 attention."""
++    supports_beam_search = True
++
++    def set_defaults(self):
++        self.defaults = {
++            'emb_dim': 128,             # Source and target embedding sizes
++            'emb_maxnorm': None,        # Normalize embeddings l2 norm to 1
++            'emb_gradscale': False,     # Scale embedding gradients w.r.t. batch frequency
++            'enc_dim': 256,             # Encoder hidden size
++            'enc_type': 'gru',          # Encoder type (gru|lstm)
++            'enc_proj_activ': 'relu',   # Output projection activation for encoder
++            'enc_l2norm': False,        # l2norm of text encoder
++            'n_encoders': 1,            # Number of stacked encoders
++            'dec_dim': 256,             # Decoder hidden size
++            'dec_type': 'gru',          # Decoder type (gru|lstm)
++            'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
++            'dec_init_size': None,      # feature vector dimensionality for
++            'dec_init_activ': 'tanh',   # Decoder initialization activation func
++                                        # dec_init == 'feats'
++            'att_temp': 1.,             # Attention temperature
++            'att_activ': 'tanh',        # Attention non-linearity (all torch nonlins)
++            'att_hidactiv': None,       # Attention hid2att activ
++            'dropout_emb': 0,           # Simple dropout to source embeddings
++            'dropout_ctx': 0,           # Simple dropout to source encodings
++            'dropout_out': 0,           # Simple dropout to decoder output
++            'dropout_enc': 0,           # Intra-encoder dropout if n_encoders > 1
++            'tied_emb': False,          # Share embeddings: (False|2way|3way)
++            'direction': None,          # Network directionality, i.e. en->de
++            'max_len': 80,              # Reject sentences where 'bucket_by' length > 80
++            'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
++                                        # the batches will be sorted
++            'bucket_order': None,       # Curriculum: ascending/descending/None
++            'sampler_type': 'bucket',   # bucket or approximate
++            'sched_sampling': 0,        # Scheduled sampling ratio
++            'bos_type': 'emb',          # 'emb': default learned emb
++            'bos_activ': None,          #
++            'bos_dim': None,            #
++        }
++
++    def __init__(self, opts):
++        super().__init__()
++
++        # opts -> config file sections {.model, .data, .vocabulary, .train}
++        self.opts = opts
++
++        # Vocabulary objects
++        self.vocabs = {}
++
++        # Each auxiliary loss should be stored inside this dictionary
++        # in order to be taken into account by the mainloop for multi-tasking
++        self.aux_loss = {}
++
++        # Setup options
++        self.opts.model = self.set_model_options(opts.model)
++
++        # Parse topology & languages
++        self.topology = Topology(self.opts.model['direction'])
++
++        # Load vocabularies here
++        for name, fname in self.opts.vocabulary.items():
++            self.vocabs[name] = Vocabulary(fname, name=name)
++
++        # Inherently non multi-lingual aware
++        slangs = self.topology.get_src_langs()
++        tlangs = self.topology.get_trg_langs()
++        if slangs:
++            self.sl = slangs[0]
++            self.src_vocab = self.vocabs[self.sl]
++            self.n_src_vocab = len(self.src_vocab)
++        if tlangs:
++            self.tl = tlangs[0]
++            self.trg_vocab = self.vocabs[self.tl]
++            self.n_trg_vocab = len(self.trg_vocab)
++            # Need to be set for early-stop evaluation
++            # NOTE: This should come from config or elsewhere
++            self.val_refs = self.opts.data['val_set'][self.tl]
++
++        # In this model, we project encoder outputs to be dec_dim
++        if 'enc_dim' in self.opts.model:
++            self.ctx_sizes = {str(self.sl): self.opts.model['dec_dim']}
++
++        # Check vocabulary sizes for 3way tying
++        if self.opts.model['tied_emb'] not in [False, '2way', '3way']:
++            raise RuntimeError(
++                "'{}' not recognized for tied_emb.".format(self.opts.model['tied_emb']))
++        if self.opts.model['tied_emb'] == '3way':
++            assert self.n_src_vocab == self.n_trg_vocab, \
++                "The vocabulary sizes do not match for 3way tied embeddings."
++
++    def __repr__(self):
++        s = super().__repr__() + '\n'
++        for vocab in self.vocabs.values():
++            s += "{}\n".format(vocab)
++        s += "{}\n".format(get_n_params(self))
++        return s
++
++    def set_model_options(self, model_opts):
++        self.set_defaults()
++        for opt, value in model_opts.items():
++            if opt in self.defaults:
++                # Override defaults from config
++                self.defaults[opt] = value
++            else:
++                logger.info('Warning: unused model option: {}'.format(opt))
++        return self.defaults
++
++    def reset_parameters(self):
++        for name, param in self.named_parameters():
++            if param.requires_grad and 'bias' not in name:
++                nn.init.kaiming_normal_(param.data)
++
++    def setup(self, is_train=True):
++        """Sets up NN topology by creating the layers."""
++        ########################
++        # Create Textual Encoder
++        ########################
++        self.enc = TextEncoder(
++            input_size=self.opts.model['emb_dim'],
++            hidden_size=self.opts.model['enc_dim'],
++            n_vocab=self.n_src_vocab,
++            rnn_type=self.opts.model['enc_type'],
++            dropout_emb=self.opts.model['dropout_emb'],
++            dropout_ctx=self.opts.model['dropout_ctx'],
++            dropout_rnn=self.opts.model['dropout_enc'],
++            num_layers=self.opts.model['n_encoders'],
++            emb_maxnorm=self.opts.model['emb_maxnorm'],
++            emb_gradscale=self.opts.model['emb_gradscale'],
++            proj_dim=self.opts.model['dec_dim'],
++            proj_activ=self.opts.model['enc_proj_activ'])
++
++        ################
++        # Create Decoder
++        ################
++        self.dec = Conditionalv2Decoder(
++            input_size=self.opts.model['emb_dim'],
++            hidden_size=self.opts.model['dec_dim'],
++            n_vocab=self.n_trg_vocab,
++            rnn_type=self.opts.model['dec_type'],
++            ctx_size_dict=self.ctx_sizes,
++            ctx_name=str(self.sl),
++            tied_emb=self.opts.model['tied_emb'],
++            dec_init=self.opts.model['dec_init'],
++            dec_init_size=self.opts.model['dec_init_size'],
++            dec_init_activ=self.opts.model['dec_init_activ'],
++            att_temp=self.opts.model['att_temp'],
++            att_activ=self.opts.model['att_activ'],
++            att_hidactiv=self.opts.model['att_hidactiv'],
++            att_dim=self.opts.model['dec_dim'],
++            dropout_out=self.opts.model['dropout_out'],
++            emb_maxnorm=self.opts.model['emb_maxnorm'],
++            emb_gradscale=self.opts.model['emb_gradscale'],
++            sched_sample=self.opts.model['sched_sampling'],
++            bos_type=self.opts.model['bos_type'],
++            bos_dim=self.opts.model['bos_dim'],
++            bos_activ=self.opts.model['bos_activ'])
++
++        # Share encoder and decoder weights
++        if self.opts.model['tied_emb'] == '3way':
++            self.enc.emb.weight = self.dec.emb.weight
++
++    def load_data(self, split, batch_size, mode='train'):
++        """Loads the requested dataset split."""
++        dataset = MultimodalDataset(
++            data=self.opts.data['{}_set'.format(split)],
++            mode=mode, batch_size=batch_size,
++            vocabs=self.vocabs, topology=self.topology,
++            bucket_by=self.opts.model['bucket_by'],
++            max_len=self.opts.model['max_len'],
++            bucket_order=self.opts.model['bucket_order'],
++            sampler_type=self.opts.model['sampler_type'])
++        logger.info(dataset)
++        return dataset
++
++    def get_bos(self, batch_size):
++        """Returns a representation for <bos> embeddings for decoding."""
++        return torch.LongTensor(batch_size).fill_(self.trg_vocab['<bos>'])
++
++    def encode(self, batch, **kwargs):
++        """Encodes all inputs and returns a dictionary.
++
++        Arguments:
++            batch (dict): A batch of samples with keys designating the
++                information sources.
++
++        Returns:
++            dict:
++                A dictionary where keys are source modalities compatible
++                with the data loader and the values are tuples where the
++                elements are encodings and masks. The mask can be ``None``
++                if the relevant modality does not require a mask.
++        """
++        ctx, mask = self.enc(batch[self.sl])
++        if self.opts.model['enc_l2norm']:
++            ctx = nn.functional.normalize(ctx, dim=-1)
++
++        d = {str(self.sl): (ctx, mask)}
++        if 'feats' in batch:
++            d['feats'] = (batch['feats'], None)
++        return d
++
++    def forward(self, batch, **kwargs):
++        """Computes the forward-pass of the network and returns batch loss.
++
++        Arguments:
++            batch (dict): A batch of samples with keys designating the source
++                and target modalities.
++
++        Returns:
++            Tensor:
++                A scalar loss normalized w.r.t batch size and token counts.
++        """
++        # Get loss dict
++        result = self.dec(self.encode(batch), batch[self.tl])
++        result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
++        return result
++
++    def test_performance(self, data_loader, dump_file=None):
++        """Computes test set loss over the given DataLoader instance."""
++        loss = Loss()
++
++        for batch in pbar(data_loader, unit='batch'):
++            batch.device(DEVICE)
++            out = self.forward(batch)
++            loss.update(out['loss'], out['n_items'])
++
++        return [
++            Metric('LOSS', loss.get(), higher_better=False),
++        ]
++
++    def get_decoder(self, task_id=None):
++        """Compatibility function for multi-tasking architectures."""
++        return self.dec

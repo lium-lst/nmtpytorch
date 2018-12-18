@@ -1,0 +1,33 @@
+diff --git a/nmtpytorch/models/nmt.py b/nmtpytorch/models/nmt.py
+index a2ab396..307441d 100644
+--- a/nmtpytorch/models/nmt.py
++++ b/nmtpytorch/models/nmt.py
+@@ -56,6 +56,7 @@ class NMT(nn.Module):
+             'sampler_type': 'bucket',   # bucket or approximate
+             'sched_sampling': 0,        # Scheduled sampling ratio
+             'bos_type': 'emb',          # 'emb': default learned emb
++            'zero_emb': None,           # A list of tokens to zero emb at each iteration
+             'bos_activ': None,          #
+             'bos_dim': None,            #
+         }
+@@ -134,8 +135,18 @@ class NMT(nn.Module):
+             if param.requires_grad and param.dim() > 1:
+                 nn.init.kaiming_normal_(param.data)
+         # Reset padding embedding to 0
+-        with torch.no_grad():
+-            self.enc.emb.weight.data[0].fill_(0)
++#         with torch.no_grad():
++            # self.enc.emb.weight.data[0].fill_(0)
++            # if self.opts.model['zero_emb'] is not None:
++                # toks = self.opts.model['zero_emb'].split(',')
++                # self.register_buffer('emb_grad_mask', torch.ones(self.n_src_vocab, 1))
++                # for tok in toks:
++                    # # Start with 0 embedding
++                    # self.enc.emb.weight.data[self.src_vocab[tok]].fill_(0)
++                    # self.emb_grad_mask[self.src_vocab[tok]].fill_(0)
++                # def grad_mask_hook(grad):
++                    # return self.emb_grad_mask * grad
++                # self.enc.emb.weight.register_hook(grad_mask_hook)
+ 
+     def setup(self, is_train=True):
+         """Sets up NN topology by creating the layers."""
