@@ -1,4 +1,5 @@
 from .sat import ShowAttendAndTell
+from .nli import NLI
 from .nmt import NMT
 from .mnmt import MultimodalNMT
 from .acapt import AttentiveCaptioning
