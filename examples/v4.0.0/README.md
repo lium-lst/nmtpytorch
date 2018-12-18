@@ -10,19 +10,29 @@ to work correctly.
 **NOTE:** These examples do not use BPE-segmented files, instead they simply
 use word forms.
 
-### mmt-task-en-fr-nmt.conf
-
-A baseline NMT for En->Fr language pair
-of Multi30K. You can download the Multi30K dataset from [here](https://github.com/multi30k/dataset).
-
 The dataset files are suffixed with `lc.norm.tok` in this experiment which
 means that Moses scripts were used to lowercase -> normalize-punctuation -> tokenize
 the corpora. Specifically for tokenization, we enable `-a` option to aggressively
-split the hyphens.
+split the hyphens. The following pipeline should do the trick (moses scripts should
+be in `$PATH` for the following to work as-is):
+
+```bash
+for split in train val test_201*flickr; do
+  for llang in en fr; do
+    lowercase.perl < ${split}.${llang} | normalize-punctuation.perl -l $llang | \
+      tokenizer.perl -q -a -l $llang -threads 4 > ${split}.lc.norm.tok.${llang}
+  done
+done
+```
 
 Next you need to run `nmtpy-build-vocab` on the `train.lc.norm.tok.*` files
 to construct the vocabularies. You should now be able to train the systems
 accordingly.
+
+### mmt-task-en-fr-nmt.conf
+
+A baseline NMT for En->Fr language pair
+of Multi30K. You can download the Multi30K dataset from [here](https://github.com/multi30k/dataset).
 
 ### mmt-task-en-fr-encdecinit.conf
 
