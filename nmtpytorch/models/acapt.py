@@ -4,7 +4,7 @@ import logging
 import torch
 from torch import nn
 
-from ..layers import TextEncoder, ConditionalDecoder
+from ..layers import ConditionalDecoder
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
