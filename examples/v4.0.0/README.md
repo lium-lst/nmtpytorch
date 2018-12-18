@@ -7,6 +7,9 @@ to work correctly.
 
 ## Multimodal task (En->Fr)
 
+**NOTE:** These examples do not use BPE-segmented files, instead they simply
+use word forms.
+
 ### mmt-task-en-fr-nmt.conf
 
 A baseline NMT for En->Fr language pair
