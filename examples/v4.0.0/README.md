@@ -32,7 +32,7 @@ to have `.npy` feature files for image features in order to train this model.
 A feature file should contain a tensor of shape `(n, feat_dim)` where `n` is the
 number of sentences of the split and `feat_dim` is the dimensionality for the features.
 
-Depending on `d`, you need to adjust the `feat_dim` option in the configuration file.
+Depending on `feat_dim`, you need to adjust the `feat_dim` option in the configuration file.
 
 You can download the provided ResNet-50 feature files for the WMT18 shared task
 from [here](https://drive.google.com/drive/folders/1I2ufg3rTva3qeBkEc-xDpkESsGkYXgCf?usp=sharing).
@@ -45,7 +45,7 @@ The feature files for this model have `avgpool` in their filenames and the
 A multimodal attentive NMT baseline replicating [this paper](https://arxiv.org/abs/1609.03976).
 You now need to use the convolutional feature files that can be downloaded from the same link above.
 
-The feature files for this model have `res4frelu` in their filenames.
+The feature files for this model have `res4frelu` in their filenames and the `feat_dim` is `1024`.
 
 **NOTE:** For this model, you may want to L2-normalize the feature files beforehands. See
 [WMT18 paper for LIUM-CVC](https://arxiv.org/abs/1809.00151).
