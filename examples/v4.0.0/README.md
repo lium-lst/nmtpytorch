@@ -29,6 +29,11 @@ Next you need to run `nmtpy-build-vocab` on the `train.lc.norm.tok.*` files
 to construct the vocabularies. You should now be able to train the systems
 accordingly.
 
+**NOTE:** For multimodal systems, you may want to L2-normalize the feature files
+and save the normalized versions, see [WMT18 paper for LIUM-CVC](https://arxiv.org/abs/1809.00151).
+You can use `numpy.linalg.norm` for this.
+
+
 ### mmt-task-en-fr-nmt.conf
 
 A baseline NMT for En->Fr language pair
@@ -56,9 +61,6 @@ A multimodal attentive NMT baseline replicating [this paper](https://arxiv.org/a
 You now need to use the convolutional feature files that can be downloaded from the same link above.
 
 - The feature files for this model have `res4frelu` in their filenames and the `feat_dim` is `1024`.
-
-- **NOTE:** For this model, you may want to L2-normalize the feature files beforehands. See
-  [WMT18 paper for LIUM-CVC](https://arxiv.org/abs/1809.00151).
 
 #### More variants
 
