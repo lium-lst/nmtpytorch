@@ -15,8 +15,8 @@ dependencies:
   - tqdm
   - pillow
   - pip:
-    - torch>=0.4.1
-    - torchvision>=0.2.1
+    - torch==1.0.0
+    - torchvision==0.2.1
     - sacrebleu>=1.2.9
     - tensorboardX==1.1
     - editdistance==0.4
