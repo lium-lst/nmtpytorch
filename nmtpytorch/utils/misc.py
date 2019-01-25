@@ -67,7 +67,7 @@ def load_pt_file(fname, device='cpu'):
     data = torch.load(fname, map_location=device)
     if 'history' not in data:
         data['history'] = {}
-    return data['model'], data['history'], data['opts']
+    return data
 
 
 def get_language(fname):

@@ -31,6 +31,7 @@ class Monitor(object):
         self.patience = patience
         self.eval_metrics = eval_metrics.upper().split(',')
         self.save_best_metrics = save_best_metrics
+        self.optimizer = None
         self.checkpoints = FileRotator(n_checkpoints)
         self.beam_metrics = None
 
@@ -66,6 +67,10 @@ class Monitor(object):
                             reverse=scores[0].higher_better)[0]
         return (idx + 1, score)
 
+    def set_optimizer(self, optimizer):
+        """Sets the optimizer to save its parameters."""
+        self.optimizer = optimizer
+
     def state_dict(self):
         """Returns a dictionary of stateful variables."""
         return {k: getattr(self, k) for k in self.VARS}
@@ -86,8 +91,8 @@ class Monitor(object):
         """Reloads the parameters from the previous best checkpoint."""
         fname = self.save_path / "{}.best.{}.ckpt".format(
             self.exp_id, self.early_metric.lower())
-        weights, _, _ = load_pt_file(fname)
-        self.model.load_state_dict(weights, strict=True)
+        data = load_pt_file(fname)
+        self.model.load_state_dict(data['model'], strict=True)
 
     def save_model(self, metric=None, suffix='', do_symlink=False):
         """Saves a checkpoint with arbitrary suffix(es) appended."""
@@ -102,12 +107,17 @@ class Monitor(object):
         fname = self.save_path / (fname + ".ckpt")
 
         # Save the file
-        torch.save(
-            {
-                'opts': self.model.opts.to_dict(),
-                'model': self.model.state_dict(),
-                'history': self.state_dict(),
-            }, fname)
+        model_dict = {
+            'opts': self.model.opts.to_dict(),
+            'model': self.model.state_dict(),
+            'history': self.state_dict(),
+        }
+
+        # Add optimizer states
+        if self.optimizer is not None:
+            model_dict['optimizer'] = self.optimizer.state_dict()
+
+        torch.save(model_dict, fname)
 
         # Also create a symbolic link to the above checkpoint for the metric
         if metric and do_symlink:

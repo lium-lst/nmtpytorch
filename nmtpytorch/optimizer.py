@@ -129,6 +129,12 @@ class Optimizer(object):
         """Returns current lr for parameters."""
         return self.optim.param_groups[0]['lr']
 
+    def state_dict(self):
+        return self.optim.state_dict()
+
+    def load_state_dict(self, state_dict):
+        self.optim.load_state_dict(state_dict)
+
     def __repr__(self):
         s = "Optimizer => {} (lr: {}, weight_decay: {}, g_clip: {}".format(
             self.name, self.initial_lr, self.weight_decay, self.gclip)

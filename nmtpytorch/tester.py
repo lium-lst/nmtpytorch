@@ -25,8 +25,10 @@ class Tester(object):
 
         self.model_file = self.models[0]
 
-        weights, _, opts = load_pt_file(self.model_file)
-        opts = Options.from_dict(opts)
+        data = load_pt_file(self.model_file)
+        weights, _, opts = data['model'], data['history'], data['opts']
+        opts = Options.from_dict(opts, override_list=self.override)
+
         instance = getattr(models, opts.train['model_type'])(opts=opts)
 
         if instance.supports_beam_search:

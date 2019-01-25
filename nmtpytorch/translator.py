@@ -35,8 +35,9 @@ class Translator(object):
 
         # Create model instances and move them to GPU
         for model_file in self.models:
-            weights, _, opts = load_pt_file(model_file)
-            opts = Options.from_dict(opts)
+            data = load_pt_file(model_file)
+            weights, _, opts = data['model'], data['history'], data['opts']
+            opts = Options.from_dict(opts, override_list=self.override)
 
             if 'att_temp' not in opts.model:
                 logger.info("INFO: Model does not support 'att_temp'")

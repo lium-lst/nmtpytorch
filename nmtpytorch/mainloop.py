@@ -24,6 +24,7 @@ class MainLoop(object):
         self.print = logger.info
         self.model = model
         self.epoch_valid = (self.eval_freq == 0)
+        self._found_optim_state = None
 
         # Load training and validation data & create iterators
         self.print('Loading dataset(s)')
@@ -63,7 +64,10 @@ class MainLoop(object):
         ################################################
         if train_opts['pretrained_file']:
             # Relax the strict condition for partial initialization
-            weights, _, _ = load_pt_file(train_opts['pretrained_file'])
+            data = load_pt_file(train_opts['pretrained_file'])
+            weights = data['model']
+            self._found_optim_state = data.get('optimizer', None)
+
             for name in get_module_groups(weights.keys()):
                 self.print(
                     ' -> will initialize {}.* with pretrained weights.'.format(name))
@@ -97,6 +101,14 @@ class MainLoop(object):
             lr_decay_min=self.lr_decay_min,
             lr_decay_patience=self.lr_decay_patience)
         self.print(self.optim)
+
+        if self._found_optim_state:
+            # NOTE: This will overwrite weight_decay and lr parameters
+            # from the checkpoint without obeying to new config file!
+            self.optim.load_state_dict(self._found_optim_state)
+
+        if self.save_optim_state:
+            self.monitor.set_optimizer(self.optim)
 
         # Create TensorBoard logger if possible and requested
         self.tb = TensorBoard(self.model, self.tensorboard_dir,

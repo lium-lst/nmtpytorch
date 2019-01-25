@@ -14,7 +14,8 @@ if __name__ == '__main__':
         print('Usage: {} <.ckpt file>'.format(sys.argv[0]))
         sys.exit(1)
 
-    weights, history, opts = load_pt_file(pt_file)
+    data = load_pt_file(pt_file)
+    weights, history, opts = data['model'], data['history'], data['opts']
 
     if not history:
         print('This is not a .ckpt file with history information.')
