@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
+import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from ...utils.data import sort_batch
+#import ipdb
 
+from ...utils.data import sort_batch
+from ...utils.nn import ModuleDict
+from ...utils.scheduler import Scheduler
 
 class TextSpecEncoder(nn.Module):
     """A recurrent encoder with embedding layer for multiple languages with common/spec features.
@@ -38,26 +42,28 @@ class TextSpecEncoder(nn.Module):
             that may further be used in attention and/or decoder. `None`
             is returned if batch contains only sentences with same lengths.
     """
-    def __init__(self, topology, specialization,
+    def __init__(self, topology, specialisation,
                 input_size, hidden_size, input_spec_size, hidden_spec_size,
-                n_vocabs, rnn_type, num_layers=1, bidirectional=True,
+                n_vocab, rnn_type, scheduler, num_layers=1, bidirectional=True,
                  dropout_rnn=0, dropout_emb=0, dropout_ctx=0,
                  emb_maxnorm=None, emb_gradscale=False):
         super().__init__()
 
         self.topology = topology
-        self.specialization = specialization
+        self.specialisation = specialisation
         self.rnn_type = rnn_type.upper()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.input_spec_size = input_spec_size
         self.hidden_spec_size = hidden_spec_size
-        self.n_vocab = n_vocab
+        #self.n_vocab = n_vocabs
+        self.n_vocab = n_vocab#["fi+et_src"]
         self.num_layers = num_layers
         self.bidirectional = bidirectional
         self.emb_maxnorm = emb_maxnorm
         self.emb_gradscale = emb_gradscale
-        
+        self.scheduler = scheduler
+
         self.embs = ModuleDict()
 
         # For dropout btw layers, only effective if num_layers > 1
@@ -78,30 +84,33 @@ class TextSpecEncoder(nn.Module):
             self.do_ctx = nn.Dropout(self.dropout_ctx)
 
         # Create embedding layer
-        
-        # depending on specialization
-        if self.specialization == 'source':
+
+        # depending on specialisation
+        if self.specialisation == 'source':
             for l in self.topology.srcs.values():
-                self.embs[l] = nn.Embedding(self.n_vocab, self.input_spec_size,
+                self.embs[str(l)] = nn.Embedding(self.n_vocab[str(l)], self.input_spec_size,
                                 padding_idx=0, max_norm=self.emb_maxnorm,
                                 scale_grad_by_freq=self.emb_gradscale)
-        elif self.specialization == 'target':
+
+        elif self.specialisation == 'target':
             for l in self.topology.trgs.values():
-                self.embs[l] = nn.Embedding(self.n_vocab, self.input_spec_size,
+                self.embs[str(l)] = nn.Embedding(self.n_vocab[str(l)], self.input_spec_size,
                                 padding_idx=0, max_norm=self.emb_maxnorm,
                                 scale_grad_by_freq=self.emb_gradscale)
         else: # both
             for l1 in self.topology.srcs.values():
                 for l2 in self.topology.trgs.values():
-                    # NOTE: we might want to avoid autoencoder specialization
+                    # NOTE: we might want to avoid autoencoder specialisation
                     #if l1.split('_')[0] != l2.split('_')[0]:
-                    self.embs[l1+'-'+l2] = nn.Embedding(self.n_vocab, self.input_spec_size,
-                                    padding_idx=0, max_norm=self.emb_maxnorm,
-                                    scale_grad_by_freq=self.emb_gradscale)
+                    self.embs[str(l1)+'-'+str(l2)] = nn.Embedding(self.n_vocab[str(l1)], self.input_spec_size,
+                                     padding_idx=0, max_norm=self.emb_maxnorm,
+                                     scale_grad_by_freq=self.emb_gradscale)
 
-        self.embs['common'] = nn.Embedding(self.n_vocab, self.input_size,
-                                    padding_idx=0, max_norm=self.emb_maxnorm,
-                                    scale_grad_by_freq=self.emb_gradscale)
+        #FIXME: here forcing n_vocab->l1, we force a unique encoder to simplify with only one vocabulary for the common part
+        for l1 in self.topology.srcs.values():
+            self.embs['common'] = nn.Embedding(self.n_vocab[str(l1)], self.input_size,
+                                        padding_idx=0, max_norm=self.emb_maxnorm,
+                                        scale_grad_by_freq=self.emb_gradscale)
 
         # Create fused/cudnn encoder according to the requested type
         RNN = getattr(nn, self.rnn_type)
@@ -110,15 +119,26 @@ class TextSpecEncoder(nn.Module):
                        dropout=self.dropout_rnn,
                        bidirectional=self.bidirectional)
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         if (x == 0).nonzero().size():
-            return self.forward_mixed_len_batches(x)
+            return self.forward_mixed_len_batches(x, **kwargs)
         else:
-            return self.forward_same_len_batches(x)
+            return self.forward_same_len_batches(x, **kwargs)
 
-    def forward_same_len_batches(self, x):
+    def forward_same_len_batches(self, x, **kwargs):
+        # Get the current training pair for specific embeddings
+        enc_ids, dec_ids, _ = self.scheduler.get_encs_and_decs()
+        task_id = kwargs.get('task_id', None)
+        enc_id_from_task_id, dec_id_from_task_id = task_id.split('-')
+        if self.specialisation=="source":
+            spec=str(enc_ids)
+        elif self.specialisation=="target":
+            spec=str(dec_ids)
+        else:
+            spec=str(enc_ids[enc_id_from_task_id])+'-'+str(dec_ids[dec_id_from_task_id])
         # Fetch embeddings
-        embs = self.emb(x)
+        #TODO: Check resulting shape from cat
+        embs = torch.cat((self.embs['common'](x) , self.embs[spec](x)), 2)
 
         if self.dropout_emb > 0:
             embs = self.do_emb(embs)
@@ -139,8 +159,18 @@ class TextSpecEncoder(nn.Module):
         # slens: lengths in sorted order for pack_padded_sequence()
         oidxs, sidxs, slens, mask = sort_batch(x)
 
+        # Get the current training pair for specific embeddings
+        enc_ids, dec_ids, _ = self.scheduler.get_encs_and_decs()
+        if self.specialisation=="source":
+            spec=str(enc_ids)
+        elif self.specialisation=="target":
+            spec=str(dec_ids)
+        else:
+            spec=str(enc_ids)+'-'+str(dec_ids)
+
         # Fetch embeddings for the sorted batch
-        embs = self.emb(x[:, sidxs])
+        #TODO: Check resulting shape from cat
+        embs = torch.cat((self.embs['common'](x[:, sidxs]) , self.embs[spec](x[:, sidxs])), 0)
 
         if self.dropout_emb > 0:
             embs = self.do_emb(embs)

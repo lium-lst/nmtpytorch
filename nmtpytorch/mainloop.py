@@ -159,6 +159,8 @@ class MainLoop(object):
         self.loss_meter = Loss()
 
         for batch in self.train_iterator:
+
+            # FIXME: here, we should increment scheduler counter
             self.monitor.uctr += 1
 
             # Keep stats

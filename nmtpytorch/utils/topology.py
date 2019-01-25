@@ -85,10 +85,16 @@ class Topology(object):
         return [v for v in self.trgs.values() if v._type == _type]
 
     def get_src_langs(self):
-        return self.get_srcs('Text')
+        if self.get_srcs('Text') != []:
+            return self.get_srcs('Text')
+        else:
+            return self.get_srcs('TextSpec')
 
     def get_trg_langs(self):
-        return self.get_trgs('Text')
+        if self.get_trgs('Text') != []:
+            return self.get_trgs('Text')
+        else:
+            return self.get_trgs('TextSpec')
 
     def __getitem__(self, key):
         return self.all[key]

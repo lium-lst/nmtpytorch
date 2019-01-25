@@ -3,6 +3,8 @@ import logging
 import random
 from itertools import cycle
 
+#import ipdb
+
 from .topology import Topology
 
 logger = logging.getLogger('nmtpytorch')
@@ -71,7 +73,8 @@ class Scheduler(object):
         if self.manual_schedule is not None:
 
             # increment batch counter and select the current scheduled task
-            self._inc_counter()
+            # FIXME: this is problematic and counter-intuitive. _get_ function should be disconnected from increment batch counter!
+            #self._inc_counter()
 
             these_encs = self.manual_schedule[self.curr_key][0].srcs
             # return appropriate set of encoders

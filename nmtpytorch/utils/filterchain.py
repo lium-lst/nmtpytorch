@@ -17,6 +17,7 @@ class FilterChain(object):
             'de-spm': Stitches back sentence pieces produced with spm_encode
             'de-segment': Converts <tag:morpheme> to normal form
             'de-compond': Stitches back German compound splittings
+            'de-hyphen': De-hyphenate 'foo @-@ bar' constructs of Moses.
             'c2w': Stitches back space delimited characters to words.
                 Necessary for word-level BLEU, etc. when using CharNMT.
     """
@@ -35,6 +36,7 @@ class FilterChain(object):
                                    .replace(" @", "").replace("@ ", "")),
         'lower': lambda s: s.lower(),
         'upper': lambda s: s.upper(),
+        'de-hyphen': lambda s: re.sub('\s*@-@\s*', '-', s),
     }
 
     def __init__(self, filters):

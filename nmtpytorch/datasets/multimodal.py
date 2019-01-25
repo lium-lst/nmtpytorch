@@ -63,6 +63,9 @@ class MultimodalDataset(Dataset):
                 # Prepend <bos> if datasource is on target side
                 self.datasets[ds] = TextDataset(
                     data[key], vocabs[key], bos=ds.trg)
+            elif ds._type == "TextSpec":
+                self.datasets[ds] = TextDataset(
+                        data[key], vocabs[key], bos=ds.trg)
             elif ds._type == "OneHot":
                 self.datasets[ds] = OneHotDataset(data[key], vocabs[key])
             elif ds._type == "ImageFolder":

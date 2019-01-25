@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from ..layers import TextEncoder, ImageEncoder, VectorDecoder
+from ..layers import TextSpecEncoder, TextEncoder, ImageEncoder, VectorDecoder
 from ..layers import FeatureEncoder, MaxMargin, FF
 from ..layers import BiLSTMp
 from ..layers import SimpleGRUDecoder, ConditionalDecoder, ZSpaceAtt
@@ -36,8 +36,8 @@ class MultitaskAtt(nn.Module):
             # ------------- Options for text encoder (bidir RNN)
             'te_emb_dim': 128,              # Source and target embedding sizes
             'te_enc_dim': 128,              # Encoder hidden size
-            'te_emb_spec_dim': 64,              # Source and target embedding sizes
-            'te_enc_spec_dim': 64,              # Encoder hidden size
+            'te_emb_spec_dim': 100,              # Source and target embedding sizes
+            'te_enc_spec_dim': 100,              # Encoder hidden size
             'te_enc_type': 'gru',           # Encoder type (gru|lstm)
             'te_dropout_emb': 0,            # Simple dropout to source embeddings
             'te_dropout_ctx': 0,            # Simple dropout to source encodings
@@ -138,7 +138,9 @@ class MultitaskAtt(nn.Module):
             'pooling_type': 'mean',         # pooling method to be used before max-margin layer (mean)
             'margin': 0.1,                  # max-margin layer "alpha"
             'max_violation': False,         # max-margin hinge type (True: max-of-hinges, False: sum-of-hinges)
-            'sim_function': 'cosine'        # max-margin similarity function
+            'sim_function': 'cosine',       # max-margin similarity function
+            # ------------- Options for Specific encoders
+            'specialisation': 'both'            # specific encoder specification (source|target|both)
         }
 
     def __init__(self, opts):
@@ -157,7 +159,7 @@ class MultitaskAtt(nn.Module):
         self.n_tvocabs = {}     # sizes of sources vocabs
         self.val_refs = {}
         self.ctx_sizes = {}
-
+        self.specialisation = ''
         # Each auxiliary loss should be stored inside this dictionary
         # in order to be taken into account by the mainloop for multi-tasking
         self.aux_loss = {}
@@ -174,6 +176,7 @@ class MultitaskAtt(nn.Module):
         # Inherently non multi-lingual aware <-- Let's change that!
         slangs = self.topology.get_src_langs()
         tlangs = self.topology.get_trg_langs()
+
         for sl in slangs:
             self.slangs.append(sl)
             self.svocabs[sl] = self.vocabs[sl]
@@ -278,10 +281,22 @@ class MultitaskAtt(nn.Module):
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
 
+        if is_train:
+            # create scheduler
+            self.scheduler = Scheduler(
+                self.topology, self.schedule_type_enc, self.schedule_type_dec,
+                self.droptask_prob, self.droptask_e_delay, self.manual_schedule)
+            if self.use_mpn:
+                self.scheduler.check_mpn()
+            if self.manual_schedule is not None and self.loss_scaling is not None:
+                assert self.manual_schedule.keys() == self.loss_scaling.keys(), \
+                    "Keys for manual_schedule and loss_scaling must match."
+
         # create encoders
         self.encs = ModuleDict()
         self.encs_type = {}
         enc_switcher = {
+            "TextSpec": self.create_text_spec_encoder,
             "Text": self.create_text_encoder,
             "Image": self.create_image_encoder,
             "Kaldi": self.create_speech_encoder,
@@ -290,6 +305,7 @@ class MultitaskAtt(nn.Module):
         self.single_ffs = ModuleDict()
         ff_switcher = {
             "Text": self.create_text_ff,
+            "TextSpec": self.create_text_ff,
             "Kaldi": self.create_speech_ff,
             "Shelve": self.create_video_ff
         }
@@ -327,7 +343,7 @@ class MultitaskAtt(nn.Module):
             "Image": self.create_image_decoder,
             "Text": self.create_attentional_text_decoder,
             "Kaldi": self.create_speech_decoder,
-            "Shelve": self.create_video_decoder
+            #"Shelve": self.create_video_decoder
         }
         dec_ff_switcher = {
             "Text": self.create_dec_text_ff,
@@ -341,16 +357,6 @@ class MultitaskAtt(nn.Module):
             create_ff = dec_ff_switcher.get(d._type, "Invalid FF transform {} for {}".format(d._type, d))
             self.single_ffs[str(d)] = create_ff(str(d))
 
-        if is_train:
-            # create scheduler
-            self.scheduler = Scheduler(
-                self.topology, self.schedule_type_enc, self.schedule_type_dec,
-                self.droptask_prob, self.droptask_e_delay, self.manual_schedule)
-            if self.use_mpn:
-                self.scheduler.check_mpn()
-            if self.manual_schedule is not None and self.loss_scaling is not None:
-                assert self.manual_schedule.keys() == self.loss_scaling.keys(), \
-                    "Keys for manual_schedule and loss_scaling must match."
 
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
@@ -385,9 +391,22 @@ class MultitaskAtt(nn.Module):
                 if the relevant modality does not require a mask.
         """
 
-        task_id = kwargs.get('task_id', None)
+        #task_id = kwargs.get('task_id', None)
+        #enc_ids = kwargs.get('enc_ids', None)
 
         #logger.info("encode: batch is {}".format(batch))
+        enc_ids, dec_ids, _ = self.scheduler.get_encs_and_decs()
+        if self.specialisation=="source":
+            for i in self.topology.srcs.values():
+                task_id=str(i)
+        elif self.specialisation=="target":
+            for j in self.topology.trgs.values():
+                task_id=str(j)
+        else:
+            for i in self.topology.srcs.values():
+                for j in self.topology.trgs.values():
+                    task_id=str(i) + '-' + str(j)
+
         if enc_ids is None:
             raise Exception('Encoders not given')
         else:
@@ -395,7 +414,7 @@ class MultitaskAtt(nn.Module):
             for e in enc_ids:
                 #logger.info("encoding batch {} with {} ".format(batch[e].shape, e))
                 #the encoders() return a tuple (values, mask) where mask can be None if sent have same length
-                enc_results[e] = self.encs[e](batch, task_id)
+                enc_results[e] = self.encs[e](batch[e], task_id=task_id)
                 #logger.info("enc_res[{}] size is {}".format(e, enc_results[e][0].shape))
 
         assert(enc_results), "For some reason, the encoding results are empty!"
@@ -435,6 +454,7 @@ class MultitaskAtt(nn.Module):
         # uctr = kwargs['uctr']
         # ectr = kwargs['ectr']
         val_task = kwargs.get('val_task', None)
+        task_id=kwargs.get('task_id', None)
 
         dec_results = {}
         # encode the batch and project it to latent space
@@ -444,6 +464,7 @@ class MultitaskAtt(nn.Module):
             dec_results = self.decode(enc_results, batch, val_task.trgs)
         else:
             enc_ids, dec_ids, _ = self.scheduler.get_encs_and_decs()
+            self.scheduler._inc_counter()
             enc_results = self.encode(batch, enc_ids=enc_ids, dec_ids=dec_ids)
             dec_results = self.decode(enc_results, batch, dec_ids)
             if self.use_mpn:
@@ -511,22 +532,38 @@ class MultitaskAtt(nn.Module):
     ######
     # Functions to create a text encoder and decoder with default parameters
     ######
-    def create_text_spec_encoder(self):
+    def create_text_spec_encoder(self, id):
         return TextSpecEncoder(
+        #return TextEncoder(
             topology=self.topology,
-            specialization=self.opts.model['specialization'],
+            specialisation=self.opts.model['specialisation'],
             input_size=self.opts.model['te_emb_dim'],
             hidden_size=self.opts.model['te_enc_dim'],
             input_spec_size=self.opts.model['te_emb_spec_dim'],
             hidden_spec_size=self.opts.model['te_enc_spec_dim'],
-            n_vocabs=self.n_svocabs,
+            #n_vocabs=self.n_svocabs,
+            n_vocab=self.n_svocabs,
             rnn_type=self.opts.model['te_enc_type'],
             dropout_emb=self.opts.model['te_dropout_emb'],
             dropout_ctx=self.opts.model['te_dropout_ctx'],
             dropout_rnn=self.opts.model['te_dropout_enc'],
             num_layers=self.opts.model['te_n_encoders'],
             emb_maxnorm=self.opts.model['te_emb_maxnorm'],
-            emb_gradscale=self.opts.model['te_emb_gradscale'])
+            emb_gradscale=self.opts.model['te_emb_gradscale'],
+            scheduler=self.scheduler)
+
+    def create_text_encoder(self, id):
+        return TextEncoder(
+                input_size=self.opts.model['te_emb_dim'],
+                hidden_size=self.opts.model['te_enc_dim'],
+                n_vocab=self.n_svocabs,
+                rnn_type=self.opts.model['te_enc_type'],
+                dropout_emb=self.opts.model['te_dropout_emb'],
+                dropout_ctx=self.opts.model['te_dropout_ctx'],
+                dropout_rnn=self.opts.model['te_dropout_enc'],
+                num_layers=self.opts.model['te_n_encoders'],
+                emb_maxnorm=self.opts.model['te_emb_maxnorm'],
+                emb_gradscale=self.opts.model['te_emb_gradscale'])
 
     def create_text_ff(self, id):
         ''' Only used to create an additional non-linearity between
