@@ -43,6 +43,7 @@ TRAIN_DEFAULTS = {
                                  # Useful when using pretrained_file
     'save_best_metrics': True,   # Save best models for each eval_metric
     'save_path': '',             # Path to root experiment folder
+    'save_optim_state': False,   # Save optimizer states into checkpoint
     'checkpoint_freq': 5000,     # Periodic checkpoint frequency
     'n_checkpoints': 5,          # Number of checkpoints to keep
     'tensorboard_dir': '',       # Enable TB and give global log folder

@@ -32,7 +32,9 @@ class Tester:
         # Disable gradient tracking
         torch.set_grad_enabled(False)
 
-        weights, _, opts = load_pt_file(self.model_file)
+        data = load_pt_file(self.model_file)
+        weights, _, opts = data['model'], data['history'], data['opts']
+
         opts = Options.from_dict(opts, override_list=self.override)
         instance = getattr(models, opts.train['model_type'])(opts=opts)
 

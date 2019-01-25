@@ -41,7 +41,8 @@ class Translator:
 
         # Create model instances and move them to device
         for model_file in self.models:
-            weights, _, opts = load_pt_file(model_file)
+            data = load_pt_file(model_file)
+            weights, _, opts = data['model'], data['history'], data['opts']
             opts = Options.from_dict(opts, override_list=self.override)
 
             # Create model instance
