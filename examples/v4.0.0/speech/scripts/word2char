@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+import sys
+import argparse
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(prog='word2char')
+
+    parser.add_argument('-i', '--has-ids', action='store_true',
+                        help='Enable if input file has segment IDs in first column.')
+    parser.add_argument('-s', '--space', default='<s>',
+                        help='Placeholder token for explicit space characters.')
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    for line in sys.stdin:
+        text = line.strip()
+        if args.has_ids:
+            sid, text = text.split(' ', 1)
+
+        text = ' '.join(list(text)).replace('   ', ' {} '.format(args.space))
+        print(text.replace('[ n o i s e ]', '[noise]').replace(
+            '[ v o c a l i z e d - n o i s e ]', '[vocalized-noise]').replace(
+                '[ l a u g h t e r ]', '[laughter]'))
