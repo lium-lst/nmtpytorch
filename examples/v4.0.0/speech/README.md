@@ -11,13 +11,26 @@ features and labels to train an ASR system.
 
 Right now nmtpytorch only supports Kaldi feature files namely `.ark` and `.scp`
 files along with a special folder structure. Let's assume that all speech related
-files are under `/path/to/data/speech`. The data should be further organized
-as follows:
+files are under `~/data/swbd`:
+  - Each train/test set split should have a corresponding subfolder with the following files:
+    - feats.scp
+    - cmvn.scp
+    - text
+    - utt2spk
+  - The paths to `.ark` files in the `.scp` files should be valid paths.
+  
+Once you have this folder hierarchy ready, you can modify the input and output folder paths in the `scripts/prepare.sh` accordingly and launch the script. The script will create the uncompressed feature files in the format required by `nmtpytorch`. Specifically, the output folder hierarchy should look something like below:
 
-  - A subfolder for each dataset split, i.e. train, dev, test and other sets.
-    - An `.scp` file which should be called `feats_local.scp`
-    - A `segments.len` file listing the number of frames per utterance on each line.
-  - The `.ark` files referred to by the `feats_local.scp` should be uncompressed
-    using `copy-feats` utility from Kaldi.
+```
+/tmp/data/swbd/
+├── eval2000_test
+│   ├── feats_local.scp
+│   └── segments.len
+├── train_dev
+│   ├── feats_local.scp
+│   └── segments.len
+└── train_nodup
+    ├── feats_local.scp
+    └── segments.len
+```
 
-We will further detail how to ge
