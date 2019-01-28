@@ -2,10 +2,7 @@ Automatic Speech Recognition (ASR)
 --
 
 Two example configuration files for character level and subword level
-ASR systems.
-
-First, we will briefly specify how to organize the input and output
-features and labels to train an ASR system.
+ASR systems. These experiments make use of the [ASR](https://github.com/lium-lst/nmtpytorch/blob/master/nmtpytorch/models/asr.py) model from `nmtpytorch`.
 
 ## Preparing Kaldi features
 
