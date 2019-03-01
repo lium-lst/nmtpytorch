@@ -76,6 +76,9 @@ class MultimodalDataset(Dataset):
         sizes = set([len(dataset) for dataset in self.datasets.values()])
         assert len(sizes) == 1, "Non-parallel datasets are not supported."
 
+        # Set dataset size
+        self.size = list(sizes)[0]
+
         # Set list of available datasets
         self.keys = list(self.datasets.keys())
 
@@ -113,9 +116,6 @@ class MultimodalDataset(Dataset):
         # Set some metadata
         self.n_sources = len([k for k in self.keys if k.src])
         self.n_targets = len([k for k in self.keys if k.trg])
-
-        # Set dataset size
-        self.size = list(sizes)[0]
 
     def __getitem__(self, idx):
         return {k: self.datasets[k][idx] for k in self.keys}
