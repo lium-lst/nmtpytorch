@@ -9,7 +9,9 @@ from . import ConditionalDecoder
 
 class ConditionalMMDecoder(ConditionalDecoder):
     """A conditional multimodal decoder with multimodal attention."""
-    def __init__(self, fusion_type='concat', aux_ctx_name='image', **kwargs):
+    def __init__(self, fusion_type='concat',
+                 aux_ctx_name='image', att_type='md-dd',
+                 out_logic='simple', **kwargs):
         super().__init__(**kwargs)
         self.aux_ctx_name = aux_ctx_name
 

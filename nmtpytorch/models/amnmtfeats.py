@@ -21,6 +21,12 @@ class AttentiveMNMTFeatures(NMT):
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
             'n_channels': 2048,         # depends on the features used
             'alpha_c': 0.0,             # doubly stoch. attention
+            'att_type': 'md-dd',        # multimodal attention type
+                                        # md: modality dep.
+                                        # mi: modality indep.
+                                        # dd: decoder state dep.
+                                        # di: decoder state indep.
+            'out_logic': 'simple',      # simple vs deep output
             'img_sequence': False,      # if true img is sequence of img features,
                                         # otherwise it's a conv map
         })
