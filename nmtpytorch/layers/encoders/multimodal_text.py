@@ -75,7 +75,7 @@ class MultimodalTextEncoder(TextEncoder):
                 self.tile_factor *= 2
             out_dim = self.hidden_size * self.n_init_types
             inp_dim = self.feat_size
-        elif self.feat_fusion in ('concat', 'sum', 'prepend', 'append'):
+        elif self.feat_fusion in ('concat', 'sum', 'prepend', 'append', 'srcmul'):
             out_dim = self.input_size
             inp_dim = self.feat_size
             if self.feat_fusion == 'concat':
@@ -84,6 +84,8 @@ class MultimodalTextEncoder(TextEncoder):
                     (e, v.expand(e.shape[0], -1, -1)), dim=-1))
             elif self.feat_fusion == 'sum':
                 self.merge_op = lambda e, v: e + self.ff_vis(v)
+            elif self.feat_fusion == 'srcmul':
+                self.merge_op = lambda e, v: e * self.ff_vis(v)
             elif self.feat_fusion == 'prepend':
                 self.merge_op = lambda e, v: torch.cat((self.ff_vis(v), e), dim=0)
             elif self.feat_fusion == 'append':
