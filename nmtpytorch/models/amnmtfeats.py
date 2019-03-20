@@ -21,7 +21,7 @@ class AttentiveMNMTFeatures(NMT):
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
             'n_channels': 2048,         # depends on the features used
             'alpha_c': 0.0,             # doubly stoch. attention
-            'att_type': 'md-dd',        # multimodal attention type
+            'mm_att_type': 'md-dd',     # multimodal attention type
                                         # md: modality dep.
                                         # mi: modality indep.
                                         # dd: decoder state dep.
@@ -66,6 +66,8 @@ class AttentiveMNMTFeatures(NMT):
             tied_emb=self.opts.model['tied_emb'],
             dec_init=self.opts.model['dec_init'],
             att_type=self.opts.model['att_type'],
+            mm_att_type=self.opts.model['mm_att_type'],
+            out_logic=self.opts.model['out_logic'],
             att_activ=self.opts.model['att_activ'],
             transform_ctx=self.opts.model['att_transform_ctx'],
             mlp_bias=self.opts.model['att_mlp_bias'],

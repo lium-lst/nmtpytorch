@@ -10,10 +10,26 @@ from . import ConditionalDecoder
 class ConditionalMMDecoder(ConditionalDecoder):
     """A conditional multimodal decoder with multimodal attention."""
     def __init__(self, fusion_type='concat',
-                 aux_ctx_name='image', att_type='md-dd',
+                 aux_ctx_name='image', mm_att_type='md-dd',
                  out_logic='simple', **kwargs):
         super().__init__(**kwargs)
         self.aux_ctx_name = aux_ctx_name
+        self.mm_att_type = mm_att_type
+        self.out_logic = out_logic
+
+        # Parse attention type
+        att_str = sorted(self.mm_att_type.lower().split('-'))
+        assert len(att_str) == 2 and att_str[0][0] == 'd' and att_str[1][0] == 'm', \
+            "att_type should be m[d|i]-d[d-i]"
+        # Independent <d>ecoder state means shared dec state
+        self.shared_dec_state = att_str[0][1] == 'i'
+
+        # Independent <m>odality means sharing the mlp in the MLP attention
+        self.shared_att_mlp = att_str[1][1] == 'i'
+
+        # Sanity check
+        if self.shared_att_mlp and self.att_type != 'mlp':
+            raise Exception("Shared attention requires MLP attention.")
 
         # Define (context) fusion operator
         self.fusion_type = fusion_type
@@ -36,6 +52,13 @@ class ConditionalMMDecoder(ConditionalDecoder):
             transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
             att_activ=self.att_activ,
             att_bottleneck=self.att_bottleneck)
+
+        # Tune multimodal attention type
+        if self.shared_att_mlp:
+            self.txt_att.mlp.weight = self.img_att.mlp.weight
+
+        if self.shared_dec_state:
+            self.txt_att.hid2ctx.weight = self.img_att.hid2ctx.weight
 
     def f_next(self, ctx_dict, y, h):
         # Get hidden states from the first decoder (purely cond. on LM)
