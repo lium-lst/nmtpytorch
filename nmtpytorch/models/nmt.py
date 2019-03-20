@@ -182,7 +182,8 @@ class NMT(nn.Module):
             sched_sample=self.opts.model['sched_sampling'],
             bos_type=self.opts.model['bos_type'],
             bos_dim=self.opts.model['bos_dim'],
-            bos_activ=self.opts.model['bos_activ'])
+            bos_activ=self.opts.model['bos_activ'],
+            bos_bias=self.opts.model['bos_type'] == 'feats')
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
