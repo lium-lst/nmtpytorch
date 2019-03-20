@@ -73,7 +73,7 @@ class ConditionalDecoder(nn.Module):
         self.bos_bias = bos_bias
 
         if self.bos_type == 'feats':
-            # Learn a <bos> embedding
+            # Learn a visual <bos> embedding
             self.ff_bos = FF(self.bos_dim, self.input_size, bias=self.bos_bias,
                              activ=self.bos_activ)
 
