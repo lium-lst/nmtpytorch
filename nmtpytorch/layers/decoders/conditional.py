@@ -187,7 +187,7 @@ class ConditionalDecoder(nn.Module):
         self.history = defaultdict(list)
         # Compute <bos> out of 'feats' if requested
         if self.bos_type == 'feats':
-            self.bos = self.ff_bos(ctx_dict['feats'][0])
+            self.bos = self.ff_bos(ctx_dict['feats'][0]).squeeze(0)
         return self._init_func(ctx_dict)
 
     def f_next(self, ctx_dict, y, h):
