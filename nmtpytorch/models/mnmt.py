@@ -16,6 +16,7 @@ class MultimodalNMT(NMT):
             'encinit':      Initialize RNNs in the encoder
             'decinit':      Initializes first decoder RNN.
             'srcmul':       Multiplicative interaction with src embs.
+            'ctxmul':       Multiplicative interaction with src encodings.
             'trgmul':       Multiplicative interaction with trg embs (not implemented yet)
             'encdecinit':   Initializes RNNs in the encoder & first decoder RNN.
             'concat':       Concat the embeddings and features (doubles RNN input)
