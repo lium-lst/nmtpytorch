@@ -15,8 +15,9 @@ class MultimodalNMT(NMT):
         Integration types (feat_fusion argument)
             'encinit':      Initialize RNNs in the encoder
             'decinit':      Initializes first decoder RNN.
+            'srcmul':       Multiplicative interaction with src embs.
+            'trgmul':       Multiplicative interaction with trg embs (not implemented yet)
             'encdecinit':   Initializes RNNs in the encoder & first decoder RNN.
-            'vbos':         Replace <bos> in decoder with visual features (Not implemented)
             'concat':       Concat the embeddings and features (doubles RNN input)
             'sum':          Sum the embeddings with projected features
             'prepend':      Input sequence: [vis, embs, eos]
