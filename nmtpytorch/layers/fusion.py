@@ -22,16 +22,19 @@ class Fusion(torch.nn.Module):
             concatenation. Only necessary if ``fusion_type==concat``.
     """
 
-    def __init__(self, fusion_type='concat', input_size=None, output_size=None):
+    def __init__(self, fusion_type='concat', input_size=None, output_size=None,
+                 fusion_activ=None):
         super().__init__()
 
         self.fusion_type = fusion_type
+        self.fusion_activ = fusion_activ
         self.forward = getattr(self, '_{}'.format(self.fusion_type))
 
         if self.fusion_type == 'concat':
             assert input_size and output_size, \
                 "input_size and output_size should be given for concat"
-            self.adaptor = FF(input_size, output_size, bias=False, activ=None)
+            self.adaptor = FF(input_size, output_size, bias=False,
+                              activ=self.fusion_activ)
 
     def _sum(self, *inputs):
         return reduce(operator.add, inputs)
@@ -43,6 +46,7 @@ class Fusion(torch.nn.Module):
         return self.adaptor(torch.cat(inputs, dim=-1))
 
     def __repr__(self):
-        return "Fusion(type={}, adaptor={})".format(
+        return "Fusion(type={}, adaptor={}, activ={})".format(
             self.fusion_type,
-            getattr(self, 'adaptor') if hasattr(self, 'adaptor') else 'None')
+            getattr(self, 'adaptor') if hasattr(self, 'adaptor') else 'None',
+            self.fusion_activ)
