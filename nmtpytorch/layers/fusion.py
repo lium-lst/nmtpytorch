@@ -5,6 +5,7 @@ from functools import reduce
 import torch
 
 from . import FF
+from ..utils.nn import get_activation_fn
 
 
 class Fusion(torch.nn.Module):
@@ -27,23 +28,24 @@ class Fusion(torch.nn.Module):
         super().__init__()
 
         self.fusion_type = fusion_type
-        self.fusion_activ = fusion_activ
         self.forward = getattr(self, '_{}'.format(self.fusion_type))
+
+        self.fusion_activ = fusion_activ
+        self.activ = get_activation_fn(fusion_activ)
 
         if self.fusion_type == 'concat':
             assert input_size and output_size, \
                 "input_size and output_size should be given for concat"
-            self.adaptor = FF(input_size, output_size, bias=False,
-                              activ=self.fusion_activ)
+            self.adaptor = FF(input_size, output_size, bias=False, activ=None)
 
     def _sum(self, *inputs):
-        return reduce(operator.add, inputs)
+        return self.activ(reduce(operator.add, inputs))
 
     def _mul(self, *inputs):
-        return reduce(operator.mul, inputs)
+        return self.activ(reduce(operator.mul, inputs))
 
     def _concat(self, *inputs):
-        return self.adaptor(torch.cat(inputs, dim=-1))
+        return self.activ(self.adaptor(torch.cat(inputs, dim=-1)))
 
     def __repr__(self):
         return "Fusion(type={}, adaptor={}, activ={})".format(
