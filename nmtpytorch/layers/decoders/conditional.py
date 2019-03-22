@@ -19,11 +19,13 @@ class ConditionalDecoder(nn.Module):
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
                  transform_ctx=True, mlp_bias=False, dropout_out=0,
                  emb_maxnorm=None, emb_gradscale=False, sched_sample=0,
-                 bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False):
+                 bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False,
+                 out_logic='simple'):
         super().__init__()
 
         # Normalize case
         self.rnn_type = rnn_type.upper()
+        self.out_logic = out_logic
 
         # Safety checks
         assert self.rnn_type in ('GRU', 'LSTM'), \
@@ -113,7 +115,19 @@ class ConditionalDecoder(nn.Module):
             self.do_out = nn.Dropout(p=self.dropout_out)
 
         # Output bottleneck: maps hidden states to target emb dim
-        self.hid2out = FF(self.hidden_size, self.input_size,
+        # simple: tanh(W*h)
+        #   deep: tanh(W*h + U*emb + V*ctx)
+        out_inp_size = self.hidden_size
+
+        # Dummy op to return back the hidden state for simple output
+        self.out_merge_fn = lambda h, e, c: h
+
+        if self.out_logic == 'deep':
+            out_inp_size += (self.input_size + self.hidden_size)
+            self.out_merge_fn = lambda h, e, c: torch.cat((h, e, c), dim=1)
+
+        # Final transformation that receives concatenated outputs or only h
+        self.hid2out = FF(out_inp_size, self.input_size,
                           bias_zero=True, activ='tanh')
 
         # Final softmax
@@ -207,8 +221,8 @@ class ConditionalDecoder(nn.Module):
         h2_c2 = self.dec1(txt_z_t, h1_c1)
         h2 = get_rnn_hidden_state(h2_c2)
 
-        # This is a bottleneck to avoid going from H to V directly
-        logit = self.hid2out(h2)
+        # Output logic
+        logit = self.hid2out(self.out_merge_fn(h2, y, txt_z_t))
 
         # Apply dropout if any
         if self.dropout_out > 0:
