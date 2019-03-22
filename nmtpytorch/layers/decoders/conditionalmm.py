@@ -9,7 +9,7 @@ from . import ConditionalDecoder
 
 class ConditionalMMDecoder(ConditionalDecoder):
     """A conditional multimodal decoder with multimodal attention."""
-    def __init__(self, fusion_type='concat',
+    def __init__(self, fusion_type='concat', fusion_activ=None,
                  aux_ctx_name='image', mm_att_type='md-dd',
                  **kwargs):
         super().__init__(**kwargs)
@@ -38,7 +38,8 @@ class ConditionalMMDecoder(ConditionalDecoder):
                 self.hidden_size, self.hidden_size)
         else:
             self.fusion = Fusion(
-                fusion_type, 2 * self.hidden_size, self.hidden_size)
+                fusion_type, 2 * self.hidden_size, self.hidden_size,
+                fusion_activ=fusion_activ)
 
         # Rename textual attention layer
         self.txt_att = self.att
