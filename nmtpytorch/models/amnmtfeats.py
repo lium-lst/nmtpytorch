@@ -19,6 +19,7 @@ class AttentiveMNMTFeatures(NMT):
         super().set_defaults()
         self.defaults.update({
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
+            'fusion_activ': None,       # Multimodal context non-linearity
             'n_channels': 2048,         # depends on the features used
             'alpha_c': 0.0,             # doubly stoch. attention
             'mm_att_type': 'md-dd',     # multimodal attention type
@@ -63,6 +64,7 @@ class AttentiveMNMTFeatures(NMT):
             ctx_size_dict=self.ctx_sizes,
             ctx_name=str(self.sl),
             fusion_type=self.opts.model['fusion_type'],
+            fusion_activ=self.opts.model['fusion_activ'],
             tied_emb=self.opts.model['tied_emb'],
             dec_init=self.opts.model['dec_init'],
             att_type=self.opts.model['att_type'],
