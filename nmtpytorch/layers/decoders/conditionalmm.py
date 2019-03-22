@@ -11,11 +11,10 @@ class ConditionalMMDecoder(ConditionalDecoder):
     """A conditional multimodal decoder with multimodal attention."""
     def __init__(self, fusion_type='concat',
                  aux_ctx_name='image', mm_att_type='md-dd',
-                 out_logic='simple', **kwargs):
+                 **kwargs):
         super().__init__(**kwargs)
         self.aux_ctx_name = aux_ctx_name
         self.mm_att_type = mm_att_type
-        self.out_logic = out_logic
 
         # Parse attention type
         att_str = sorted(self.mm_att_type.lower().split('-'))
@@ -85,7 +84,7 @@ class ConditionalMMDecoder(ConditionalDecoder):
         h2 = get_rnn_hidden_state(h2_c2)
 
         # This is a bottleneck to avoid going from H to V directly
-        logit = self.hid2out(h2)
+        logit = self.hid2out(self.out_merge_fn(h2, y, z_t))
 
         # Apply dropout if any
         if self.dropout_out > 0:
