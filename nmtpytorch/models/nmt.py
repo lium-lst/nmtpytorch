@@ -58,6 +58,7 @@ class NMT(nn.Module):
             'bos_type': 'emb',          # 'emb': default learned emb
             'bos_activ': None,          #
             'bos_dim': None,            #
+            'out_logic': 'simple',      # 'simple' or 'deep' output
         }
 
     def __init__(self, opts):
@@ -183,7 +184,8 @@ class NMT(nn.Module):
             bos_type=self.opts.model['bos_type'],
             bos_dim=self.opts.model['bos_dim'],
             bos_activ=self.opts.model['bos_activ'],
-            bos_bias=self.opts.model['bos_type'] == 'feats')
+            bos_bias=self.opts.model['bos_type'] == 'feats',
+            out_logic=self.opts.model['out_logic'])
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
