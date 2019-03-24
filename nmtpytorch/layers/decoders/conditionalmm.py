@@ -37,8 +37,17 @@ class ConditionalMMDecoder(ConditionalDecoder):
                 [self.hidden_size, self.hidden_size],
                 self.hidden_size, self.hidden_size)
         else:
+            if self.att_ctx2hid:
+                # Old behaviour
+                fusion_inp_size = 2 * self.hidden_size
+            else:
+                fusion_inp_sizes = list(self.ctx_size_dict.values())
+                if fusion_type == 'concat':
+                    fusion_inp_size = sum(fusion_inp_sizes)
+                else:
+                    fusion_inp_size = fusion_inp_sizes[0]
             self.fusion = Fusion(
-                fusion_type, 2 * self.hidden_size, self.hidden_size,
+                fusion_type, fusion_inp_size, self.hidden_size,
                 fusion_activ=fusion_activ)
 
         # Rename textual attention layer
@@ -50,14 +59,18 @@ class ConditionalMMDecoder(ConditionalDecoder):
         self.img_att = Attention(
             self.ctx_size_dict[self.aux_ctx_name], self.hidden_size,
             transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
+            ctx2hid=self.att_ctx2hid,
             att_activ=self.att_activ,
             att_bottleneck=self.att_bottleneck)
 
         # Tune multimodal attention type
         if self.shared_att_mlp:
+            # Modality independent
             self.txt_att.mlp.weight = self.img_att.mlp.weight
+            self.txt_att.ctx2ctx.weight = self.img_att.ctx2ctx.weight
 
         if self.shared_dec_state:
+            # Decoder independent
             self.txt_att.hid2ctx.weight = self.img_att.hid2ctx.weight
 
     def f_next(self, ctx_dict, y, h):
