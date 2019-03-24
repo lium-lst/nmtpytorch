@@ -17,6 +17,7 @@ class ConditionalDecoder(nn.Module):
                  rnn_type, tied_emb=False, dec_init='zero', dec_init_activ='tanh',
                  dec_init_size=None, att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
+                 att_ctx2hid=True,
                  transform_ctx=True, mlp_bias=False, dropout_out=0,
                  emb_maxnorm=None, emb_gradscale=False, sched_sample=0,
                  bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False,
@@ -64,6 +65,7 @@ class ConditionalDecoder(nn.Module):
         self.att_type = att_type
         self.att_temp = att_temp
         self.transform_ctx = transform_ctx
+        self.att_ctx2hid = att_ctx2hid
         self.mlp_bias = mlp_bias
         self.dropout_out = dropout_out
         self.emb_maxnorm = emb_maxnorm
@@ -90,6 +92,7 @@ class ConditionalDecoder(nn.Module):
             self.ctx_size_dict[self.ctx_name],
             self.hidden_size,
             transform_ctx=self.transform_ctx,
+            ctx2hid=self.att_ctx2hid,
             mlp_bias=self.mlp_bias,
             att_activ=self.att_activ,
             att_bottleneck=self.att_bottleneck,
