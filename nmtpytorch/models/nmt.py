@@ -43,6 +43,7 @@ class NMT(nn.Module):
             'att_mlp_bias': False,      # Enables bias in attention mechanism
             'att_bottleneck': 'ctx',    # Bottleneck dimensionality (ctx|hid)
             'att_transform_ctx': True,  # Transform annotations before attention
+            'att_ctx2hid': True,        # Add one last FC layer on top of the ctx
             'dropout_emb': 0,           # Simple dropout to source embeddings
             'dropout_ctx': 0,           # Simple dropout to source encodings
             'dropout_out': 0,           # Simple dropout to decoder output
@@ -174,6 +175,7 @@ class NMT(nn.Module):
             att_type=self.opts.model['att_type'],
             att_temp=self.opts.model['att_temp'],
             att_activ=self.opts.model['att_activ'],
+            att_ctx2hid=self.opts.model['att_ctx2hid'],
             transform_ctx=self.opts.model['att_transform_ctx'],
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
