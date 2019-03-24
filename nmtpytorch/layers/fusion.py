@@ -28,21 +28,19 @@ class Fusion(torch.nn.Module):
         super().__init__()
 
         self.fusion_type = fusion_type
-        self.forward = getattr(self, '_{}'.format(self.fusion_type))
-
         self.fusion_activ = fusion_activ
+        self.forward = getattr(self, '_{}'.format(self.fusion_type))
         self.activ = get_activation_fn(fusion_activ)
+        self.adaptor = lambda x: x
 
-        if self.fusion_type == 'concat':
-            assert input_size and output_size, \
-                "input_size and output_size should be given for concat"
+        if self.fusion_type == 'concat' or input_size != output_size:
             self.adaptor = FF(input_size, output_size, bias=False, activ=None)
 
     def _sum(self, *inputs):
-        return self.activ(reduce(operator.add, inputs))
+        return self.activ(self.adaptor(reduce(operator.add, inputs)))
 
     def _mul(self, *inputs):
-        return self.activ(reduce(operator.mul, inputs))
+        return self.activ(self.adaptor(reduce(operator.mul, inputs)))
 
     def _concat(self, *inputs):
         return self.activ(self.adaptor(torch.cat(inputs, dim=-1)))
