@@ -76,6 +76,7 @@ class AttentiveMNMTFeaturesColing(NMT):
             out_logic=self.opts.model['out_logic'],
             att_activ=self.opts.model['att_activ'],
             transform_ctx=self.opts.model['att_transform_ctx'],
+            att_ctx2hid=False,
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'],
