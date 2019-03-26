@@ -6,6 +6,7 @@ import torch
 
 from ..datasets import MultimodalDataset
 from ..layers import ConditionalMMDecoder, TextEncoder, FF
+from ..utils.topology import Topology
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
@@ -37,6 +38,10 @@ class AttentiveMNMTFeaturesColingMasked(NMT):
         super().__init__(opts)
         if self.opts.model['alpha_c'] > 0:
             self.aux_loss['alpha_reg'] = 0.0
+
+        self.test_topology = self.topology
+        if 'test_direction' in self.opts.model:
+            self.test_topology = Topology(self.opts.model['test_direction'])
 
     def setup(self, is_train=True):
         txt_ctx_size = list(self.ctx_sizes.values())[0]
