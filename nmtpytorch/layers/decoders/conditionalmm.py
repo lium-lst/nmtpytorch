@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state
@@ -11,10 +12,11 @@ class ConditionalMMDecoder(ConditionalDecoder):
     """A conditional multimodal decoder with multimodal attention."""
     def __init__(self, fusion_type='concat', fusion_activ=None,
                  aux_ctx_name='image', mm_att_type='md-dd',
-                 **kwargs):
+                 persistent_dump=False, **kwargs):
         super().__init__(**kwargs)
         self.aux_ctx_name = aux_ctx_name
         self.mm_att_type = mm_att_type
+        self.persistent_dump = persistent_dump
 
         # Parse attention type
         att_str = sorted(self.mm_att_type.lower().split('-'))
@@ -92,6 +94,12 @@ class ConditionalMMDecoder(ConditionalDecoder):
             self.h_att, z_t = self.fusion([txt_z_t, img_z_t], h1.unsqueeze(0))
         else:
             z_t = self.fusion(txt_z_t, img_z_t)
+
+        if not self.training and self.persistent_dump:
+            # For test-time activation debugging
+            self.persistence['z_t'].append(z_t.t().cpu().numpy())
+            self.persistence['txt_z_t'].append(txt_z_t.t().cpu().numpy())
+            self.persistence['img_z_t'].append(img_z_t.t().cpu().numpy())
 
         # Run second decoder (h1 is compatible now as it was returned by GRU)
         h2_c2 = self.dec1(z_t, h1_c1)
