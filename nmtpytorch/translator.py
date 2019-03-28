@@ -3,6 +3,7 @@ import sys
 import math
 import time
 import logging
+import pickle as pkl
 from pathlib import Path
 
 import torch
@@ -140,6 +141,11 @@ class Translator:
         up_time = time.time() - start
         logger.info('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
+
+        if hasattr(self.instances[0].dec, 'persistent_dump') and \
+                self.instances[0].dec.persistent_dump:
+            with open('{}.dump'.format(self.models[0]), 'wb') as f:
+                pkl.dump(self.instances[0].dec.persistence, f)
 
         return hyps
 
