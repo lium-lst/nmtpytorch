@@ -28,6 +28,9 @@ class ConditionalDecoder(nn.Module):
         # Normalize case
         self.rnn_type = rnn_type.upper()
         self.out_logic = out_logic
+        # A persistent dictionary to save activations for further debugging
+        # Currently only used in MMT decoder
+        self.persistence = defaultdict(list)
 
         # Safety checks
         assert self.rnn_type in ('GRU', 'LSTM'), \
