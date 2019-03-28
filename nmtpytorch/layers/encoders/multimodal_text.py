@@ -64,7 +64,7 @@ class MultimodalTextEncoder(TextEncoder):
         ##################################################
         # Create the necessary visual transformation layer
         ##################################################
-        self.plain = self.feat_fusion is None
+        self.plain = self.feat_fusion is None or self.feat_fusion.startswith('trg')
         self.init_enc = self.feat_fusion in ('encinit', 'encdecinit')
         # No-op by default
         self.merge_op = lambda e, *v: e
