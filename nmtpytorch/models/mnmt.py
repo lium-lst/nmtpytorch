@@ -48,12 +48,14 @@ class MultimodalNMT(NMT):
         """Sets up NN topology by creating the layers."""
         # Hack to sync enc-decinit computation
         self.dec_requires_img = False
-        if self.opts.model['feat_fusion'] and \
-                'decinit' in self.opts.model['feat_fusion']:
-            self.opts.model['dec_init'] = 'feats'
-            self.opts.model['dec_init_size'] = self.opts.model['feat_dim']
-            self.opts.model['dec_init_activ'] = self.opts.model['feat_activ']
-            self.dec_requires_img = True
+        if self.opts.model['feat_fusion']:
+            if 'decinit' in self.opts.model['feat_fusion']:
+                self.opts.model['dec_init'] = 'feats'
+                self.opts.model['dec_init_size'] = self.opts.model['feat_dim']
+                self.opts.model['dec_init_activ'] = self.opts.model['feat_activ']
+                self.dec_requires_img = True
+            elif self.opts.model['feat_fusion'].startswith('trg'):
+                self.dec_requires_img = True
 
         self.enc = MultimodalTextEncoder(
             input_size=self.opts.model['emb_dim'],
@@ -91,7 +93,11 @@ class MultimodalNMT(NMT):
             dropout_out=self.opts.model['dropout_out'],
             emb_maxnorm=self.opts.model['emb_maxnorm'],
             emb_gradscale=self.opts.model['emb_gradscale'],
-            sched_sample=self.opts.model['sched_sampling'])
+            sched_sample=self.opts.model['sched_sampling'],
+            out_logic=self.opts.model['out_logic'],
+            emb_interact=self.opts.model['feat_fusion'],
+            emb_interact_dim=self.opts.model['feat_dim'],
+            emb_interact_activ=self.opts.model['feat_activ'])
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
