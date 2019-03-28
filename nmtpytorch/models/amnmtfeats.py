@@ -28,6 +28,7 @@ class AttentiveMNMTFeatures(NMT):
                                         # dd: decoder state dep.
                                         # di: decoder state indep.
             'out_logic': 'simple',      # simple vs deep output
+            'persistent_dump': False,   # To save activations during beam-search
             'img_sequence': False,      # if true img is sequence of img features,
                                         # otherwise it's a conv map
         })
@@ -77,7 +78,8 @@ class AttentiveMNMTFeatures(NMT):
             att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'],
             emb_maxnorm=self.opts.model['emb_maxnorm'],
-            emb_gradscale=self.opts.model['emb_gradscale'])
+            emb_gradscale=self.opts.model['emb_gradscale'],
+            persistent_dump=self.opts.model['persistent_dump'])
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
