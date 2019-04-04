@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
+import math
 import logging
 
 import torch
+from torch import nn
 
 from ..datasets import MultimodalDataset
 from ..layers import ConditionalMMDecoder, TextEncoder, FF
@@ -29,6 +32,8 @@ class AttentiveMNMTFeaturesColing(NMT):
                                         # di: decoder state indep.
             'out_logic': 'deep',        # simple vs deep output
             'persistent_dump': False,   # To save activations during beam-search
+            'preatt': False,            # Apply filtered attention
+            'preatt_activ': 'ReLU',     # Activation for convatt block
         })
 
     def __init__(self, opts):
@@ -37,7 +42,8 @@ class AttentiveMNMTFeaturesColing(NMT):
             self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
-        txt_ctx_size = list(self.ctx_sizes.values())[0]
+        # Textual context dim
+        txt_ctx_size = self.ctx_sizes[self.sl]
 
         # Add visual context transformation (sect. 3.2 in paper)
         self.ff_img = FF(self.opts.model['n_channels'], txt_ctx_size)
@@ -89,6 +95,17 @@ class AttentiveMNMTFeaturesColing(NMT):
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
 
+        if self.opts.model['preatt']:
+            # From 640+640 to 640
+            # To 1*W*W for attention scores
+            in_channels = sum(self.ctx_sizes.values())
+            self.preatt = nn.Sequential(OrderedDict([
+                ('conv1', nn.Conv2d(in_channels, self.ctx_sizes[self.sl], 1, 1)),
+                ('nlin1', getattr(nn, self.opts.model['preatt_activ'])()),
+                ('conv2', nn.Conv2d(self.ctx_sizes[self.sl], 1, 1, 1)),
+                ('nlin2', getattr(nn, self.opts.model['preatt_activ'])()),
+            ]))
+
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
         dataset = MultimodalDataset(
@@ -102,13 +119,43 @@ class AttentiveMNMTFeaturesColing(NMT):
         return dataset
 
     def encode(self, batch, **kwargs):
-        # Let's start with a None mask by assuming that
-        # we have a fixed-length feature collection
-        feats, feats_mask = self.ff_img(batch['image']), None
+        # Transform the features to context dim
+        feats = self.ff_img(batch['image'])
+
+        # Get source language encodings (S*B*C)
+        text_encoding = self.enc(batch[self.sl])
+
+        if self.opts.model['preatt']:
+            # Infer spatial width/height
+            w = int(math.sqrt(feats.shape[0]))
+
+            # image features will come as: (HW,B,C) -> (B, C, HW) -> (B, C, H, W)
+            conv_map = feats.permute(1, 2, 0).view(
+                *feats.shape[1:], w, w)
+
+            # Get last encoding (B*C)
+            last_encoding = text_encoding[0][-1]
+
+            # Tile over spatial dimensions: B*C*H*W
+            tiled_encoding = last_encoding[..., None, None].expand(
+                -1, -1, *conv_map.shape[2:])
+
+            # Final concat representation: B*(D+C)*H*W
+            concat = torch.cat([conv_map, tiled_encoding], dim=1)
+
+            att_scores = self.preatt(concat)
+            att_probs = nn.functional.softmax(
+                att_scores.view(batch.size, -1), dim=1).view_as(att_scores)
+
+            # Filter features
+            feats = conv_map * att_probs
+
+            # Get features into (B, C, HW) and then (HW, B, C)
+            feats = feats.view(*feats.shape[:2], -1).permute(2, 0, 1)
 
         return {
-            'image': (feats, feats_mask),
-            str(self.sl): self.enc(batch[self.sl]),
+            str(self.sl): text_encoding,
+            'image': (feats, None),
         }
 
     def forward(self, batch, **kwargs):
