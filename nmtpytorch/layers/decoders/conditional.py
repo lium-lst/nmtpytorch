@@ -6,7 +6,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from ...utils.nn import get_rnn_hidden_state
+from ...utils.nn import get_rnn_hidden_state, get_activation_fn
 from .. import FF
 from ..attention import get_attention
 
@@ -22,7 +22,7 @@ class ConditionalDecoder(nn.Module):
                  emb_maxnorm=None, emb_gradscale=False, sched_sample=0,
                  bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False,
                  out_logic='simple', emb_interact=None, emb_interact_dim=None,
-                 emb_interact_activ=None):
+                 emb_interact_activ=None, dec_inp_activ=None):
         super().__init__()
 
         # Normalize case
@@ -82,6 +82,7 @@ class ConditionalDecoder(nn.Module):
         self.emb_interact = emb_interact
         self.emb_interact_dim = emb_interact_dim
         self.emb_interact_activ = emb_interact_activ
+        self.dec_inp_activ_fn = get_activation_fn(dec_inp_activ)
 
         # no-ops
         self.emb_fn = lambda e, f: e
@@ -251,7 +252,9 @@ class ConditionalDecoder(nn.Module):
             self.history['alpha_txt'].append(txt_alpha_t)
 
         # Run second decoder (h1 is compatible now as it was returned by GRU)
-        h2_c2 = self.dec1(txt_z_t, h1_c1)
+        # Additional optional transformation is to make the comparison
+        # fair with the MMT model.
+        h2_c2 = self.dec1(self.dec_inp_activ_fn(txt_z_t), h1_c1)
         h2 = get_rnn_hidden_state(h2_c2)
 
         # Output logic
