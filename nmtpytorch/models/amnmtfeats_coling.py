@@ -144,11 +144,11 @@ class AttentiveMNMTFeaturesColing(NMT):
             concat = torch.cat([conv_map, tiled_encoding], dim=1)
 
             att_scores = self.preatt(concat)
-            att_probs = nn.functional.softmax(
+            self.pre_att = nn.functional.softmax(
                 att_scores.view(batch.size, -1), dim=1).view_as(att_scores)
 
             # Filter features
-            feats = conv_map * att_probs
+            feats = conv_map * self.pre_att
 
             # Get features into (B, C, HW) and then (HW, B, C)
             feats = feats.view(*feats.shape[:2], -1).permute(2, 0, 1)
