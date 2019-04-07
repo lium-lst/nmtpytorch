@@ -24,6 +24,7 @@ class AttentiveMNMTFeaturesColing(NMT):
             'alpha_c': 0.0,             # doubly stoch. attention
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
             'fusion_activ': 'tanh',     # Multimodal context non-linearity
+            'vis_activ': 'linear',      # Visual feature transformation activ.
             'n_channels': 2048,         # depends on the features used
             'mm_att_type': 'md-dd',     # multimodal attention type
                                         # md: modality dep.
@@ -46,7 +47,9 @@ class AttentiveMNMTFeaturesColing(NMT):
         txt_ctx_size = self.ctx_sizes[self.sl]
 
         # Add visual context transformation (sect. 3.2 in paper)
-        self.ff_img = FF(self.opts.model['n_channels'], txt_ctx_size)
+        self.ff_img = FF(
+            self.opts.model['n_channels'], txt_ctx_size,
+            activ=self.opts.model['vis_activ'])
 
         # Add vis ctx size
         self.ctx_sizes['image'] = txt_ctx_size
