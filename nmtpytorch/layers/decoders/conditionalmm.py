@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-from collections import defaultdict
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state
-from ..attention import HierarchicalAttention, get_attention
+from ..attention import HierarchicalAttention, UniformAttention, get_attention
 from .. import Fusion
 from . import ConditionalDecoder
 
@@ -18,19 +17,24 @@ class ConditionalMMDecoder(ConditionalDecoder):
         self.mm_att_type = mm_att_type
         self.persistent_dump = persistent_dump
 
-        # Parse attention type
-        att_str = sorted(self.mm_att_type.lower().split('-'))
-        assert len(att_str) == 2 and att_str[0][0] == 'd' and att_str[1][0] == 'm', \
-            "att_type should be m[d|i]-d[d-i]"
-        # Independent <d>ecoder state means shared dec state
-        self.shared_dec_state = att_str[0][1] == 'i'
+        if self.mm_att_type == 'uniform':
+            # Dummy uniform attention
+            self.shared_dec_state = False
+            self.shared_att_mlp = False
+        else:
+            # Parse attention type
+            att_str = sorted(self.mm_att_type.lower().split('-'))
+            assert len(att_str) == 2 and att_str[0][0] == 'd' and att_str[1][0] == 'm', \
+                "att_type should be m[d|i]-d[d-i]"
+            # Independent <d>ecoder state means shared dec state
+            self.shared_dec_state = att_str[0][1] == 'i'
 
-        # Independent <m>odality means sharing the mlp in the MLP attention
-        self.shared_att_mlp = att_str[1][1] == 'i'
+            # Independent <m>odality means sharing the mlp in the MLP attention
+            self.shared_att_mlp = att_str[1][1] == 'i'
 
-        # Sanity check
-        if self.shared_att_mlp and self.att_type != 'mlp':
-            raise Exception("Shared attention requires MLP attention.")
+            # Sanity check
+            if self.shared_att_mlp and self.att_type != 'mlp':
+                raise Exception("Shared attention requires MLP attention.")
 
         # Define (context) fusion operator
         self.fusion_type = fusion_type
@@ -56,14 +60,17 @@ class ConditionalMMDecoder(ConditionalDecoder):
         self.txt_att = self.att
         del self.att
 
-        # Visual attention over convolutional feature maps
-        Attention = get_attention(self.att_type)
-        self.img_att = Attention(
-            self.ctx_size_dict[self.aux_ctx_name], self.hidden_size,
-            transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
-            ctx2hid=self.att_ctx2hid,
-            att_activ=self.att_activ,
-            att_bottleneck=self.att_bottleneck)
+        if self.mm_att_type == 'uniform':
+            self.img_att = UniformAttention()
+        else:
+            # Visual attention over convolutional feature maps
+            Attention = get_attention(self.att_type)
+            self.img_att = Attention(
+                self.ctx_size_dict[self.aux_ctx_name], self.hidden_size,
+                transform_ctx=self.transform_ctx, mlp_bias=self.mlp_bias,
+                ctx2hid=self.att_ctx2hid,
+                att_activ=self.att_activ,
+                att_bottleneck=self.att_bottleneck)
 
         # Tune multimodal attention type
         if self.shared_att_mlp:
