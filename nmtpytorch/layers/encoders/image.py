@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import torch
 from torchvision import models
-from torchvision.models.vgg import cfg as vgg_cfg
+from torchvision.models.vgg import cfgs as vgg_cfg
 
 from ...utils.misc import get_n_params
 from ..flatten import Flatten
