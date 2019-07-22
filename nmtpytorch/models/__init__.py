@@ -8,6 +8,9 @@ from .acapt import AttentiveCaptioning
 from .amnmtraw import AttentiveRawMNMT
 # Spatial features + NMT
 from .amnmtfeats import AttentiveMNMTFeatures
+from .hamnmtfeats import HybridAttentiveMNMTFeatures
+from .amnmtfeats_coling import AttentiveMNMTFeaturesColing
+from .amnmtfeats_coling_masked import AttentiveMNMTFeaturesColingMasked
 # Filtered attention (LIUMCVC-MMT2018)
 from .amnmtfeats_fa import AttentiveMNMTFeaturesFA
 

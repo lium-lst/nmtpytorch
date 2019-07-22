@@ -43,6 +43,7 @@ class NMT(nn.Module):
             'att_mlp_bias': False,      # Enables bias in attention mechanism
             'att_bottleneck': 'ctx',    # Bottleneck dimensionality (ctx|hid)
             'att_transform_ctx': True,  # Transform annotations before attention
+            'att_ctx2hid': True,        # Add one last FC layer on top of the ctx
             'dropout_emb': 0,           # Simple dropout to source embeddings
             'dropout_ctx': 0,           # Simple dropout to source encodings
             'dropout_out': 0,           # Simple dropout to decoder output
@@ -58,6 +59,8 @@ class NMT(nn.Module):
             'bos_type': 'emb',          # 'emb': default learned emb
             'bos_activ': None,          #
             'bos_dim': None,            #
+            'out_logic': 'simple',      # 'simple' or 'deep' output
+            'dec_inp_activ': None,      # Non-linearity for GRU2 input in dec
         }
 
     def __init__(self, opts):
@@ -173,6 +176,7 @@ class NMT(nn.Module):
             att_type=self.opts.model['att_type'],
             att_temp=self.opts.model['att_temp'],
             att_activ=self.opts.model['att_activ'],
+            att_ctx2hid=self.opts.model['att_ctx2hid'],
             transform_ctx=self.opts.model['att_transform_ctx'],
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
@@ -182,7 +186,10 @@ class NMT(nn.Module):
             sched_sample=self.opts.model['sched_sampling'],
             bos_type=self.opts.model['bos_type'],
             bos_dim=self.opts.model['bos_dim'],
-            bos_activ=self.opts.model['bos_activ'])
+            bos_activ=self.opts.model['bos_activ'],
+            bos_bias=self.opts.model['bos_type'] == 'feats',
+            out_logic=self.opts.model['out_logic'],
+            dec_inp_activ=self.opts.model['dec_inp_activ'])
 
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':

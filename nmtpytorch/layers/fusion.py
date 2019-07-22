@@ -5,6 +5,7 @@ from functools import reduce
 import torch
 
 from . import FF
+from ..utils.nn import get_activation_fn
 
 
 class Fusion(torch.nn.Module):
@@ -22,27 +23,30 @@ class Fusion(torch.nn.Module):
             concatenation. Only necessary if ``fusion_type==concat``.
     """
 
-    def __init__(self, fusion_type='concat', input_size=None, output_size=None):
+    def __init__(self, fusion_type='concat', input_size=None, output_size=None,
+                 fusion_activ=None):
         super().__init__()
 
         self.fusion_type = fusion_type
+        self.fusion_activ = fusion_activ
         self.forward = getattr(self, '_{}'.format(self.fusion_type))
+        self.activ = get_activation_fn(fusion_activ)
+        self.adaptor = lambda x: x
 
-        if self.fusion_type == 'concat':
-            assert input_size and output_size, \
-                "input_size and output_size should be given for concat"
+        if self.fusion_type == 'concat' or input_size != output_size:
             self.adaptor = FF(input_size, output_size, bias=False, activ=None)
 
     def _sum(self, *inputs):
-        return reduce(operator.add, inputs)
+        return self.activ(self.adaptor(reduce(operator.add, inputs)))
 
     def _mul(self, *inputs):
-        return reduce(operator.mul, inputs)
+        return self.activ(self.adaptor(reduce(operator.mul, inputs)))
 
     def _concat(self, *inputs):
-        return self.adaptor(torch.cat(inputs, dim=-1))
+        return self.activ(self.adaptor(torch.cat(inputs, dim=-1)))
 
     def __repr__(self):
-        return "Fusion(type={}, adaptor={})".format(
+        return "Fusion(type={}, adaptor={}, activ={})".format(
             self.fusion_type,
-            getattr(self, 'adaptor') if hasattr(self, 'adaptor') else 'None')
+            getattr(self, 'adaptor') if hasattr(self, 'adaptor') else 'None',
+            self.fusion_activ)

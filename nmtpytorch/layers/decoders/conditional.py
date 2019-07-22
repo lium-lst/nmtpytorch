@@ -6,7 +6,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from ...utils.nn import get_rnn_hidden_state
+from ...utils.nn import get_rnn_hidden_state, get_activation_fn
 from .. import FF
 from ..attention import get_attention
 
@@ -17,13 +17,20 @@ class ConditionalDecoder(nn.Module):
                  rnn_type, tied_emb=False, dec_init='zero', dec_init_activ='tanh',
                  dec_init_size=None, att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
+                 att_ctx2hid=True,
                  transform_ctx=True, mlp_bias=False, dropout_out=0,
                  emb_maxnorm=None, emb_gradscale=False, sched_sample=0,
-                 bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False):
+                 bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False,
+                 out_logic='simple', emb_interact=None, emb_interact_dim=None,
+                 emb_interact_activ=None, dec_inp_activ=None):
         super().__init__()
 
         # Normalize case
         self.rnn_type = rnn_type.upper()
+        self.out_logic = out_logic
+        # A persistent dictionary to save activations for further debugging
+        # Currently only used in MMT decoder
+        self.persistence = defaultdict(list)
 
         # Safety checks
         assert self.rnn_type in ('GRU', 'LSTM'), \
@@ -62,6 +69,7 @@ class ConditionalDecoder(nn.Module):
         self.att_type = att_type
         self.att_temp = att_temp
         self.transform_ctx = transform_ctx
+        self.att_ctx2hid = att_ctx2hid
         self.mlp_bias = mlp_bias
         self.dropout_out = dropout_out
         self.emb_maxnorm = emb_maxnorm
@@ -71,9 +79,29 @@ class ConditionalDecoder(nn.Module):
         self.bos_dim = bos_dim
         self.bos_activ = bos_activ
         self.bos_bias = bos_bias
+        self.emb_interact = emb_interact
+        self.emb_interact_dim = emb_interact_dim
+        self.emb_interact_activ = emb_interact_activ
+        self.dec_inp_activ_fn = get_activation_fn(dec_inp_activ)
+
+        # no-ops
+        self.emb_fn = lambda e, f: e
+        self.v_emb = None
+
+        if self.emb_interact and self.emb_interact.startswith('trg'):
+            self.ff_feats = FF(
+                self.emb_interact_dim, self.input_size, bias=True,
+                activ=self.emb_interact_activ)
+            if self.emb_interact == 'trgmul':
+                self.emb_fn = lambda e, f: e * f
+            elif self.emb_interact == 'trgsum':
+                self.emb_fn = lambda e, f: e + f
+            self.emb_interact = True
+        else:
+            self.emb_interact = False
 
         if self.bos_type == 'feats':
-            # Learn a <bos> embedding
+            # Learn a visual <bos> embedding
             self.ff_bos = FF(self.bos_dim, self.input_size, bias=self.bos_bias,
                              activ=self.bos_activ)
 
@@ -88,6 +116,7 @@ class ConditionalDecoder(nn.Module):
             self.ctx_size_dict[self.ctx_name],
             self.hidden_size,
             transform_ctx=self.transform_ctx,
+            ctx2hid=self.att_ctx2hid,
             mlp_bias=self.mlp_bias,
             att_activ=self.att_activ,
             att_bottleneck=self.att_bottleneck,
@@ -113,7 +142,19 @@ class ConditionalDecoder(nn.Module):
             self.do_out = nn.Dropout(p=self.dropout_out)
 
         # Output bottleneck: maps hidden states to target emb dim
-        self.hid2out = FF(self.hidden_size, self.input_size,
+        # simple: tanh(W*h)
+        #   deep: tanh(W*h + U*emb + V*ctx)
+        out_inp_size = self.hidden_size
+
+        # Dummy op to return back the hidden state for simple output
+        self.out_merge_fn = lambda h, e, c: h
+
+        if self.out_logic == 'deep':
+            out_inp_size += (self.input_size + self.hidden_size)
+            self.out_merge_fn = lambda h, e, c: torch.cat((h, e, c), dim=1)
+
+        # Final transformation that receives concatenated outputs or only h
+        self.hid2out = FF(out_inp_size, self.input_size,
                           bias_zero=True, activ='tanh')
 
         # Final softmax
@@ -166,28 +207,35 @@ class ConditionalDecoder(nn.Module):
         """Feature based decoder initialization."""
         return self.ff_dec_init(ctx_dict['feats'][0].squeeze(0))
 
-    def get_emb(self, idxs, tstep):
+    def get_emb(self, idxs, tstep=-1):
         """Returns time-step based embeddings."""
         if tstep == 0:
-            if self.bos_type == 'emb':
-                # Learned <bos> embedding
-                return self.emb(idxs)
-            elif self.bos_type == 'zero':
+            if self.bos_type == 'zero':
                 # Constant-zero <bos> embedding
                 return torch.zeros(
                     idxs.shape[0], self.input_size, device=idxs.device)
-            else:
+            elif self.bos_type == 'feats':
                 # Feature-based <bos> computed in f_init()
                 return self.bos
         # For other timesteps, look up the embedding layer
-        return self.emb(idxs)
+        if self.emb_interact and idxs.ndimension() == 1:
+                # beam search
+                embs = self.emb(idxs)
+                return self.emb_fn(
+                    embs.view((self.v_emb.shape[0], -1, self.v_emb.shape[1])),
+                    self.v_emb.unsqueeze(1)).view(embs.shape)
+        else:
+            return self.emb_fn(self.emb(idxs), self.v_emb)
 
     def f_init(self, ctx_dict):
         """Returns the initial h_0 for the decoder."""
         self.history = defaultdict(list)
         # Compute <bos> out of 'feats' if requested
         if self.bos_type == 'feats':
-            self.bos = self.ff_bos(ctx_dict['feats'][0])
+            self.bos = self.ff_bos(ctx_dict['feats'][0]).squeeze(0)
+        if self.emb_interact:
+            # We have features for embedding interaction
+            self.v_emb = self.ff_feats(ctx_dict['feats'][0]).squeeze(0)
         return self._init_func(ctx_dict)
 
     def f_next(self, ctx_dict, y, h):
@@ -204,11 +252,13 @@ class ConditionalDecoder(nn.Module):
             self.history['alpha_txt'].append(txt_alpha_t)
 
         # Run second decoder (h1 is compatible now as it was returned by GRU)
-        h2_c2 = self.dec1(txt_z_t, h1_c1)
+        # Additional optional transformation is to make the comparison
+        # fair with the MMT model.
+        h2_c2 = self.dec1(self.dec_inp_activ_fn(txt_z_t), h1_c1)
         h2 = get_rnn_hidden_state(h2_c2)
 
-        # This is a bottleneck to avoid going from H to V directly
-        logit = self.hid2out(h2)
+        # Output logic
+        logit = self.hid2out(self.out_merge_fn(h2, y, txt_z_t))
 
         # Apply dropout if any
         if self.dropout_out > 0:
@@ -246,7 +296,7 @@ class ConditionalDecoder(nn.Module):
         bos = self.get_emb(y[0], 0)
         log_p, h = self.f_next(ctx_dict, bos, h)
         loss += self.nll_loss(log_p, y[1])
-        y_emb = self.emb(y[1:])
+        y_emb = self.get_emb(y[1:])
 
         for t in range(y_emb.shape[0] - 1):
             emb = self.emb(log_p.argmax(1)) if sched else y_emb[t]

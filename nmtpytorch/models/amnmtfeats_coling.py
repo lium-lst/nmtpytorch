@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
+import math
 import logging
 
 import torch
+from torch import nn
 
 from ..datasets import MultimodalDataset
-from ..layers import ConditionalMMDecoder, TextEncoder
+from ..layers import ConditionalMMDecoder, TextEncoder, FF
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
 
 
-class AttentiveMNMTFeatures(NMT):
+class AttentiveMNMTFeaturesColing(NMT):
     """An end-to-end sequence-to-sequence NMT model with visual attention over
     pre-extracted convolutional features.
     """
@@ -18,19 +21,20 @@ class AttentiveMNMTFeatures(NMT):
         # Set parent defaults
         super().set_defaults()
         self.defaults.update({
-            'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
-            'fusion_activ': None,       # Multimodal context non-linearity
-            'n_channels': 2048,         # depends on the features used
             'alpha_c': 0.0,             # doubly stoch. attention
+            'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
+            'fusion_activ': 'tanh',     # Multimodal context non-linearity
+            'vis_activ': 'linear',      # Visual feature transformation activ.
+            'n_channels': 2048,         # depends on the features used
             'mm_att_type': 'md-dd',     # multimodal attention type
                                         # md: modality dep.
                                         # mi: modality indep.
                                         # dd: decoder state dep.
                                         # di: decoder state indep.
-            'out_logic': 'simple',      # simple vs deep output
+            'out_logic': 'deep',        # simple vs deep output
             'persistent_dump': False,   # To save activations during beam-search
-            'img_sequence': False,      # if true img is sequence of img features,
-                                        # otherwise it's a conv map
+            'preatt': False,            # Apply filtered attention
+            'preatt_activ': 'ReLU',     # Activation for convatt block
         })
 
     def __init__(self, opts):
@@ -39,7 +43,16 @@ class AttentiveMNMTFeatures(NMT):
             self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
-        self.ctx_sizes['image'] = self.opts.model['n_channels']
+        # Textual context dim
+        txt_ctx_size = self.ctx_sizes[self.sl]
+
+        # Add visual context transformation (sect. 3.2 in paper)
+        self.ff_img = FF(
+            self.opts.model['n_channels'], txt_ctx_size,
+            activ=self.opts.model['vis_activ'])
+
+        # Add vis ctx size
+        self.ctx_sizes['image'] = txt_ctx_size
 
         ########################
         # Create Textual Encoder
@@ -73,7 +86,7 @@ class AttentiveMNMTFeatures(NMT):
             out_logic=self.opts.model['out_logic'],
             att_activ=self.opts.model['att_activ'],
             transform_ctx=self.opts.model['att_transform_ctx'],
-            att_ctx2hid=self.opts.model['att_ctx2hid'],
+            att_ctx2hid=False,
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'],
@@ -84,6 +97,17 @@ class AttentiveMNMTFeatures(NMT):
         # Share encoder and decoder weights
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
+
+        if self.opts.model['preatt']:
+            # From 640+640 to 640
+            # To 1*W*W for attention scores
+            in_channels = sum(self.ctx_sizes.values())
+            self.preatt = nn.Sequential(OrderedDict([
+                ('conv1', nn.Conv2d(in_channels, self.ctx_sizes[self.sl], 1, 1)),
+                ('nlin1', getattr(nn, self.opts.model['preatt_activ'])()),
+                ('conv2', nn.Conv2d(self.ctx_sizes[self.sl], 1, 1, 1)),
+                ('nlin2', getattr(nn, self.opts.model['preatt_activ'])()),
+            ]))
 
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
@@ -98,17 +122,43 @@ class AttentiveMNMTFeatures(NMT):
         return dataset
 
     def encode(self, batch, **kwargs):
-        # Let's start with a None mask by assuming that
-        # we have a fixed-length feature collection
-        feats, feats_mask = batch['image'], None
+        # Transform the features to context dim
+        feats = self.ff_img(batch['image'])
 
-        if self.opts.model['img_sequence']:
-            # Let's create mask in this case
-            feats_mask = feats.ne(0).float().sum(2).ne(0).float()
+        # Get source language encodings (S*B*C)
+        text_encoding = self.enc(batch[self.sl])
+
+        if self.opts.model['preatt']:
+            # Infer spatial width/height
+            w = int(math.sqrt(feats.shape[0]))
+
+            # image features will come as: (HW,B,C) -> (B, C, HW) -> (B, C, H, W)
+            conv_map = feats.permute(1, 2, 0).view(
+                *feats.shape[1:], w, w)
+
+            # Get last encoding (B*C)
+            last_encoding = text_encoding[0][-1]
+
+            # Tile over spatial dimensions: B*C*H*W
+            tiled_encoding = last_encoding[..., None, None].expand(
+                -1, -1, *conv_map.shape[2:])
+
+            # Final concat representation: B*(D+C)*H*W
+            concat = torch.cat([conv_map, tiled_encoding], dim=1)
+
+            att_scores = self.preatt(concat)
+            self.pre_att = nn.functional.softmax(
+                att_scores.view(batch.size, -1), dim=1).view_as(att_scores)
+
+            # Filter features
+            feats = conv_map * self.pre_att
+
+            # Get features into (B, C, HW) and then (HW, B, C)
+            feats = feats.view(*feats.shape[:2], -1).permute(2, 0, 1)
 
         return {
-            'image': (feats, feats_mask),
-            str(self.sl): self.enc(batch[self.sl]),
+            str(self.sl): text_encoding,
+            'image': (feats, None),
         }
 
     def forward(self, batch, **kwargs):

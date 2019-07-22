@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     model = translator.instances[0]
 
-    dataset = model.load_data(args.split, 96, mode='beam')
+    dataset = model.load_data(args.split, 64, mode='beam')
     loader = make_dataloader(dataset)
     data = []
 
@@ -62,10 +62,10 @@ if __name__ == '__main__':
 
         # Iterate for 100 timesteps
         for t in range(100):
-            logp, h_t = model.dec.f_next(ctx_dict, model.dec.get_emb(y_t, t).squeeze(), h_t)
+            logp, h_t = model.dec.f_next(ctx_dict, model.dec.get_emb(y_t, t).squeeze(1), h_t)
 
             # text attention
-            tatt = model.dec.txt_alpha_t.data.clone().numpy()
+            tatt = model.dec.history['alpha_txt'][-1].data.clone().numpy()
             iatt, hatt = None, None
 
             # If decoder has .img_alpha_t
@@ -90,7 +90,6 @@ if __name__ == '__main__':
                         hie_att[idx].append(None)
                     else:
                         hie_att[idx].append(hatt[:, idx])
-
 
             # Did we finish? (2 == <eos>)
             fini = fini | y_t.eq(2).squeeze().long()
