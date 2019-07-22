@@ -65,7 +65,7 @@ if __name__ == '__main__':
             logp, h_t = model.dec.f_next(ctx_dict, model.dec.get_emb(y_t, t).squeeze(1), h_t)
 
             # text attention
-            tatt = model.dec.txt_alpha_t.data.clone().numpy()
+            tatt = model.dec.history['alpha_txt'][-1].data.clone().numpy()
             iatt, hatt = None, None
 
             # If decoder has .img_alpha_t
