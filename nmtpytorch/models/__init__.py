@@ -3,6 +3,7 @@ from .nli import NLI
 from .nmt import NMT
 from .mnmt import MultimodalNMT
 from .acapt import AttentiveCaptioning
+from .vcap import VideoCaptioner
 
 # Raw images
 from .amnmtraw import AttentiveRawMNMT
