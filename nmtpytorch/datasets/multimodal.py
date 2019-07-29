@@ -30,11 +30,13 @@ class MultimodalDataset(Dataset):
             perform length-based curriculum learning. Default is ``None``
             which shuffles bucket order. Does not have an effect if mode != 'train'.
         sampler_type(str, optional): 'bucket' or 'approximate' (Default: 'bucket')
+        master(str, optional): If given, sampler IDs and dataset IDs will be
+            coordinated through the provided dataset's underlying mapper.
         kwargs (dict): Additional arguments to pass to the dataset constructors.
     """
     def __init__(self, data, mode, batch_size, vocabs, topology,
                  bucket_by, bucket_order=None, max_len=None,
-                 sampler_type='bucket', **kwargs):
+                 sampler_type='bucket', master=None, **kwargs):
         self.datasets = {}
         self.mode = mode
         self.vocabs = vocabs
@@ -42,6 +44,7 @@ class MultimodalDataset(Dataset):
         self.topology = topology
         self.bucket_by = bucket_by
         self.sampler_type = sampler_type
+        self.master = master
 
         # Disable filtering if not training
         self.max_len = max_len if self.mode == 'train' else None
@@ -72,12 +75,19 @@ class MultimodalDataset(Dataset):
                 fname=data[key],
                 vocab=vocabs.get(key, None), bos=ds.trg, **kwargs)
 
-        # Detect dataset sizes
-        sizes = set([len(dataset) for dataset in self.datasets.values()])
-        assert len(sizes) == 1, "Non-parallel datasets are not supported."
+        if self.mode != 'beam' and self.master is not None:
+            self.size = len(self.datasets[self.master])
+            slave_datasets = set(self.datasets.keys()).difference(set([self.master]))
+            for sld in slave_datasets:
+                # Map through master dataset
+                self.datasets[sld].idx2key = lambda x: self.datasets[self.master]._map[x]
+        else:
+            # Detect dataset sizes
+            sizes = set([len(dataset) for dataset in self.datasets.values()])
+            assert len(sizes) == 1, "Non-parallel datasets are not supported."
 
-        # Set dataset size
-        self.size = list(sizes)[0]
+            # Set dataset size
+            self.size = list(sizes)[0]
 
         # Set list of available datasets
         self.keys = list(self.datasets.keys())
