@@ -73,8 +73,8 @@ def load_pt_file(fname, device='cpu'):
 def get_language(fname):
     suffix = pathlib.Path(fname).suffix[1:]
     if suffix not in LANGUAGES:
-        logger.info("Can not detect language from {}.".format(fname))
-        return None
+        logger.info("Can not detect language from {}, fallback to 'en'".format(fname))
+        return 'en'
     return suffix
 
 
