@@ -24,10 +24,11 @@ class MSVDJSONDataset(Dataset):
             "<bos>" marker will be prepended to sentences.
     """
 
-    def __init__(self, fname, vocab, bos=False, eos=False, **kwargs):
+    def __init__(self, fname, vocab, bos=True, eos=True, **kwargs):
         self.path = Path(fname)
         self.vocab = vocab
         self.bos = bos
+        self.eos = eos
 
         # Detect glob patterns
         self.fnames = sorted(self.path.parent.glob(self.path.name))
@@ -44,7 +45,7 @@ class MSVDJSONDataset(Dataset):
 
         # Number of captions = dataset size
         self.size = len(self.data)
-        self._map = {}
+        self._keys = {}
 
         # Split into words
         for i in range(self.size):
@@ -52,7 +53,7 @@ class MSVDJSONDataset(Dataset):
             self.data[i]['seq'] = self.vocab.sent_to_idxs(
                 self.data[i]['caption'], explicit_bos=bos,
                 explicit_eos=eos)
-            self._map[i] = self.data[i]['image_id']
+            self._keys[i] = self.data[i]['image_id']
 
         self.lengths = [len(d['seq']) for d in self.data]
 
