@@ -8,7 +8,7 @@ from .numpy_sequence import NumpySequenceDataset
 from .label import LabelDataset
 from .shelve import ShelveDataset
 from .msvd.mjson import MSVDJSONDataset
-from .msvd.mshelve import MSVDShelveDataset
+from .msvd.numpy import MSVDNumpyDataset
 
 # Second the selector function
 def get_dataset(type_):
@@ -22,7 +22,7 @@ def get_dataset(type_):
         'label': LabelDataset,
         'shelve': ShelveDataset,
         'msvdjson': MSVDJSONDataset,
-        'msvdshelve': MSVDShelveDataset,
+        'msvdnumpy': MSVDNumpyDataset,
     }[type_.lower()]
 
 
