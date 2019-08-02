@@ -75,19 +75,31 @@ class MultimodalDataset(Dataset):
                 fname=data[key],
                 vocab=vocabs.get(key, None), bos=ds.trg, **kwargs)
 
-        if self.mode != 'beam' and self.master is not None:
-            self.size = len(self.datasets[self.master])
-            slave_datasets = set(self.datasets.keys()).difference(set([self.master]))
-            for sld in slave_datasets:
-                # Map through master dataset
-                self.datasets[sld].idx2key = lambda x: self.datasets[self.master]._map[x]
+        # Install idx to human-readable idx mapper if any
+        # Default does nothing
+        self._mapper = None
+
+        # Detect dataset sizes
+        sizes = set([len(dataset) for dataset in self.datasets.values()])
+
+        # Set dataset size
+        self.size = list(sizes)[0]
+
+        # A master dataset coordinates key:value access for correct samples
+        # Use its own mapper for other datasets
+        if self.master is not None:
+            if self.mode == 'beam':
+                first_ds = list(self.datasets.values())[0]
+                self._mapper = lambda x: first_ds._keys[x]
+            else:
+                self._mapper = lambda x: self.datasets[self.master]._keys[x]
+                self.size = len(self.datasets[self.master])
+                slave_datasets = set(self.datasets.keys()).difference(set([self.master]))
+                for sld in slave_datasets:
+                    self.datasets[sld].idx2key = lambda x: self.datasets[self.master]._keys[x]
         else:
-            # Detect dataset sizes
-            sizes = set([len(dataset) for dataset in self.datasets.values()])
             assert len(sizes) == 1, "Non-parallel datasets are not supported."
 
-            # Set dataset size
-            self.size = list(sizes)[0]
 
         # Set list of available datasets
         self.keys = list(self.datasets.keys())
