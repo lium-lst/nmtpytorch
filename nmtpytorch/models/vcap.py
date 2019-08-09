@@ -1,33 +1,33 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
 import logging
 
 import torch
 from torch import nn
 
-from ..layers import TextEncoder
+from ..layers import FF
 from ..layers.decoders import get_decoder
-from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
-from ..utils.ml_metrics import Loss
-from ..utils.device import DEVICE
-from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
-from ..metrics import Metric
+from . import NMT
 
 logger = logging.getLogger('nmtpytorch')
 
 
-class VideoCaptioner(nn.Module):
+class VideoCaptioner(NMT):
     supports_beam_search = True
 
     def set_defaults(self):
         self.defaults = {
-            'n_labels': None,           # # of input labels available
-            'feat_dim': 256,            # Input video feat dim
-            'emb_dim': 128,             # Source and target embedding sizes
-            'emb_maxnorm': None,        # Normalize embeddings l2 norm to 1
-            'emb_gradscale': False,     # Scale embedding gradients w.r.t. batch frequency
+            'n_labels': 601,            # # of input labels available
+            'n_act_labels': 339,        # # of input action labels
+            'feat_dim': 128,            # Projected feature dim
+            'feat_activ': None,         # feature activation type
+            'feat_bias': True,          # Bias for the label embeddings
+            'feat_fusion': None,        # concat or last
+            'encoder': False,           # Add an encoder or not
+            'emb_dim': 128,             # Target embedding sizes
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
             'dec_variant': 'cond',      # (cond|simplegru|vector)
@@ -43,11 +43,9 @@ class VideoCaptioner(nn.Module):
             'att_transform_ctx': True,  # Transform annotations before attention
             'att_ctx2hid': True,        # Add one last FC layer on top of the ctx
             'dropout_emb': 0,           # Simple dropout to source embeddings
-            'dropout_ctx': 0,           # Simple dropout to source encodings
             'dropout_out': 0,           # Simple dropout to decoder output
-            'dropout_enc': 0,           # Intra-encoder dropout if n_encoders > 1
             'direction': None,          # Network directionality, i.e. en->de
-            'max_len': 80,              # Reject sentences where 'bucket_by' length > 80
+            'max_len': None,            # Reject sentences where 'bucket_by' length > 80
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
                                         # the batches will be sorted
             'bucket_order': None,       # Curriculum: ascending/descending/None
@@ -62,7 +60,8 @@ class VideoCaptioner(nn.Module):
         }
 
     def __init__(self, opts):
-        super().__init__()
+        # Don't call NMT init as it's too different from this model
+        nn.Module.__init__(self)
 
         # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
@@ -92,37 +91,49 @@ class VideoCaptioner(nn.Module):
 
         self.ctx_sizes = {'obj': self.opts.model['feat_dim']}
 
-    def __repr__(self):
-        s = super().__repr__() + '\n'
-        for vocab in self.vocabs.values():
-            s += "{}\n".format(vocab)
-        s += "{}\n".format(get_n_params(self))
-        return s
-
-    def set_model_options(self, model_opts):
-        self.set_defaults()
-        for opt, value in model_opts.items():
-            if opt in self.defaults:
-                # Override defaults from config
-                self.defaults[opt] = value
-            else:
-                logger.info('Warning: unused model option: {}'.format(opt))
-        return self.defaults
-
     def reset_parameters(self):
         for name, param in self.named_parameters():
             # Skip 1-d biases and scalars
             if param.requires_grad and param.dim() > 1:
                 nn.init.kaiming_normal_(param.data)
-        # Reset padding embedding to 0
-        with torch.no_grad():
-            if hasattr(self, 'enc'):
-                self.enc.emb.weight.data[0].fill_(0)
 
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
-        self.emb = nn.Embedding(self.opts.model['n_labels'] + 1,
-                                self.opts.model['feat_dim'])
+        # Actual embeddings
+        emb = FF(self.opts.model['n_labels'], self.opts.model['feat_dim'])
+
+        # Add another projection layer
+        proj = FF(
+            self.opts.model['feat_dim'], self.opts.model['feat_dim'])
+
+        self.emb = nn.Sequential(OrderedDict([
+            ('emb', emb),
+            ('emb_proj', proj),
+        ]))
+
+        self.act_emb = None
+        if self.opts.model['feat_fusion'] is not None:
+            # Assume action features are available then
+            self.act_emb = FF(self.opts.model['n_act_labels'],
+                              self.opts.model['feat_dim'])
+            if self.opts.model['feat_fusion'] == 'last':
+                # Last concat
+                self.fuse_op = lambda obj, act: torch.cat((obj, act))
+            elif self.opts.model['feat_fusion'] == 'concat':
+                self.concat_proj = FF(
+                    2 * self.opts.model['feat_dim'],
+                    self.opts.model['feat_dim'],
+                    bias=self.opts.model['feat_bias'],
+                    activ=self.opts.model['feat_activ'])
+                self.fuse_op = lambda obj, act: self.concat_proj(torch.cat(
+                    (obj, act.expand(obj.shape[0], -1, -1)), dim=-1))
+
+        self.dropout = nn.Dropout(self.opts.model['dropout_emb'])
+
+        if self.opts.model['encoder']:
+            self.enc = nn.GRU(
+                self.opts.model['feat_dim'], self.opts.model['feat_dim'],
+                1, bias=True, batch_first=False, bidirectional=False)
 
         ################
         # Create Decoder
@@ -147,8 +158,6 @@ class VideoCaptioner(nn.Module):
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'],
-            emb_maxnorm=self.opts.model['emb_maxnorm'],
-            emb_gradscale=self.opts.model['emb_gradscale'],
             sched_sample=self.opts.model['sched_sampling'],
             bos_type=self.opts.model['bos_type'],
             bos_dim=self.opts.model['bos_dim'],
@@ -171,10 +180,6 @@ class VideoCaptioner(nn.Module):
         logger.info(dataset)
         return dataset
 
-    def get_bos(self, batch_size):
-        """Returns a representation for <bos> embeddings for decoding."""
-        return torch.LongTensor(batch_size).fill_(self.trg_vocab['<bos>'])
-
     def encode(self, batch, **kwargs):
         """Encodes all inputs and returns a dictionary.
 
@@ -189,40 +194,17 @@ class VideoCaptioner(nn.Module):
                 elements are encodings and masks. The mask can be ``None``
                 if the relevant modality does not require a mask.
         """
-        d = {
-                'obj': (self.emb(batch['obj']), None),
-            }
-        return d
+        feat = self.emb(batch['obj'])
+        if self.act_emb is not None:
+            act = self.act_emb(batch['act'])
+            feat = self.fuse_op(feat, act)
 
-    def forward(self, batch, **kwargs):
-        """Computes the forward-pass of the network and returns batch loss.
+        # Apply dropout
+        feat = self.dropout(feat)
 
-        Arguments:
-            batch (dict): A batch of samples with keys designating the source
-                and target modalities.
+        if self.opts.model['encoder']:
+            feat, _ = self.enc(feat)
 
-        Returns:
-            Tensor:
-                A scalar loss normalized w.r.t batch size and token counts.
-        """
-        # Get loss dict
-        result = self.dec(self.encode(batch), batch[self.tl])
-        result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
-        return result
-
-    def test_performance(self, data_loader, dump_file=None):
-        """Computes test set loss over the given DataLoader instance."""
-        loss = Loss()
-
-        for batch in pbar(data_loader, unit='batch'):
-            batch.device(DEVICE)
-            out = self.forward(batch)
-            loss.update(out['loss'], out['n_items'])
-
-        return [
-            Metric('LOSS', loss.get(), higher_better=False),
-        ]
-
-    def get_decoder(self, task_id=None):
-        """Compatibility function for multi-tasking architectures."""
-        return self.dec
+        return {
+            'obj': (feat, None),
+        }
