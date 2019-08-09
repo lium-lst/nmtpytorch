@@ -37,11 +37,11 @@ class MSVDNumpyDataset(Dataset):
     @staticmethod
     def to_torch(batch):
         # NOTE: Assumes x.shape == (n, *) & make batch the 1st dim
-        return torch.from_numpy(np.array(batch, dtype='float32')).permute(1, 0, 2)
-        # Convert it to (t(=1 if fixed features), n, c)
-        # By default we flatten h*w to first dim for interoperability
-        # Models should further reshape the tensor for their needs
-        #return x.view(*x.size()[:2], -1).permute(2, 0, 1)
+        x = torch.from_numpy(np.array(batch, dtype='float32'))
+        return x.view(
+            x.shape[0],
+            x.shape[1] if x.ndimension() == 3 else 1,
+            x.shape[-1]).permute(1, 0, 2)
 
     def __getitem__(self, idx):
         # The sample order matches the keys given in the .npz file so
