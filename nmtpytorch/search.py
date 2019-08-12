@@ -193,4 +193,16 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
     if getattr(data_loader.batch_sampler, 'store_indices', False):
         results = [results[i] for i, j in sorted(
             enumerate(data_loader.batch_sampler.orig_idxs), key=lambda k: k[1])]
+
+    if data_loader.dataset._mapper is not None:
+        json_results = []
+        for i in range(len(results)):
+            json_results.append(
+                {
+                    'image_id': data_loader.dataset._mapper(i),
+                    'caption': results[i],
+                }
+            )
+        results = json_results
+
     return results

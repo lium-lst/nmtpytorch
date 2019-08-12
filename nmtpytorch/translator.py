@@ -127,6 +127,7 @@ class Translator:
 
         # Load data
         dataset = self.instances[0].load_data(split, self.batch_size, mode='beam')
+        self._mapper = dataset._mapper
 
         # NOTE: Data iteration needs to be unique for ensembling
         # otherwise it gets too complicated
@@ -166,7 +167,11 @@ class Translator:
         output = "{}.{}{}".format(self.output, split, suffix)
 
         f = open(output, 'w')
-        if self.n_best:
+        if self._mapper is not None:
+            # NOTE: Probably json-ready list of dicts
+            import json
+            json.dump(hyps, f)
+        elif self.n_best:
             for idx, (cands, scores) in enumerate(hyps):
                 cands = self.filter(cands)
                 sorted_cs = sorted(
@@ -177,7 +182,7 @@ class Translator:
         else:
             # Post-process strings if requested
             hyps = self.filter(hyps)
-            for line in hyps:
+            for idx, line in enumerate(hyps):
                 f.write(line + '\n')
         f.close()
 
