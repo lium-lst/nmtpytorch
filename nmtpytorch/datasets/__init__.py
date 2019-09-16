@@ -11,6 +11,7 @@ from .shelve import ShelveDataset
 from .msvd.mjson import MSVDJSONDataset
 from .msvd.numpy import MSVDNumpyDataset
 from .vatex_json import VatexJSONDataset
+from .coco_json import COCOJSONDataset
 
 # Second the selector function
 def get_dataset(type_):
@@ -27,6 +28,7 @@ def get_dataset(type_):
         'msvdjson': MSVDJSONDataset,
         'msvdnumpy': MSVDNumpyDataset,
         'vatexjson': VatexJSONDataset,
+        'cocojson': COCOJSONDataset,
     }[type_.lower()]
 
 
