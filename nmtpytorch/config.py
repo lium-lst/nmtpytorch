@@ -95,16 +95,6 @@ def _parse_value(value):
 
 class Options:
     @classmethod
-    def parse_overrides(cls, override_list):
-        overrides = defaultdict(dict)
-        for opt in override_list:
-            section, keyvalue = opt.split('.', 1)
-            key, value = keyvalue.split(':')
-            value = resolve_path(value)
-            overrides[section][key] = _parse_value(value)
-        return overrides
-
-    @classmethod
     def from_dict(cls, dict_, override_list=None):
         """Loads object from dict."""
         obj = cls.__new__(cls)
@@ -117,26 +107,22 @@ class Options:
                 for key, value in ov_dict.items():
                     obj.__dict__[section][key] = value
 
-        obj._psections = {
-            section: obj.__dict__[section] for section in dict_['sections']
-        }
-
         return obj
 
-    def to_dict(self):
-        """Serializes the instance as dict."""
-        dict_ = {
-            'filename': self.filename,
-            'sections': self._parser.sections(),
-        }
-        for section, opts in self._psections.items():
-            dict_[section] = copy.deepcopy(opts)
-
-        return dict_
+    @classmethod
+    def parse_overrides(cls, override_list):
+        overrides = defaultdict(dict)
+        for opt in override_list:
+            section, keyvalue = opt.split('.', 1)
+            key, value = keyvalue.split(':')
+            value = resolve_path(value)
+            overrides[section][key] = _parse_value(value)
+        return overrides
 
     def __init__(self, filename, overrides=None):
         self._parser = ConfigParser(interpolation=ExtendedInterpolation())
         self.filename = filename
+        self.sections = []
 
         with open(self.filename) as fhandle:
             data = expand_env_vars(fhandle.read().strip())
@@ -150,39 +136,19 @@ class Options:
         if overrides is not None:
             # ex: train.batch_size:32
             self.overrides = self.parse_overrides(overrides)
-        else:
-            self.overrides = []
-
-        # Verify section names: "train" and "model"
-        avail_sections = self._parser.sections()[:]
-        for section in ["train", "model"]:
-            assert section in avail_sections, \
-                "[{}] section missing in configuration file.".format(section)
-            # Remove it
-            avail_sections.remove(section)
-
-        assert all([s.startswith('tasks.') for s in avail_sections]), \
-            "Configuration file should include train, model and tasks.* sections."
-
-        max_nest_level = max([s.count('.') for s in self._parser.sections()])
-        assert max_nest_level < 2, \
-            "Maximum level of section name grouping exceeded"
-
-        # Keep the parsed sections separately
-        self._psections = {}
 
         for section in self._parser.sections():
             opts = {}
+            self.sections.append(section)
 
-            for key, value in self._parser.items(section):
+            for key, value in self._parser[section].items():
                 opts[key] = resolve_path(_parse_value(value))
 
             if section in self.overrides:
                 for (key, value) in self.overrides[section].items():
                     opts[key] = value
 
-            # Store parsed section data
-            self._psections[section] = opts
+            setattr(self, section, opts)
 
         # Sanity check for [train]
         train_keys = list(self.train.keys())
@@ -200,22 +166,10 @@ class Options:
         if invalid_keys:
             sys.exit(1)
 
-    def __getattr__(self, key):
-        return self.__getitem__(key)
-
-    def __getitem__(self, key):
-        try:
-            return self._psections[key]
-        except KeyError as ke:
-            # A parent section may be requested
-            return {
-                k.split('.')[-1]:v for k, v in
-                    self._psections.items() if k.startswith('{}.'.format(key))
-            }
-
     def __repr__(self):
         repr_ = ""
-        for section, opts in self._psections.items():
+        for section in self.sections:
+            opts = getattr(self, section)
             repr_ += "-" * (len(section) + 2)
             repr_ += "\n[{}]\n".format(section)
             repr_ += "-" * (len(section) + 2)
@@ -234,3 +188,17 @@ class Options:
         repr_ += "-" * 70
         repr_ += "\n"
         return repr_
+
+    def to_dict(self):
+        """Serializes the instance as dict."""
+        dict_ = {
+            'filename': self.filename,
+            'sections': self.sections,
+        }
+        for section in self.sections:
+            dict_[section] = copy.deepcopy(getattr(self, section))
+
+        return dict_
+
+    def __getitem__(self, key):
+        return getattr(self, key)
