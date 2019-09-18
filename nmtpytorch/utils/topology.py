@@ -15,10 +15,10 @@ class DataSource(UserString):
         # Assign the method that knows how to create a tensor for a batch
         # of this type
         klass = getattr(datasets, '{}Dataset'.format(_type))
-        self.to_torch = klass.to_torch
-
+        self.kwargs = {}
+        self.torchify = lambda batch: klass.to_torch(batch, **self.kwargs)
     def __repr__(self):
-        return "DataSource('{}')".format(self.data)
+        return "DataSource('{}', kwargs:{})".format(self.data, self.kwargs)
 
 
 class Topology:
