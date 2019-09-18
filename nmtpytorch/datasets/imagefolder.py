@@ -75,7 +75,7 @@ class ImageFolderDataset(data.Dataset):
             return self.transform(img)
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         return torch.stack(batch)
 
     def __getitem__(self, idx):
