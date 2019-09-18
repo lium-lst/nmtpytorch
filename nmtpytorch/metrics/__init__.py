@@ -20,4 +20,7 @@ metric_info = {
     'WER': 'min',
     'CER': 'min',
     'ACC': 'max',
+    'RECALL': 'max',
+    'PRECISION': 'max',
+    'F1': 'max',
 }
