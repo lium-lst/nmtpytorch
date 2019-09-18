@@ -27,7 +27,7 @@ class KeyedNPZDataset(Dataset):
 
         # Load the file into .data
         self.data = np.load(self.path)
-        self.keys = self.data.files
+        self.keys = sorted(self.data.files)
         self.size = len(self.keys)
 
         # Introspect to determine feature size
@@ -45,17 +45,17 @@ class KeyedNPZDataset(Dataset):
             self.lengths = [self.data[key].shape[1] for key in self.keys]
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         # NOTE: Assumes x.shape == (n, *) & make batch the 1st dim
         x = torch.from_numpy(np.array(batch, dtype='float32'))
-        return x.view(
+        return x.squeeze_(1).view(
             x.shape[0],
             x.shape[1] if x.ndimension() == 3 else 1,
             x.shape[-1]).permute(1, 0, 2)
 
     def __getitem__(self, idx):
         """Fetch a sample from the dataset with string keys."""
-        return self.data[idx]
+        return self.data[self.keys[idx]]
 
     def __len__(self):
         """Returns the dataset size."""
