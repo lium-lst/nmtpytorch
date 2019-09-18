@@ -44,7 +44,7 @@ class ShelveDataset(Dataset):
         return lengths
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         ''' Pad the video sequence, if necessary.
         Transposes the video sequence to conform to the RNN expected inputs:
             n_samples x timesteps x feats -> timesteps x n_samples x feats

@@ -46,7 +46,7 @@ class NumpyDataset(Dataset):
         self.size = len(self.order)
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         # NOTE: Assumes x.shape == (n, *)
         x = torch.from_numpy(np.array(batch, dtype='float32'))
         # Convert it to (t(=1 if fixed features), n, c)

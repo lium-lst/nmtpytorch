@@ -31,7 +31,7 @@ def get_collate(data_sources):
 
     def collate_fn(batch):
         return Batch(
-            {ds: ds.to_torch([elem[ds] for elem in batch]) for ds in data_sources},
+            {ds: ds.torchify([elem[ds] for elem in batch]) for ds in data_sources},
         )
 
     return collate_fn

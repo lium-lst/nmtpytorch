@@ -44,7 +44,7 @@ class TextDataset(Dataset):
         self.size = len(self.data)
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         return pad_sequence(
             [torch.tensor(b, dtype=torch.long) for b in batch], batch_first=False)
 

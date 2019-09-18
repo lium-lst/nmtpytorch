@@ -67,7 +67,7 @@ class NumpySequenceDataset(Dataset):
         return self._read(self.data[idx])
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         # List of (t, feat_dim)
         max_len = max(x.shape[0] for x in batch)
         width = batch[0].shape[1]

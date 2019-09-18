@@ -100,7 +100,6 @@ class MultimodalDataset(Dataset):
         else:
             assert len(sizes) == 1, "Non-parallel datasets are not supported."
 
-
         # Set list of available datasets
         self.keys = list(self.datasets.keys())
 

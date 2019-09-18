@@ -63,7 +63,7 @@ class KaldiDataset(Dataset):
             raise RuntimeError("Dataset size and lengths size does not match.")
 
     @staticmethod
-    def to_torch(batch):
+    def to_torch(batch, **kwargs):
         return pad_sequence(
             [torch.FloatTensor(x) for x in batch], batch_first=False)
 
