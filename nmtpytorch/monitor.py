@@ -29,7 +29,7 @@ class Monitor:
         self.exp_id = exp_id
         self.model = model
         self.patience = patience
-        self.eval_metrics = eval_metrics.upper().split(',')
+        self.eval_metrics = [e.strip() for e in eval_metrics.upper().split(',')]
         self.save_best_metrics = save_best_metrics
         self.optimizer = None
         self.checkpoints = FileRotator(n_checkpoints)
