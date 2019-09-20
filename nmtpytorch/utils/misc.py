@@ -196,11 +196,11 @@ def setup_experiment(opts, suffix=None, short=False):
     mopts = opts.model.copy()
 
     # Start with general ones
-    if 'enc_type' in mopts:
+    if 'enc_type' in mopts and mopts['enc_type'] is not None:
         names.append("enc%d%s%d" % (mopts.get('n_encoders', 1),
                                     mopts['enc_type'].upper(),
                                     mopts.pop('enc_dim')))
-    if 'dec_type' in mopts:
+    if 'dec_type' in mopts and mopts['dec_type'] is not None:
         names.append("dec%d%s%d" % (mopts.get('n_decoders', 1),
                                     mopts['dec_type'].upper(),
                                     mopts.pop('dec_dim')))
