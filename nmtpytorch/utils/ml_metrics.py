@@ -6,7 +6,11 @@ import torch
 from sklearn.metrics import coverage_error
 from sklearn.metrics import label_ranking_average_precision_score as lrap
 
+from ignite import metrics as ig_metrics
+
 from .device import DEVICE
+
+from ..metrics import Metric
 
 
 class Loss:
@@ -31,6 +35,67 @@ class Loss:
 
     def get(self):
         return self._loss / self._denom
+
+
+class Precision:
+    """Wrapper metric around `pytorch-ignite`."""
+    def __init__(self, is_multilabel=True):
+        self.is_multilabel = is_multilabel
+        self.__metric = ig_metrics.Precision(
+            average=True, is_multilabel=self.is_multilabel)
+
+    def update(self, y_pred, y):
+        """Tensors should have N x n_labels dimensions with N = batch_size."""
+        self.__metric.update((y_pred, y))
+
+    def compute(self):
+        """Once the updates are over, this returns the actual metric."""
+        val = 100 * self.__metric.compute()
+        return Metric('PRECISION', val, higher_better=True)
+
+
+class Recall:
+    """Wrapper metric around `pytorch-ignite`."""
+    def __init__(self, is_multilabel=True):
+        self.is_multilabel = is_multilabel
+        self.__metric = ig_metrics.Recall(
+            average=True, is_multilabel=self.is_multilabel)
+
+    def update(self, y_pred, y):
+        """Tensors should have N x n_labels dimensions with N = batch_size."""
+        self.__metric.update((y_pred, y))
+
+    def compute(self):
+        """Once the updates are over, this returns the actual metric."""
+        val = 100 * self.__metric.compute()
+        return Metric('RECALL', val, higher_better=True)
+
+
+class F1:
+    """Wrapper metric around `pytorch-ignite`."""
+    def __init__(self, is_multilabel=True):
+        self.is_multilabel = is_multilabel
+        # Create underlying metrics
+        self.__precision = ig_metrics.Precision(
+            average=False, is_multilabel=self.is_multilabel)
+
+        self.__recall = ig_metrics.Recall(
+            average=False, is_multilabel=self.is_multilabel)
+
+        num = self.__precision * self.__recall * 2
+        denom = self.__precision + self.__recall + 1e-20
+        f1 = num / denom
+        self.__metric = ig_metrics.MetricsLambda(
+            lambda t: t.mean().item(), f1)
+
+    def update(self, y_pred, y):
+        """Tensors should have N x n_labels dimensions with N = batch_size."""
+        self.__precision.update((y_pred, y))
+        self.__recall.update((y_pred, y))
+
+    def compute(self):
+        val = 100 * self.__metric.compute()
+        return Metric('F1', val, higher_better=True)
 
 
 class CoverageError:
