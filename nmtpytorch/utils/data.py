@@ -54,7 +54,7 @@ def pad_video_sequence(seqs):
     return torch.FloatTensor(torch.from_numpy(padded))
 
 
-def onehot_data(idxs, n_classes):
+def convert_to_onehot(idxs, n_classes):
     """Returns a binary batch_size x n_classes one-hot tensor."""
     out = torch.zeros(len(idxs), n_classes, device=idxs[0].device)
     for row, indices in zip(out, idxs):
