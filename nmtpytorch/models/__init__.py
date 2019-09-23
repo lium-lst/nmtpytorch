@@ -4,6 +4,7 @@ from .nmt import NMT
 from .mnmt import MultimodalNMT
 from .acapt import AttentiveCaptioning
 from .vcap import VideoCaptioner
+from .vatex_cap import VATEXCaptioner
 
 # Raw images
 from .amnmtraw import AttentiveRawMNMT
@@ -22,6 +23,9 @@ from .multimodal_asr import MultimodalASR
 # Experimental: requires work/adaptation
 from .multitask import Multitask
 from .multitask_att import MultitaskAtt
+
+# Multi-label classifier
+from .label_classifier import LabelClassifier
 
 ##########################################
 # Backward-compatibility with older models
