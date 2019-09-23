@@ -2,6 +2,7 @@
 from .ff import FF
 from .fusion import Fusion
 from .flatten import Flatten
+from .argselect import ArgSelect
 from .pool import Pool
 from .seq_conv import SequenceConvolution
 from .rnninit import RNNInitializer
@@ -10,10 +11,6 @@ from .embedding import get_partial_embedding_layer
 
 # Attention layers
 from .attention import *
-
-# ZSpace layers
-from .z import ZSpace
-from .z_att import ZSpaceAtt
 
 # Encoder layers
 from .encoders import *
