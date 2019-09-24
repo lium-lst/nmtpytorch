@@ -7,7 +7,7 @@ import torch
 
 from torch.utils.data import Dataset
 
-from ..utils.data import onehot_data
+from ..utils.data import convert_to_onehot
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -54,7 +54,7 @@ class COCOJSONLabelDataset(Dataset):
     def to_torch(batch, **kwargs):
         # Hack: kwargs is filled by model through injection into DataSource
         # We always have to have a time/sequence dim at 0
-        return onehot_data(batch, kwargs['n_labels']).unsqueeze(0)
+        return convert_to_onehot(batch, kwargs['n_labels']).unsqueeze(0)
 
     def __getitem__(self, idx):
         return self.data[self.keys[idx]]
