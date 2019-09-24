@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 # First the basic types
 from .numpy import NumpyDataset
 from .keyed_npz import KeyedNPZDataset
@@ -9,9 +11,11 @@ from .label import LabelDataset
 from .shelve import ShelveDataset
 from .msvd.mjson import MSVDJSONDataset
 from .msvd.numpy import MSVDNumpyDataset
-from .vatex_json import VatexJSONDataset
 from .coco_json import COCOJSONDataset
 from .coco_json_label import COCOJSONLabelDataset
+from .vatex_feats import VATEXFeaturesDataset
+
+Element = namedtuple('Element', ['data', 'size', 'idx'])
 
 # Second the selector function
 def get_dataset(type_):
@@ -26,12 +30,11 @@ def get_dataset(type_):
         'shelve': ShelveDataset,
         'msvdjson': MSVDJSONDataset,
         'msvdnumpy': MSVDNumpyDataset,
-        'vatexjson': VatexJSONDataset,
         'cocojson': COCOJSONDataset,
         'cocojsonlabel': COCOJSONLabelDataset,
+        'vatexfeatures': VATEXFeaturesDataset,
     }[type_.lower()]
 
 
 # Should always be at the end
 from .multimodal import MultimodalDataset
-from .multitask import MultitaskDataset
