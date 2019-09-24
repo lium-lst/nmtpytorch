@@ -37,9 +37,9 @@ class COCOJSONDataset(Dataset):
             annotations,  _ = data['annotations'], data['images']
 
         # Number of captions = dataset size
-        self.size = len(annotations)
         self.data = {}
         self.lengths = []
+        self.size = len(annotations)
 
         # Multiple image_id keys will exist for multiple captions
         # Here we neatly add captionIDs to keep them separate
@@ -59,7 +59,7 @@ class COCOJSONDataset(Dataset):
             # Store the length
             self.lengths.append(len(caption))
 
-        self.keys = list(self.data.keys())
+        self.keys = sorted(self.data.keys())
 
     @staticmethod
     def to_torch(batch, **kwargs):
