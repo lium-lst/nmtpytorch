@@ -167,9 +167,9 @@ class Translator:
         output = "{}.{}{}".format(self.output, split, suffix)
 
         f = open(output, 'w')
-        if isinstance(hyps[0], dict):
+        if getattr(self.instances[0], 'prepare_outputs'):
             # NOTE: Assume that it's json-ready COCO annotations
-            json.dump(hyps, f)
+            json.dump(self.instances[0].prepare_outputs(hyps), f)
         elif self.n_best:
             for idx, (cands, scores) in enumerate(hyps):
                 cands = self.filter(cands)
