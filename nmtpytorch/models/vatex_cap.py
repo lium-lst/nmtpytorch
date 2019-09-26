@@ -7,6 +7,7 @@ from ..layers import FF, ArgSelect
 from ..layers.decoders import ConditionalDecoder
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
+from ..datasets import MultimodalDataset
 from . import NMT
 
 logger = logging.getLogger('nmtpytorch')
@@ -26,7 +27,7 @@ class VATEXCaptioner(NMT):
             'enc_bidir': False,         # Bi-directional?
             'dropout_feat': 0,          # Simple dropout to source embeddings
             'dec_dim': 256,             # Decoder hidden size
-            'dec_emb_dim': 256,         # Decoder hidden size
+            'emb_dim': 256,             # Decoder embedding size
             'dec_init': 'mean_ctx',     # How to initialize decoder (zero/mean_ctx/feats)
             'dropout_out': 0,           # Simple dropout to decoder output
             'direction': None,          # Network directionality, i.e. en->de
@@ -75,6 +76,20 @@ class VATEXCaptioner(NMT):
             if param.requires_grad and param.dim() > 1:
                 nn.init.kaiming_normal_(param.data)
 
+    def load_data(self, split, batch_size, mode='train'):
+        """Loads the requested dataset split."""
+        self.dataset = MultimodalDataset(
+            data=self.opts.data['{}_set'.format(split)],
+            mode=mode, batch_size=batch_size,
+            vocabs=self.vocabs, topology=self.topology,
+            bucket_by=self.opts.model['bucket_by'],
+            max_len=self.opts.model['max_len'],
+            bucket_order=self.opts.model['bucket_order'],
+            sampler_type=self.opts.model['sampler_type'],
+            repeat_by=10 if mode != 'beam' else 1)
+        logger.info(self.dataset)
+        return self.dataset
+
     def setup(self, is_train=True):
         ##############################
         # Copied from label_classifier
@@ -99,7 +114,8 @@ class VATEXCaptioner(NMT):
             layers.append(ArgSelect(0))
             if self.opts.model['enc_bidir']:
                 layers.append(FF(out_dim * 2, out_dim, bias=False))
-            self.ctx_dim = out_dim
+
+        self.ctx_dim = out_dim
 
         if self.opts.model['dropout_feat'] > 0:
             layers.append(nn.Dropout(self.opts.model['dropout_feat']))
@@ -111,13 +127,23 @@ class VATEXCaptioner(NMT):
         # Create Decoder
         ################
         self.dec = ConditionalDecoder(
-            input_size=self.opts.model['dec_emb_dim'],
+            input_size=self.opts.model['emb_dim'],
             hidden_size=self.opts.model['dec_dim'],
-            ctx_size_dict={'i3d': self.ctx_dim},
+            rnn_type='gru',
             ctx_name='i3d',
+            ctx_size_dict={'i3d': self.ctx_dim},
             n_vocab=self.n_trg_vocab,
             dropout_out=self.opts.model['dropout_out'])
 
     def encode(self, batch, **kwargs):
-        d = {str(self.sl): self.enc(batch[self.sl])}
-        return d
+        return {
+            'i3d': (self.enc(batch['i3d']), None),
+        }
+
+    def prepare_outputs(self, beam_results):
+        json_results = []
+        for idx, cap in enumerate(beam_results):
+            json_results.append({
+                'image_id': self.dataset.datasets['i3d'].keys[idx],
+                'caption': cap})
+        return json_results
