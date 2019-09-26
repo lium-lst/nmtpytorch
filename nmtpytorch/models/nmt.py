@@ -197,7 +197,7 @@ class NMT(nn.Module):
 
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
-        dataset = MultimodalDataset(
+        self.dataset = MultimodalDataset(
             data=self.opts.data['{}_set'.format(split)],
             mode=mode, batch_size=batch_size,
             vocabs=self.vocabs, topology=self.topology,
@@ -205,8 +205,8 @@ class NMT(nn.Module):
             max_len=self.opts.model['max_len'],
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'])
-        logger.info(dataset)
-        return dataset
+        logger.info(self.dataset)
+        return self.dataset
 
     def get_bos(self, batch_size):
         """Returns a representation for <bos> embeddings for decoding."""
