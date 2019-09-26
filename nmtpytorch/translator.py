@@ -166,11 +166,12 @@ class Translator:
             suffix += ".nbest"
         output = "{}.{}{}".format(self.output, split, suffix)
 
-        f = open(output, 'w')
         if getattr(self.instances[0], 'prepare_outputs'):
+            f = open('{}.json'.format(output), 'w')
             # NOTE: Assume that it's json-ready COCO annotations
             json.dump(self.instances[0].prepare_outputs(hyps), f)
         elif self.n_best:
+            f = open(output, 'w')
             for idx, (cands, scores) in enumerate(hyps):
                 cands = self.filter(cands)
                 sorted_cs = sorted(
@@ -179,6 +180,7 @@ class Translator:
                     # cands is a list of n sents, scores as well
                     f.write('{} ||| {} ||| {:.5f}\n'.format(idx, cand, score))
         else:
+            f = open(output, 'w')
             # Post-process strings if requested
             hyps = self.filter(hyps)
             for idx, line in enumerate(hyps):
