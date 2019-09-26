@@ -283,6 +283,8 @@ class MainLoop:
                                max_len=self.eval_max_len)
             beam_time = time.time() - beam_time
 
+            if getattr(self.model, 'prepare_outputs'):
+                hyps = self.model.prepare_outputs(hyps)
             # Compute metrics and update results
             score_time = time.time()
             results.extend(self.evaluator.score(hyps))
