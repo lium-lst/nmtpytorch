@@ -4,6 +4,7 @@ import torch
 from .utils.misc import pbar
 from .utils.topology import Topology
 from .utils.device import DEVICE
+from .utils.data import sort_predictions
 
 
 def tile_ctx_dict(ctx_dict, idxs):
@@ -190,7 +191,4 @@ def beam_search(models, data_loader, task_id=None, beam_size=12, max_len=200,
             results.extend(vocab.list_of_idxs_to_sents(hyps.tolist()))
 
     # Recover order of the samples if necessary
-    if getattr(data_loader.batch_sampler, 'store_indices', False):
-        results = [results[i] for i, j in sorted(
-            enumerate(data_loader.batch_sampler.orig_idxs), key=lambda k: k[1])]
-    return results
+    return sort_predictions(data_loader, results)
