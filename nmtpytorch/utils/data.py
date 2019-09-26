@@ -9,6 +9,15 @@ from ..utils.misc import fopen, pbar
 logger = logging.getLogger('nmtpytorch')
 
 
+def sort_predictions(data_loader, results):
+    """Recovers the dataset order when bucketing samplers are used."""
+    if getattr(data_loader.batch_sampler, 'store_indices', False):
+        results = [results[i] for i, j in sorted(
+            enumerate(data_loader.batch_sampler.orig_idxs), key=lambda k: k[1])]
+    else:
+        return results
+
+
 def make_dataloader(dataset, pin_memory=False, num_workers=0):
     if num_workers != 0:
         logger.info('Forcing num_workers to 0 since it fails with torch 0.4')
