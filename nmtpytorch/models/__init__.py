@@ -18,10 +18,6 @@ from .amnmtfeats_fa import AttentiveMNMTFeaturesFA
 from .asr import ASR
 from .multimodal_asr import MultimodalASR
 
-# Experimental: requires work/adaptation
-from .multitask import Multitask
-from .multitask_att import MultitaskAtt
-
 ##########################################
 # Backward-compatibility with older models
 ##########################################
