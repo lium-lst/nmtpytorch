@@ -63,6 +63,7 @@ class Translator:
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)
+            logger.info(instance)
 
         # Split the string
         self.splits = self.splits.split(',')
