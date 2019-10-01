@@ -34,6 +34,8 @@ class Loss:
         self._denom += n_items
 
     def get(self):
+        if self._denom == 0:
+            return 0
         return self._loss / self._denom
 
 
