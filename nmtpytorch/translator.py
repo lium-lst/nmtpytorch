@@ -64,6 +64,7 @@ class Translator:
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)
+            logger.info(instance)
 
         # Split the string
         self.splits = self.splits.split(',')
@@ -166,7 +167,7 @@ class Translator:
             suffix += ".nbest"
         output = "{}.{}{}".format(self.output, split, suffix)
 
-        if getattr(self.instances[0], 'prepare_outputs'):
+        if hasattr(self.instances[0], 'prepare_outputs'):
             f = open('{}.json'.format(output), 'w')
             # NOTE: Assume that it's json-ready COCO annotations
             json.dump(self.instances[0].prepare_outputs(hyps), f)
