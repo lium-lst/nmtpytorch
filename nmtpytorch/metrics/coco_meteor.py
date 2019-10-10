@@ -11,7 +11,7 @@ class COCOMETEORScorer:
     def __init__(self):
         self.__cmdline = [
             '/data/ozan/git/coco-caption-ozan/cocoeval',
-            '-m', 'METEOR']
+            '-c', 'meteor']
         self.__tmp_ref = get_temp_file()
         self.__tmp_ref.close()
 
