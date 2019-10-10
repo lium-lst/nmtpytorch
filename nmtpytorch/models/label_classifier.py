@@ -9,6 +9,7 @@ from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss, Recall, Precision, F1
 from ..utils.device import DEVICE
 from ..utils.misc import pbar
+from ..utils.data import sort_predictions
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 from . import NMT
@@ -131,8 +132,6 @@ class LabelClassifier(NMT):
             elif self.opts.model['weight_type'] == 'inv_log':
                 counts.log_().round_()
                 counts = 1 / (counts.div(counts.min()))
-            logger.info(counts[:2])
-            logger.info(counts[-2:])
             self.train_loss = nn.MultiLabelSoftMarginLoss(
                 weight=counts, reduction='sum')
         else:
@@ -167,21 +166,22 @@ class LabelClassifier(NMT):
             Tensor:
                 A scalar loss normalized w.r.t batch size and token counts.
         """
+        # Encode
         out = self.encoder(batch[self.src])
-        labels = batch[self.trg].squeeze_(0)
-        if self.training:
-            loss = self.train_loss(out, labels)
-        else:
-            loss = self.eval_loss(out, labels)
+
+        # Prepare results
+        results = {'loss': 0, 'n_items': out.shape[0]}
+
+        # Loss can only be computed if target labels available
+        loss_fn = self.train_loss if self.training else self.eval_loss
+        if self.trg in batch:
+            labels = batch[self.trg].squeeze_(0)
+            results['loss'] = loss_fn(out, labels)
 
         # Prepare predictions for further metric computations
-        preds = out.detach().sigmoid()
+        results['preds'] = out.detach().sigmoid()
 
-        return {
-            'loss': loss,
-            'preds': preds,
-            'n_items': out.shape[0],
-        }
+        return results
 
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
@@ -190,22 +190,48 @@ class LabelClassifier(NMT):
         prec = Precision()
         f1 = F1()
 
+        if dump_file:
+            results = []
+
         for batch in pbar(data_loader, unit='batch'):
             batch.device(DEVICE)
-            labels = batch[self.trg]
-
             out = self.forward(batch)
 
-            # Apply classifier threshold
-            preds = self.thresholder(out['preds'])
-            loss.update(out['loss'], out['n_items'])
-            rec.update(preds, labels)
-            prec.update(preds, labels)
-            f1.update(preds, labels)
+            if dump_file:
+                results.append(out['preds'].cpu().numpy())
 
-        return [
-            Metric('LOSS', loss.get(), higher_better=False),
-            rec.compute(),
-            prec.compute(),
-            f1.compute(),
-        ]
+            if self.trg in batch:
+                labels = batch[self.trg]
+                loss.update(out['loss'], out['n_items'])
+                # Apply classifier threshold
+                preds = self.thresholder(out['preds'])
+                rec.update(preds, labels)
+                prec.update(preds, labels)
+                f1.update(preds, labels)
+
+        if dump_file:
+            import numpy as np
+            results = sort_predictions(data_loader, np.concatenate(results))
+            sample_idxs = data_loader.dataset.datasets[self.src].keys
+            rdict = {}
+
+            with open('{}.labels.txt'.format(dump_file), 'w') as f:
+                for idx, scores in zip(sample_idxs, results):
+                    rdict[idx] = scores.reshape(1, -1)
+
+                    label_str = self.vocabs[self.trg].idxs_to_sent(
+                        scores.argsort()[::-1][:100], debug=True)
+                    f.write('{}\t{}\n'.format(idx, label_str))
+
+                # Dump raw score vectors as .npz
+                np.savez_compressed(dump_file, **rdict)
+
+        if data_loader.dataset.n_targets > 0:
+            return [
+                Metric('LOSS', loss.get(), higher_better=False),
+                rec.compute(),
+                prec.compute(),
+                f1.compute(),
+            ]
+        else:
+            return []
