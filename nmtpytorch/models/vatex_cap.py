@@ -12,6 +12,8 @@ from . import NMT
 
 logger = logging.getLogger('nmtpytorch')
 
+import ipdb
+
 
 class VATEXCaptioner(NMT):
     supports_beam_search = True
@@ -21,6 +23,8 @@ class VATEXCaptioner(NMT):
             'feat_dim': 1024,           # Source feature dim
             'feat_proj_dim': 128,       # FF-layer dim
             'feat_proj_activ': None,    # Linear FF by default
+            'feat_topk': 0,             # Only useful for label->caption
+            'feat_sort': False,         # Sort topk labels first
             'enc_type': None,           # None, gru or lstm
             'enc_dim': 128,             # Hidden dim of the encoder
             'n_encoders': 1,            # Only used if enc_type != None
@@ -38,6 +42,7 @@ class VATEXCaptioner(NMT):
             'sampler_type': 'bucket',   # bucket or approximate
             'sched_sampling': 0,        # Scheduled sampling ratio
             'out_logic': 'simple',      # 'simple' or 'deep' output
+            'tied_emb': False,          # Tie target embeddings
         }
 
     def __init__(self, opts):
@@ -59,6 +64,8 @@ class VATEXCaptioner(NMT):
 
         # Parse topology & languages
         self.topology = Topology(self.opts.model['direction'])
+        self.src = self.topology.first_src
+        self.tl = self.topology.first_trg
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
@@ -94,10 +101,15 @@ class VATEXCaptioner(NMT):
         ##############################
         # Copied from label_classifier
         ##############################
-        feat_proj = FF(self.opts.model['feat_dim'],
-                       self.opts.model['feat_proj_dim'],
-                       activ=self.opts.model['feat_proj_activ'],
-                       bias=False)
+        if self.opts.model['feat_topk'] > 0:
+            # Create a lookup table
+            feat_proj = nn.Embedding(self.opts.model['feat_dim'],
+                                     self.opts.model['feat_proj_dim'])
+        else:
+            feat_proj = FF(self.opts.model['feat_dim'],
+                           self.opts.model['feat_proj_dim'],
+                           activ=self.opts.model['feat_proj_activ'],
+                           bias=False)
 
         layers = [feat_proj]
         out_dim = self.opts.model['feat_proj_dim']
@@ -130,20 +142,32 @@ class VATEXCaptioner(NMT):
             input_size=self.opts.model['emb_dim'],
             hidden_size=self.opts.model['dec_dim'],
             rnn_type='gru',
-            ctx_name='i3d',
-            ctx_size_dict={'i3d': self.ctx_dim},
+            ctx_name=self.src,
+            tied_emb=self.opts.model['tied_emb'],
+            ctx_size_dict={self.src: self.ctx_dim},
             n_vocab=self.n_trg_vocab,
             dropout_out=self.opts.model['dropout_out'])
 
     def encode(self, batch, **kwargs):
+        input_ = batch[self.src]
+        if self.opts.model['feat_topk'] > 0:
+            # Remove 1st dim
+            input_.squeeze_()
+            scores, idxs = input_.topk(
+                self.opts.model['feat_topk'], sorted=not self.opts.model['feat_sort'])
+            if self.opts.model['feat_sort']:
+                idxs, _ = idxs.sort()
+
+            # Finally transpose
+            input_ = idxs.t()
         return {
-            'i3d': (self.enc(batch['i3d']), None),
+            self.src: (self.enc(input_), None),
         }
 
     def prepare_outputs(self, beam_results):
         json_results = []
         for idx, cap in enumerate(beam_results):
             json_results.append({
-                'image_id': self.dataset.datasets['i3d'].keys[idx],
+                'image_id': self.dataset.datasets[self.src].keys[idx],
                 'caption': cap})
         return json_results
