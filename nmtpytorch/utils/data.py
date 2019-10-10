@@ -14,8 +14,7 @@ def sort_predictions(data_loader, results):
     if getattr(data_loader.batch_sampler, 'store_indices', False):
         results = [results[i] for i, j in sorted(
             enumerate(data_loader.batch_sampler.orig_idxs), key=lambda k: k[1])]
-    else:
-        return results
+    return results
 
 
 def make_dataloader(dataset, pin_memory=False, num_workers=0):
