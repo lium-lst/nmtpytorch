@@ -15,18 +15,25 @@ class Vocabulary:
               "<eos>": 2,
               "<unk>": 3}
 
-    def __init__(self, vocab, name):
+    def __init__(self, vocab, name, short_list=0):
         self.vocab = pathlib.Path(vocab).expanduser()
         self.name = name
+        self.short_list = short_list
         self._map = None
         self._imap = None
         self.freqs = None
         self.counts = None
         self._allmap = None
         self.n_tokens = None
+        # By default, we start with all special tokens
+        for tok in self.TOKENS:
+            setattr(self, f'has_{tok[1:-1]}', True)
 
         # Load file
         data = json.load(open(self.vocab))
+        if self.short_list > 0:
+            # Get a slice of most frequent `short_list` items
+            data = dict(list(data.items())[:self.short_list])
 
         # Detect vocabulary: values can be int or a string of type "id count"
         elem = next(iter(data.values()))
@@ -43,7 +50,8 @@ class Vocabulary:
         # Sanity check for placeholder tokens
         for tok, idx in self.TOKENS.items():
             if self._map.get(tok, -1) != idx:
-                logger.info('{} not found in {}'.format(tok, self.vocab.name))
+                logger.info(f'{tok} not found in vocabulary \'{self.name}\'')
+                setattr(self, f'has_{tok[1:-1]}', False)
 
         # Set # of tokens
         self.n_tokens = len(self._map)
@@ -69,14 +77,21 @@ class Vocabulary:
         """Convert from list of strings to list of token indices."""
         tidxs = []
 
-        if explicit_bos:
+        if explicit_bos and self.has_bos:
             tidxs.append(self.TOKENS["<bos>"])
 
-        for tok in line.split():
-            tidxs.append(self._map.get(tok, self.TOKENS["<unk>"]))
+        if self.has_unk:
+            for tok in line.split():
+                tidxs.append(self._map.get(tok, self.TOKENS["<unk>"]))
+        else:
+            # Silently remove unknown tokens from the words
+            for tok in line.split():
+                try:
+                    tidxs.append(self._map[tok])
+                except KeyError as ke:
+                    pass
 
-        if explicit_eos:
-            # Append <eos>
+        if explicit_eos and self.has_eos:
             tidxs.append(self.TOKENS["<eos>"])
 
         return tidxs
@@ -85,7 +100,7 @@ class Vocabulary:
         """Convert integer hypothesis to string."""
         result = []
         for idx in idxs:
-            if not debug and idx == self.TOKENS["<eos>"]:
+            if not debug and self.has_eos and idx == self.TOKENS["<eos>"]:
                 break
             result.append(self._imap.get(idx, self.TOKENS["<unk>"]))
 
