@@ -15,7 +15,7 @@ class Pool(torch.nn.Module):
             self.__pool_fn = lambda x: x.select(self.pool_dim, -1)
         elif self.op_type == 'max':
             pool_fn = getattr(torch, self.op_type)
-            self.__pool_fn = lambda x: pool_fn(x, dim=self.pool_dim)[0]
+            self.__pool_fn = lambda x: pool_fn(x, dim=self.pool_dim, keepdim=True)[0]
         else:
             pool_fn = getattr(torch, self.op_type)
             self.__pool_fn = lambda x: pool_fn(x, dim=self.pool_dim)
