@@ -61,6 +61,7 @@ class MultimodalDataset(Dataset):
         for key, ds in self.topology.all.items():
             if self.mode == 'beam' and ds.trg:
                 # Skip target streams for beam-search
+                logger.info("Skipping '{}' as target".format(key))
                 continue
 
             try:
@@ -69,12 +70,15 @@ class MultimodalDataset(Dataset):
             except KeyError as ke:
                 logger.info("ERROR: Unknown dataset type '{}'".format(ds._type))
 
-            # Construct the dataset
-            logger.info("Initializing dataset for '{}'".format(ds))
-            self.datasets[ds] = dataset_constructor(
-                fname=data[key],
-                vocab=vocabs.get(key, None), bos=ds.trg, **kwargs)
-            self.size_dict[ds] = len(self.datasets[ds])
+            logger.info("Initializing dataset for '{}'...".format(ds))
+            if key in data:
+                # Construct the dataset
+                self.datasets[ds] = dataset_constructor(
+                    fname=data[key],
+                    vocab=vocabs.get(key, None), bos=ds.trg, **kwargs)
+                self.size_dict[ds] = len(self.datasets[ds])
+            else:
+                logger.info("  Skipping as '{}' not defined. This may be an issue.".format(key))
 
         # Set dataset size
         if len(set(self.size_dict.values())) > 1:
