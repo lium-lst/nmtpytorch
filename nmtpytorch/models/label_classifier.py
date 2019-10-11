@@ -42,6 +42,9 @@ class LabelClassifier(NMT):
             'weight_type': 'custom',    #
             'threshold': 0.3,           # classification threshold
             'dropout': 0.5,             # Dropout p
+            'short_list': 0,            # Reduce vocabulary if given
+            'n_ff_layers': 1,           # How many stacked output layers?
+            'ff_out_activ': 'tanh',     # If n_ff_layers > 1, use this non-lin
             ############################
             'direction': None,          # Network directionality, i.e. en->de
             'bucket_by': None,          # A key like 'en' to define w.r.t which dataset
@@ -73,7 +76,8 @@ class LabelClassifier(NMT):
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, name=name)
+            self.vocabs[name] = Vocabulary(
+                fname, name=name, short_list=self.opts.model['short_list'])
 
         # Set implicit label count for correct batch preparation
         self.topology[self.trg].kwargs['n_labels'] = len(self.vocabs[self.trg])
@@ -109,7 +113,14 @@ class LabelClassifier(NMT):
                 layers.append(FF(out_dim * 2, out_dim, bias=False))
 
         # Pool states over the 1st dim (sequential)
-        layers.append(Pool(self.opts.model['feat_aggregate'], pool_dim=0))
+        layers.append(
+            Pool(self.opts.model['feat_aggregate'], pool_dim=0, keepdim=False))
+
+        # Additional layers
+        if self.opts.model['n_ff_layers'] > 1:
+            for i in range(self.opts.model['n_ff_layers'] - 1):
+                layers.append(
+                    FF(out_dim, out_dim, activ=self.opts.model['ff_out_activ']))
 
         # Output layer
         layers.append(
@@ -219,6 +230,7 @@ class LabelClassifier(NMT):
                 for idx, scores in zip(sample_idxs, results):
                     rdict[idx] = scores.reshape(1, -1)
 
+                    # For inspection purposes, dump only top 100 labels
                     label_str = self.vocabs[self.trg].idxs_to_sent(
                         scores.argsort()[::-1][:100], debug=True)
                     f.write('{}\t{}\n'.format(idx, label_str))
