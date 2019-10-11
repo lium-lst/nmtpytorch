@@ -160,7 +160,7 @@ def get_n_params(module):
         readable_size(n_param_all), readable_size(n_param_learnable))
 
 
-def get_temp_file(delete=False):
+def get_temp_file(delete=False, close=False):
     """Creates a temporary file under a folder."""
     root = pathlib.Path(os.environ.get('NMTPY_TMP', '/tmp'))
     if not root.exists():
@@ -170,6 +170,8 @@ def get_temp_file(delete=False):
     t = tempfile.NamedTemporaryFile(
         mode='w', prefix=prefix, delete=delete)
     cleanup.register_tmp_file(t.name)
+    if close:
+        t.close()
     return t
 
 
