@@ -8,21 +8,27 @@ class Pool(torch.nn.Module):
 
         self.op_type = op_type
         self.pool_dim = pool_dim
+        self.keepdim = keepdim
         assert self.op_type in ["last", "mean", "max", "sum"], \
             "Pool() operation should be mean, max, sum or last."
 
         if self.op_type == 'last':
-            self.__pool_fn = lambda x: x.select(self.pool_dim, -1)
-        elif self.op_type == 'max':
-            pool_fn = getattr(torch, self.op_type)
-            self.__pool_fn = lambda x: pool_fn(x, dim=self.pool_dim, keepdim=keepdim)[0]
+            self.__pool_fn = lambda x: x.select(
+                self.pool_dim, -1).unsqueeze(0)
         else:
-            pool_fn = getattr(torch, self.op_type)
-            self.__pool_fn = lambda x: pool_fn(x, dim=self.pool_dim)
+            if self.op_type == 'max':
+                self.__pool_fn = lambda x: torch.max(
+                    x, dim=self.pool_dim, keepdim=self.keepdim)[0]
+            elif self.op_type == 'mean':
+                self.__pool_fn = lambda x: torch.mean(
+                    x, dim=self.pool_dim, keepdim=self.keepdim)
+            elif self.op_type == 'sum':
+                self.__pool_fn = lambda x: torch.sum(
+                    x, dim=self.pool_dim, keepdim=self.keepdim)
 
     def forward(self, x):
         return self.__pool_fn(x)
 
     def __repr__(self):
-        return "Pool(op_type={}, pool_dim={})".format(
-            self.op_type, self.pool_dim)
+        return "Pool(op_type={}, pool_dim={}, keepdim={})".format(
+            self.op_type, self.pool_dim, self.keepdim)
