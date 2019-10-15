@@ -5,6 +5,7 @@ from .mnmt import MultimodalNMT
 from .acapt import AttentiveCaptioning
 from .vcap import VideoCaptioner
 from .vatex_cap import VATEXCaptioner
+from .vatex_simple_cap import VATEXSimpleCaptioner
 
 # Raw images
 from .amnmtraw import AttentiveRawMNMT
