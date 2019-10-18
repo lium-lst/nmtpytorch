@@ -71,8 +71,6 @@ class VATEXCaptioner(NMT):
         for name, fname in self.opts.vocabulary.items():
             self.vocabs[name] = Vocabulary(fname, name=name)
 
-        # NOTE: Hardcode 'en' key as target modality
-        self.tl = 'en'
         self.trg_vocab = self.vocabs[self.tl]
         self.n_trg_vocab = len(self.trg_vocab)
         self.val_refs = self.opts.data['val_set'][self.tl]
