@@ -55,7 +55,7 @@ TRAIN_DEFAULTS = {
 
 def expand_env_vars(data):
     """Interpolate some environment variables."""
-    for key in ('HOME', 'USER', 'LOCAL', 'SCRATCH'):
+    for key in ('HOME', 'USER', 'LOCAL', 'SCRATCH', 'PWD'):
         var = '$' + key
         if var in data and key in os.environ:
             data = data.replace(var, os.environ[key])
