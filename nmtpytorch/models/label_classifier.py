@@ -122,12 +122,12 @@ class LabelClassifier(NMT):
                 layers.append(
                     FF(out_dim, out_dim, activ=self.opts.model['ff_out_activ']))
 
+        if self.opts.model['dropout'] > 0:
+            layers.append(nn.Dropout(self.opts.model['dropout']))
+
         # Output layer
         layers.append(
             FF(out_dim, len(self.vocabs[self.trg]), bias=False))
-
-        if self.opts.model['dropout'] > 0:
-            layers.append(nn.Dropout(self.opts.model['dropout']))
 
         # Construct one encoder abstraction
         self.encoder = nn.Sequential(*layers)

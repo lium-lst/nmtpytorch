@@ -21,7 +21,7 @@ class VideoCaptioner(NMT):
     def set_defaults(self):
         self.defaults = {
             'n_labels': 601,            # # of input labels available
-            'n_act_labels': 339,        # # of input action labels
+            #'n_act_labels': 339,        # # of input action labels
             'feat_dim': 128,            # Projected feature dim
             'feat_activ': None,         # feature activation type
             'feat_bias': True,          # Bias for the label embeddings
