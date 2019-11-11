@@ -24,6 +24,8 @@ from .multimodal_asr import MultimodalASR
 # Multi-label classifier
 from .label_classifier import LabelClassifier
 
+from .rationale import Rationale
+
 ##########################################
 # Backward-compatibility with older models
 ##########################################
