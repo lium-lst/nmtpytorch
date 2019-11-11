@@ -61,10 +61,10 @@ class MultiHeadCoAttention(nn.Module):
 
         if ctx_1_mask is not None:
             mask = ctx_1_mask.t().unsqueeze(2).unsqueeze(3).expand_as(scores)
-            scores = scores.masked_fill(mask.byte(), -1e18)
+            scores = scores.masked_fill(mask.bool(), -1e18)
         if ctx_2_mask is not None:
             mask = ctx_2_mask.t().unsqueeze(1).unsqueeze(3).expand_as(scores)
-            scores = scores.masked_fill(mask.byte(), -1e18)
+            scores = scores.masked_fill(mask.bool(), -1e18)
 
         # 3) Apply attention dropout and compute context vectors.
         dist_1_to_2 = F.softmax(scores, dim=2)
