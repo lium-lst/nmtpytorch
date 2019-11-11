@@ -45,7 +45,7 @@ setuptools.setup(
     python_requires='~=3.6',
     install_requires=[
         'numpy', 'scipy', 'scikit-learn', 'tqdm', 'pillow',
-        'torch>=1.3.0', 'torchvision>=0.4.1', 'pytorch-ignite',
+        'torch>=1.3.0', 'torchvision>=0.4.2', 'pytorch-ignite',
         'sacrebleu>=1.2.9',
         'editdistance==0.4', 'subword_nmt==0.3.5',
     ],
