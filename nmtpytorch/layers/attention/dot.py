@@ -77,7 +77,7 @@ class DotAttention(nn.Module):
         # Normalize attention scores correctly -> S*B
         if ctx_mask is not None:
             # Mask out padded positions with -inf so that they get 0 attention
-            scores.masked_fill_((1 - ctx_mask).byte(), -1e8)
+            scores.masked_fill_((1 - ctx_mask).bool(), -1e8)
 
         alpha = F.softmax(scores, dim=0)
 
