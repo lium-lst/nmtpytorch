@@ -33,7 +33,7 @@ class TensorBoard:
     def __repr__(self):
         if not self.log_dir:
             return "No 'tensorboard_dir' given in config"
-        return f"TensorBoard is active -- {self.log_dir}"
+        return "TensorBoard is active"
 
     def setup(self):
         """Setups TensorBoard logger."""
