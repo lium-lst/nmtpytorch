@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import pathlib
 
 
@@ -16,54 +15,41 @@ class TensorBoard:
         self.send_activations = send_activations
         self.send_gradients = send_gradients
         self.writer = None
-        self.available = False
+        self.available = bool(self.log_dir)
 
         # Call setup
         self.setup()
 
+    def _nop(self, *args, **kwargs):
+        return
+
+    def replace_loggers(self):
+        """Replace all log_* methods with dummy _nop."""
+        self.log_metrics = self._nop
+        self.log_scalar = self._nop
+        self.log_activations = self._nop
+        self.log_gradients = self._nop
+
     def __repr__(self):
-        if self.available:
-            return "TensorBoard is active"
-        else:
-            if not self.log_dir:
-                return "No 'tensorboard_dir' given in config"
-            else:
-                return "TensorboardX not installed"
+        if not self.log_dir:
+            return "No 'tensorboard_dir' given in config"
+        return f"TensorBoard is active -- {self.log_dir}"
 
     def setup(self):
         """Setups TensorBoard logger."""
-
-        def replace_loggers():
-            # Replace all log_* methods with dummy _nop
-            self.log_metrics = self._nop
-            self.log_scalar = self._nop
-            self.log_activations = self._nop
-            self.log_gradients = self._nop
-
-        # No log_dir given, bail out
-        if not self.log_dir:
-            replace_loggers()
+        if not self.available:
+            self.replace_loggers()
             return
 
-        # Detect tensorboard
-        try:
-            from tensorboardX import SummaryWriter
-        except ImportError as ie:
-            replace_loggers()
-            return
-        else:
-            self.available = True
+        from torch.utils.tensorboard import SummaryWriter
 
-            # Construct full folder path
-            self.log_dir = pathlib.Path(self.log_dir).expanduser()
-            self.log_dir = self.log_dir / self.subfolder / self.exp_id
-            self.log_dir.mkdir(parents=True, exist_ok=True)
+        # Construct full folder path
+        self.log_dir = pathlib.Path(self.log_dir).expanduser()
+        self.log_dir = self.log_dir / self.subfolder / self.exp_id
+        self.log_dir.mkdir(parents=True, exist_ok=True)
 
-            # Set up summary writer
-            self.writer = SummaryWriter(self.log_dir)
-
-    def _nop(self, *args, **kwargs):
-        return
+        # Set up summary writer
+        self.writer = SummaryWriter(self.log_dir)
 
     def close(self):
         """Closes TensorBoard handle."""
