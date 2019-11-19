@@ -77,18 +77,21 @@ class Rationale(NMT):
         gen_layers = []
         self.ctx_size = self.opts.model['gen_dim']
         if self.opts.model['gen_type'] in ('lstm', 'gru'):
+            if self.opts.model['gen_bidir']:
+                self.ctx_size *= 2
+
             RNN = getattr(nn, self.opts.model['gen_type'].upper())
             dropout = self.opts.model['dropout']
             if self.opts.model['n_encoders'] == 1:
                 dropout = 0
+
+            # RNN Encoder
             gen_layers.append(RNN(
                 self.opts.model['emb_dim'], self.opts.model['gen_dim'],
                 self.opts.model['n_encoders'], batch_first=False,
-                dropout=self.opts.model['dropout'],
+                dropout=dropout,
                 bidirectional=self.opts.model['gen_bidir']))
             gen_layers.append(ArgSelect(0))
-            if self.opts.model['gen_bidir']:
-                self.ctx_size *= 2
         else:
             raise NotImplementedError('gen_type unknown')
 
