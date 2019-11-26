@@ -56,6 +56,7 @@ class NMT(nn.Module):
             'bucket_order': None,       # Curriculum: ascending/descending/None
             'sampler_type': 'bucket',   # bucket or approximate
             'sched_sampling': 0,        # Scheduled sampling ratio
+            'short_list': 0,            # Short list vocabularies (0: disabled)
             'bos_type': 'emb',          # 'emb': default learned emb
             'bos_activ': None,          #
             'bos_dim': None,            #
@@ -84,7 +85,8 @@ class NMT(nn.Module):
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, name=name)
+            self.vocabs[name] = Vocabulary(
+                fname, name=name, short_list=self.opts.model['short_list'])
 
         # Inherently non multi-lingual aware
         slangs = self.topology.get_src_langs()
