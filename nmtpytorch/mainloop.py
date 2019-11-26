@@ -70,6 +70,10 @@ class MainLoop:
             data = load_pt_file(train_opts['pretrained_file'])
             weights = data['model']
             self._found_optim_state = data.get('optimizer', None)
+            if train_opts['pretrained_layers']:
+                prefixes = tuple(train_opts['pretrained_layers'].split(','))
+                keys = [w for w in weights if w.startswith(prefixes)]
+                weights = {k: weights[k] for k in keys}
 
             for name in get_module_groups(weights.keys()):
                 self.print(
@@ -87,8 +91,8 @@ class MainLoop:
                         param.requires_grad = False
                         frozen.append(name)
 
-            for name in get_module_groups(frozen):
-                self.print(' -> froze parameter {}.*'.format(name))
+            for name in frozen:
+                self.print(f' -> froze parameter {name}')
 
         self.print(self.model)
         self.model = self.model.to(self.dev_mgr.dev)
@@ -122,6 +126,9 @@ class MainLoop:
         self.tboard = TensorBoard(self.model, self.tensorboard_dir,
                                   self.exp_id, self.subfolder)
         self.print(self.tboard)
+
+        # Models can also use tensorboard for custom purposes
+        self.model.register_tensorboard(self.tboard)
 
         # Shift-by-1 and reseed to reproduce batch orders independently
         # from model initialization etc.
