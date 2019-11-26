@@ -4,7 +4,8 @@ import logging
 import torch
 from torch import nn
 
-from ..layers import FF, get_partial_embedding_layer
+from ..layers import FF
+from ..layers.embedding import get_partial_embedding_layer
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
@@ -14,10 +15,12 @@ from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
+from . import NMT
+
 logger = logging.getLogger('nmtpytorch')
 
 
-class NLI(nn.Module):
+class NLI(NMT):
     """A very simple BiLSTM NLI baseline."""
     supports_beam_search = False
 
@@ -43,7 +46,8 @@ class NLI(nn.Module):
         }
 
     def __init__(self, opts):
-        super().__init__()
+        # Don't call NMT init as it's too different from this model
+        nn.Module.__init__(self)
 
         # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
