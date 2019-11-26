@@ -3,17 +3,11 @@ import pathlib
 
 
 class TensorBoard:
-    def __init__(self, model, log_dir, exp_id, subfolder,
-                 send_metrics=True, send_activations=False,
-                 send_gradients=False):
-
+    def __init__(self, model, log_dir, exp_id, subfolder):
         self.model = model
         self.log_dir = log_dir
         self.exp_id = exp_id
         self.subfolder = subfolder
-        self.send_metrics = send_metrics
-        self.send_activations = send_activations
-        self.send_gradients = send_gradients
         self.writer = None
         self.available = bool(self.log_dir)
 
@@ -22,18 +16,6 @@ class TensorBoard:
 
     def _nop(self, *args, **kwargs):
         return
-
-    def replace_loggers(self):
-        """Replace all log_* methods with dummy _nop."""
-        self.log_metrics = self._nop
-        self.log_scalar = self._nop
-        self.log_activations = self._nop
-        self.log_gradients = self._nop
-
-    def __repr__(self):
-        if not self.log_dir:
-            return "No 'tensorboard_dir' given in config"
-        return "TensorBoard is active"
 
     def setup(self):
         """Setups TensorBoard logger."""
@@ -51,10 +33,12 @@ class TensorBoard:
         # Set up summary writer
         self.writer = SummaryWriter(self.log_dir)
 
-    def close(self):
-        """Closes TensorBoard handle."""
-        if self.available:
-            self.writer.close()
+    def replace_loggers(self):
+        """Replace all log_* methods with dummy _nop."""
+        self.log_metrics = self._nop
+        self.log_scalar = self._nop
+        self.log_activations = self._nop
+        self.log_gradients = self._nop
 
     def log_metrics(self, metrics, step, suffix=''):
         """Logs evaluation metrics as scalars."""
@@ -73,3 +57,13 @@ class TensorBoard:
     def log_gradients(self, step):
         """Logs gradients by layer."""
         pass
+
+    def close(self):
+        """Closes TensorBoard handle."""
+        if self.available:
+            self.writer.close()
+
+    def __repr__(self):
+        if not self.log_dir:
+            return "No 'tensorboard_dir' given in config"
+        return "TensorBoard is active"
