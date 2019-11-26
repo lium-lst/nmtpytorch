@@ -72,6 +72,8 @@ class MultimodalDataset(Dataset):
 
             logger.info("Initializing dataset for '{}'...".format(ds))
             if key in data:
+                # Force <eos> for target side, relax it for source side
+                kwargs['eos'] = kwargs.get('eos', True) or ds.trg
                 # Construct the dataset
                 self.datasets[ds] = dataset_constructor(
                     fname=data[key],
