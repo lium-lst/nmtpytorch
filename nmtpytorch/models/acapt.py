@@ -14,10 +14,12 @@ from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
+from . import NMT
+
 logger = logging.getLogger('nmtpytorch')
 
 
-class AttentiveCaptioning(nn.Module):
+class AttentiveCaptioning(NMT):
     """A simple attentive captioning model based on the NMT model. This is
     not a direct reimplementation of Show-attend-and-tell."""
     supports_beam_search = True
@@ -56,7 +58,8 @@ class AttentiveCaptioning(nn.Module):
         }
 
     def __init__(self, opts):
-        super().__init__()
+        # Don't call NMT init as it's too different from this model
+        nn.Module.__init__(self)
 
         # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
