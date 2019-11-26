@@ -60,6 +60,9 @@ if __name__ == '__main__':
                               help='Task to perform, e.g. en_src:Text, pt_src:Text -> fr_tgt:Text')
     parser_trans.add_argument('-x', '--override', nargs="*", default=[],
                               help="(section).key:value overrides for config")
+    parser_trans.add_argument('-r', '--stochastic', action='store_true',
+                              help="Don't fix seed for sampling-based models.")
+
 
     # You can translate a set of splits defined in the .conf file
     parser_trans.add_argument('-s', '--splits', type=str, required=True,
@@ -94,6 +97,8 @@ if __name__ == '__main__':
                              help='Comma separated splits from config file')
     parser_test.add_argument('-S', '--source', type=str,
                              help='Comma-separated key:value pairs to provide new inputs.')
+    parser_test.add_argument('-r', '--stochastic', action='store_true',
+                             help="Don't fix seed for sampling-based models.")
 
     # Parse command-line arguments first
     args = parser.parse_args()
@@ -115,7 +120,8 @@ if __name__ == '__main__':
     # translate entry point
     if args.cmd in ('translate', 'test'):
         logger.setup()
-        fix_seed(1234)
+        if not args.stochastic:
+            fix_seed(1234)
         cmd = args.__dict__.pop('cmd')
         if cmd == 'translate':
             from nmtpytorch.translator import Translator
