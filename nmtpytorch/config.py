@@ -48,6 +48,7 @@ TRAIN_DEFAULTS = {
     'n_checkpoints': 5,          # Number of checkpoints to keep
     'tensorboard_dir': '',       # Enable TB and give global log folder
     'pretrained_file': '',       # A .ckpt file from which layers will be initialized
+    'pretrained_layers': '',     # comma sep. list of layer prefixes to initialize
     'freeze_layers': '',         # comma sep. list of layer prefixes to freeze
     'handle_oom': False,         # Skip out-of-memory batches
 }
