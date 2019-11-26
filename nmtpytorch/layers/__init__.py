@@ -7,7 +7,7 @@ from .pool import Pool
 from .seq_conv import SequenceConvolution
 from .rnninit import RNNInitializer
 from .max_margin import MaxMargin
-from .embedding import get_partial_embedding_layer
+from .embedding import PEmbedding
 
 # Attention layers
 from .attention import *
