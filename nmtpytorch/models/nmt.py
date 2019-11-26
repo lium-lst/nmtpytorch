@@ -263,3 +263,7 @@ class NMT(nn.Module):
     def get_decoder(self, task_id=None):
         """Compatibility function for multi-tasking architectures."""
         return self.dec
+
+    def register_tensorboard(self, handle):
+        """Stores tensorboard hook for custom logging."""
+        self.tboard = handle
