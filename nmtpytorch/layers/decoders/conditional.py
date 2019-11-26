@@ -110,17 +110,18 @@ class ConditionalDecoder(nn.Module):
                                 padding_idx=0, max_norm=self.emb_maxnorm,
                                 scale_grad_by_freq=self.emb_gradscale)
 
-        # Create attention layer
-        Attention = get_attention(self.att_type)
-        self.att = Attention(
-            self.ctx_size_dict[self.ctx_name],
-            self.hidden_size,
-            transform_ctx=self.transform_ctx,
-            ctx2hid=self.att_ctx2hid,
-            mlp_bias=self.mlp_bias,
-            att_activ=self.att_activ,
-            att_bottleneck=self.att_bottleneck,
-            temp=self.att_temp)
+        if self.att_type:
+            # Create attention layer
+            Attention = get_attention(self.att_type)
+            self.att = Attention(
+                self.ctx_size_dict[self.ctx_name],
+                self.hidden_size,
+                transform_ctx=self.transform_ctx,
+                ctx2hid=self.att_ctx2hid,
+                mlp_bias=self.mlp_bias,
+                att_activ=self.att_activ,
+                att_bottleneck=self.att_bottleneck,
+                temp=self.att_temp)
 
         if self.dec_init != 'zero':
             # For source-based inits, input size is the encoding size
@@ -135,7 +136,9 @@ class ConditionalDecoder(nn.Module):
 
         # Create decoders
         self.dec0 = RNN(self.input_size, self.hidden_size)
-        self.dec1 = RNN(self.hidden_size, self.hidden_size)
+        if self.att_type:
+            # If no attention, do not add the 2nd GRU
+            self.dec1 = RNN(self.hidden_size, self.hidden_size)
 
         # Output dropout
         if self.dropout_out > 0:

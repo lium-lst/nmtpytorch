@@ -11,10 +11,9 @@ from . import ConditionalDecoder
 class VectorDecoder(ConditionalDecoder):
     """Single-layer RNN decoder using fixed-size vector representation."""
     def __init__(self, **kwargs):
+        # Disable attention
+        kwargs['att_type'] = None
         super().__init__(**kwargs)
-
-        # Remove attention layer and the second decoder
-        del self.att, self.dec1
 
     def f_next(self, ctx_dict, y, h):
         """Applies one timestep of recurrence."""
