@@ -36,7 +36,7 @@ class ConditionalDecoder(nn.Module):
         assert self.rnn_type in ('GRU', 'LSTM'), \
             "rnn_type '{}' not known".format(rnn_type)
         assert bos_type in ('emb', 'feats', 'zero'), "Unknown bos_type"
-        assert dec_init.startswith(('zero', 'feats', 'mean_ctx', 'max_ctx', 'last_ctx')), \
+        assert dec_init.startswith(('zero', 'feats', 'sum_ctx', 'mean_ctx', 'max_ctx', 'last_ctx')), \
             "dec_init '{}' not known".format(dec_init)
 
         RNN = getattr(nn, '{}Cell'.format(self.rnn_type))
@@ -189,6 +189,12 @@ class ConditionalDecoder(nn.Module):
         return self.ff_dec_init(
             ctx.sum(0).div(ctx_mask.unsqueeze(-1).sum(0))
             if ctx_mask is not None else ctx.mean(0))
+
+    def _rnn_init_sum_ctx(self, ctx_dict):
+        """Initialization with sum-pooled source annotations."""
+        ctx, ctx_mask = ctx_dict[self.ctx_name]
+        assert ctx_mask is None
+        return self.ff_dec_init(ctx.sum(0))
 
     def _rnn_init_max_ctx(self, ctx_dict):
         """Initialization with max-pooled source annotations."""
