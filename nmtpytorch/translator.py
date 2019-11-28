@@ -16,7 +16,6 @@ from .utils.device import DEVICE
 
 from . import models
 from .config import Options
-from .search import beam_search
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -64,6 +63,12 @@ class Translator:
             instance.train(False)
             self.instances.append(instance)
             logger.info(instance)
+
+        try:
+            self.beam_func = getattr(self.instances[0], self.beam_func)
+        except AttributeError as ae:
+            logger.info(f'Error: model does not have .{self.beam_func!r}()')
+            sys.exit(1)
 
         # Split the string
         self.splits = self.splits.split(',')
@@ -135,10 +140,11 @@ class Translator:
 
         logger.info('Starting translation')
         start = time.time()
-        hyps = beam_search(self.instances, loader, task_id=self.task_id,
-                           beam_size=self.beam_size, max_len=self.max_len,
-                           lp_alpha=self.lp_alpha, suppress_unk=self.suppress_unk,
-                           n_best=self.n_best)
+
+        hyps = self.beam_func(self.instances, loader, task_id=self.task_id,
+                              beam_size=self.beam_size, max_len=self.max_len,
+                              lp_alpha=self.lp_alpha, suppress_unk=self.suppress_unk,
+                              n_best=self.n_best)
         up_time = time.time() - start
         logger.info('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
