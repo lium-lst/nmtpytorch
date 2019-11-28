@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+import re
+import json
+import argparse
+from collections import OrderedDict
+
+import numpy as np
+import torch
+
+from nmtpytorch.vocabulary import Vocabulary
+
+
+def get_nmtpy_vocab_tokens(fname):
+    vocab = Vocabulary(fname, name='en')
+    base_tokens = list(vocab._map.keys())
+    # remove special tokens
+    base_tokens = set(base_tokens).difference(vocab.TOKENS.keys())
+    return base_tokens
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='create-pretrained-embs',
+        description="Creates a .ckpt file with pretrained embeddings ready-to-use.")
+
+    parser.add_argument('-i', '--input', type=str, required=True,
+                        help="Input pretrained file.")
+
+    parser.add_argument('-t', '--type', type=str, required=True,
+                        choices=['glove', 'fasttext'],
+                        help="Input file format i.e. glove or fasttext")
+
+    parser.add_argument('-n', '--n-tokens', type=int, default=0,
+                        help="Size limit of final vocabulary.")
+
+    parser.add_argument('-b', '--base-vocab', type=str, nargs='*',
+                        help="nmtpy .vocab file(s) for tokens which should always be included.")
+
+    parser.add_argument('-o', '--out-prefix', type=str, required=True,
+                        help="Prefix for output files.")
+
+    args = parser.parse_args()
+
+    embs = {}
+    base_tokens = []
+
+    ########################
+    # Read base vocabularies
+    ########################
+    for fname in args.base_vocab:
+        base_tokens.extend(get_nmtpy_vocab_tokens(fname))
+
+    #######################
+    # Read pretrained store
+    #######################
+    with open(args.input) as f:
+        for line in f:
+            word, *vals = line.strip().split(' ')
+            embs[word] = vals
+
+    # Separate out special tokens
+    spec_embs = {}
+    for tok in ('<s>', '</s>', '<unk>', '<oov>', '<bos>', '<eos>'):
+        if tok in embs:
+            spec_embs[tok] = embs.pop(tok)
+        elif tok.upper() in embs:
+            spec_embs[tok.upper()] = embs.pop(tok.upper())
+
+    print(f'Number of pretrained vectors: {len(embs)}')
+
+    #############################################
+    # Construct the list for the final vocabulary
+    #############################################
+    deferred_init = []
+    vocab = OrderedDict()
+
+    def emb2float(vals):
+        return [float(v) for v in vals]
+
+    # Put anything to <pad> as it will later be rewritten with zeros
+    vocab['<pad>'] = emb2float(embs['.'])
+    vocab['<bos>'] = emb2float(spec_embs['<s>'])
+    vocab['<eos>'] = emb2float(spec_embs['</s>'])
+    # We'll re-init this at a later stage
+    vocab['<unk>'] = emb2float(embs['.'])
+    # Moses hyphen symbol is OOV, use plain hyphen
+    embs['@-@'] = embs['-']
+
+    # Put base tokens
+    for tok in base_tokens:
+        if tok in embs:
+            vocab[tok] = emb2float(embs.pop(tok))
+        else:
+            deferred_init.append(tok)
+
+    # Only alphabetic ones
+    re_pat = re.compile('^[a-z]+$')
+    filtered_words = list(filter(lambda x: re_pat.match(x), embs.keys()))
+
+    if args.n_tokens > 0:
+        # Complete to args.n_tokens
+        how_many = args.n_tokens - len(vocab) - len(deferred_init)
+    else:
+        # Add all
+        how_many = len(filtered_words)
+
+    for word in filtered_words[:how_many]:
+        vocab[word] = emb2float(embs[word])
+
+    word_order = list(vocab.keys())
+    emb_W = np.array(list(vocab.values()), dtype='float32')
+
+    # Init randomly the deferred ones with sample averages
+    np.random.seed(39348)
+    deferred_embs = np.empty(
+        (len(deferred_init), emb_W.shape[1]), dtype='float32')
+    for idx, tok in enumerate(deferred_init):
+        word_order.append(tok)
+        idxs = np.random.permutation(emb_W.shape[0])[:10000]
+        deferred_embs[idx] = emb_W[idxs].mean(0)
+
+    # merge altogether
+    emb_W = np.concatenate([emb_W, deferred_embs])
+
+    # Finally replace <unk> with average embedding
+    emb_W[word_order.index('<unk>')] = emb_W.mean(0)
+
+    # cast down
+    emb_W = torch.from_numpy(emb_W.astype('float16'))
+
+    # Dump file
+    torch.save(emb_W, f'{args.out_prefix}.pt')
+
+    json_vocab = OrderedDict({k: i for i, k in enumerate(word_order)})
+    with open(f'{args.out_prefix}.vocab.en', 'w') as f:
+        json.dump(json_vocab, f, ensure_ascii=False, indent=2)
+
+    print(f'Final number of vocabulary: {emb_W.shape[0]}')
