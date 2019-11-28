@@ -62,7 +62,8 @@ if __name__ == '__main__':
                               help="(section).key:value overrides for config")
     parser_trans.add_argument('-r', '--stochastic', action='store_true',
                               help="Don't fix seed for sampling-based models.")
-
+    parser_trans.add_argument('-f', '--beam-func', default='beam_search',
+                              help="Use a custom beam search method defined in the model.")
 
     # You can translate a set of splits defined in the .conf file
     parser_trans.add_argument('-s', '--splits', type=str, required=True,

@@ -12,7 +12,6 @@ from .utils.misc import load_pt_file, fix_seed
 from .utils.ml_metrics import Loss
 from .utils.data import make_dataloader
 from .utils.tensorboard import TensorBoard
-from .search import beam_search
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -284,10 +283,9 @@ class MainLoop:
             task = None
             if hasattr(self.net, 'val_tasks'):
                 task = self.net.val_tasks[0].direction
-            hyps = beam_search([self.net], self.beam_iterator,
-                               task_id=task,
-                               beam_size=self.eval_beam,
-                               max_len=self.eval_max_len)
+            hyps = self.net.beam_search(
+                [self.net], self.beam_iterator, task_id=task,
+                beam_size=self.eval_beam, max_len=self.eval_max_len)
             beam_time = time.time() - beam_time
 
             # Compute metrics and update results
