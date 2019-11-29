@@ -27,6 +27,7 @@ from .label_classifier import LabelClassifier
 from .rationale import Rationale
 from .rationalev2 import Rationalev2
 from .rationalev3 import Rationalev3
+from .rationalev4 import Rationalev4
 
 ##########################################
 # Backward-compatibility with older models
