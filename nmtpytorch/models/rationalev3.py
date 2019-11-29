@@ -98,7 +98,7 @@ class Rationalev3(NMT):
             'gen_nolearn': False,       # Random masked baseline with reinforce loss (debug)
             # Encoder
             'enc_dim': 256,             # Re-encoder hidden size
-            'enc_type': 'gru',          # Encoder type (gru|lstm|avg|sum|max|gen_detached)
+            'enc_type': 'gru',          # Encoder type (gru|lstm|avg|sum|max)
             'enc_bidir': True,          # Bi-directional encoder in re-encoder
             'enc_n_layers': 1,          # If enc_type is recurrent: # of layers
             # Decoder
@@ -116,16 +116,16 @@ class Rationalev3(NMT):
             # Other arguments
             'emb_dim': 128,             # Source and target embedding sizes
             'proj_emb_dim': 128,        # Additional embedding projection output
-            'proj_emb_activ': 'linear', # Additional embedding projection non-lin
+            'proj_emb_activ': 'linear',  # Additional embedding projection non-lin
             'pretrained_embs': '',      # optional path to embeddings tensor
-            'pretrained_embs_l2': False,# L2 normalize pretrained embs
+            'pretrained_embs_l2': False,  # L2 normalize pretrained embs
             'short_list': 100000000,    # Use all pretrained vocab
             'dropout': 0,               # Simple dropout layer
             'add_src_eos': True,        # Append <eos> or not to inputs
             'rnn_dropout': 0,           # RNN dropout if *_n_layers > 1
             'mode': 'autoencoder',      # autoencoder|reinforce|gumbel
             'lambda_sparsity': 0.0003,  # sparsity factor
-            'lambda_coherence': 0.0006, # coherency factor
+            'lambda_coherence': 0.0006,  # coherency factor
             'reinforce_lr': 10,         # Learning rate for reinforce gradient
             'reinforce_samples': 1,     # How many samples to get from generator
             'tied_emb': False,          # Not used, always tied in this model
@@ -186,7 +186,7 @@ class Rationalev3(NMT):
         layers = []
         gen_type = self.opts.model['gen_type'].upper()
         if gen_type in ('GRU', 'LSTM'):
-            RNN = getattr(nn, self.opts.model['gen_type'].upper())
+            RNN = getattr(nn, gen_type)
 
             # RNN Encoder
             layers.append(RNN(
@@ -198,48 +198,50 @@ class Rationalev3(NMT):
             layers.append(ArgSelect(0))
 
             # Consider bi-directionality
-            self.gen_dim = self.opts.model['gen_dim'] * (int(self.opts.model['gen_bidir']) + 1)
-            self.ctx_size = self.gen_dim
+            self.gen_out = self.opts.model['gen_dim'] * (int(self.opts.model['gen_bidir']) + 1)
 
             # Create the generator wrapper
             self.gen = nn.Sequential(*layers)
         elif gen_type == 'EMB':
-            # Directly go from embeddings
-            self.gen_dim = self.opts.model['proj_emb_dim']
-            self.ctx_size = self.gen_dim
+            # Directly go from embeddings without processing with RNN
+            self.gen_out = self.opts.model['proj_emb_dim']
             self.gen = lambda x: x
 
+        # If we don't have any re-encoder, the source encoding dim is gen_out
+        self.ctx_size = self.gen_out
+
+        ############################
+        # Independent selector layer
+        ############################
         if self.opts.model['mode'] == 'reinforce':
             self.reinforce_samples = torch.ones(
                 (self.opts.model['reinforce_samples'], 1, 1))
-            self.z_layer = FF(self.gen_dim, 1, activ='sigmoid')
+            self.z_layer = FF(self.gen_out, 1, activ='sigmoid')
 
-            ###################
-            # Create Re-encoder
-            ###################
-            layers = []
-            enc_type = self.opts.model['enc_type'].upper()
-            is_rnn = enc_type in ('GRU', 'LSTM')
-            if is_rnn:
-                self.ctx_size = self.opts.model['enc_dim']
-                self.ctx_size *= int(self.opts.model['enc_bidir']) + 1
+        ###################
+        # Create Re-encoder
+        ###################
+        layers = []
+        enc_type = self.opts.model['enc_type'].upper()
+        if enc_type in ('GRU', 'LSTM'):
+            RNN = getattr(nn, enc_type)
 
-                RNN = getattr(nn, enc_type)
+            # RNN Re-encoder
+            layers.append(RNN(
+                self.opts.model['proj_emb_dim'], self.opts.model['enc_dim'],
+                self.opts.model['gen_n_layers'], batch_first=False,
+                dropout=self.opts.model['rnn_dropout'],
+                bidirectional=self.opts.model['gen_bidir']))
+            # Return the sequence of hidden outputs
+            layers.append(ArgSelect(0))
 
-                # RNN Re-encoder
-                layers.append(RNN(
-                    self.opts.model['proj_emb_dim'], self.opts.model['gen_dim'],
-                    self.opts.model['gen_n_layers'], batch_first=False,
-                    dropout=self.opts.model['rnn_dropout'],
-                    bidirectional=self.opts.model['gen_bidir']))
-                # Return the sequence of hidden outputs
-                layers.append(ArgSelect(0))
+            # Create the re-encoder wrapper
+            self.enc = nn.Sequential(*layers)
 
-                # Create the re-encoder wrapper
-                self.enc = nn.Sequential(*layers)
-            else:
-                # Poolings will be done in the decoder
-                self.enc = lambda x: x
+            self.ctx_size = self.opts.model['enc_dim'] * int(self.opts.model['enc_bidir'] + 1)
+        else:
+            # Poolings will be done in the decoder
+            self.enc = lambda x: x
 
         ################
         # Create Decoder
@@ -274,12 +276,8 @@ class Rationalev3(NMT):
             # Draw N samples from it -> N x B x T
             self.z = self.dist.sample()
 
-            if self.opts.model['enc_type'] == 'gen_detached':
-                # Take the masked hidden states from generator and detach
-                sent_rep = hs.detach().mul(self.z.permute((2, 1, 0)))
-            else:
-                # Mask out non-rationale bits and re-encode -> 1, B, G
-                sent_rep = self.enc(self.z.permute((2, 1, 0)) * do_embs)
+            # Mask out non-rationale bits and re-encode -> 1, B, G
+            sent_rep = self.enc(self.z.permute((2, 1, 0)) * do_embs)
 
             return {str(self.sl): (sent_rep, None), 'z': (self.z, None)}
 
@@ -292,28 +290,28 @@ class Rationalev3(NMT):
         result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
 
         if self.opts.model['mode'] == 'reinforce' and not self.opts.model['gen_nolearn']:
-            seq_losses = result.pop('losses')
-
-            # (B, ) shape
-            rewards = seq_losses.detach().mean(0)
-
-            # squeeze will work for 1-sample case
-            per_instance_log_prob = -self.dist.log_prob(self.z).mean(-1).squeeze()
-            gen_loss = (rewards * per_instance_log_prob).mean()
-
             # z-> TxB
             z = self.z.squeeze(0).t()
             # per instance rationale word counts
             zsum = z.sum(0)
             # continuity reward (probably not relevant for us)
-            zdiff = (z[1:] - z[:-1]).abs().sum(0)
+            zdif = (z[1:] - z[:-1]).abs().sum(0)
 
-            rewards.add_((self.opts.model['lambda_sparsity'] * zsum) \
-                           + (self.opts.model['lambda_coherence'] * zdiff))
+            # Per instance cross-entropy losses (T x B) -> (B, )
+            rewards = result.pop('losses').detach().mean(0)
+
+            # squeeze will work for 1-sample case
+            per_instance_log_prob = -self.dist.log_prob(self.z).mean(-1).squeeze()
+
+            # Enrich the rewards with regularization terms
+            scaled_zsum = self.opts.model['lambda_sparsity'] * zsum
+            scaled_zdif = self.opts.model['lambda_coherence'] * zdif
+            rewards.add_(scaled_zsum + scaled_zdif)
 
             self.aux_loss['gen_loss'] = self.opts.model['reinforce_lr'] * \
-                    (rewards * per_instance_log_prob).mean()
+                (rewards * per_instance_log_prob).mean()
 
+            # Log some stuff to tensorboard
             if self.training and kwargs['uctr'] % self.opts.train['disp_freq'] == 0:
                 self.tboard.log_scalar('z_sum', z.mean().item(), kwargs['uctr'])
 
