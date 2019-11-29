@@ -199,13 +199,13 @@ def setup_experiment(opts, suffix=None, short=False):
 
     # Start with general ones
     if 'enc_type' in mopts and mopts['enc_type'] is not None:
-        names.append("enc%d%s%d" % (mopts.get('n_encoders', 1),
+        names.append("enc%d%s%s" % (mopts.get('n_encoders', 1),
                                     mopts['enc_type'].upper(),
-                                    mopts.pop('enc_dim')))
+                                    str(mopts.pop('enc_dim', 'NA'))))
     if 'dec_type' in mopts and mopts['dec_type'] is not None:
-        names.append("dec%d%s%d" % (mopts.get('n_decoders', 1),
+        names.append("dec%d%s%s" % (mopts.get('n_decoders', 1),
                                     mopts['dec_type'].upper(),
-                                    mopts.pop('dec_dim')))
+                                    str(mopts.pop('dec_dim', 'NA'))))
     for k in sorted(mopts):
         if k.endswith("_dim"):
             names.append('%s%d' % (k.split('_')[0], mopts[k]))
