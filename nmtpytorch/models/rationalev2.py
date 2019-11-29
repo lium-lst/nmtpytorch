@@ -4,17 +4,49 @@ import logging
 import torch
 from torch import nn
 from torch import distributions
+from torch.nn import functional as F
 
-from ..layers import FF, ArgSelect, Pool
-from ..layers.decoders import get_decoder
+from ..layers import FF, ArgSelect, Pool, PEmbedding
+from ..layers.decoders import ConditionalDecoder
+from ..utils.nn import get_rnn_hidden_state
 from ..datasets import MultimodalDataset
 
 from . import NMT
 
+import ipdb
+
 logger = logging.getLogger('nmtpytorch')
 
 
-class Rationale(NMT):
+class VectorDecoder(ConditionalDecoder):
+    """Single-layer RNN decoder using fixed-size vector representation."""
+    def __init__(self, **kwargs):
+        # Disable attention
+        kwargs['att_type'] = None
+        super().__init__(**kwargs)
+
+    def f_next(self, ctx_dict, y, h):
+        """Applies one timestep of recurrence."""
+        # Get hidden states from the decoder
+        h1_c1 = self.dec0(y, self._rnn_unpack_states(h))
+        h1 = get_rnn_hidden_state(h1_c1)
+
+        # Project hidden state to embedding size
+        o = self.hid2out(h1)
+
+        # Apply dropout if any
+        logit = self.do_out(o) if self.dropout_out > 0 else o
+
+        # Transform logit to T*B*V (V: vocab_size)
+        # Compute log_softmax over token dim
+        logit = logit @ self.out2prob.proj(self.out2prob.weight).t()
+        log_p = F.log_softmax(logit, dim=-1)
+
+        # Return log probs and new hidden states
+        return log_p, self._rnn_pack_states(h1_c1)
+
+
+class Rationalev2(NMT):
     supports_beam_search = True
 
     def set_defaults(self):
@@ -46,23 +78,27 @@ class Rationale(NMT):
             'bucket_order': None,       # Curriculum: ascending/descending/None
             'sampler_type': 'bucket',   # bucket or approximate
             ### Other arguments
-            'proj_embs': False,         # Additional embedding projection
+            'emb_dim': 128,             # Source and target embedding sizes
+            'proj_emb_dim': 128,        # Additional embedding projection output
+            'proj_emb_activ': 'linear', # Additional embedding projection non-lin
             'pretrained_embs': '',      # optional path to embeddings tensor
-            'freeze_embs': True,        # Freeze embeddings
+            'pretrained_embs_l2': False,# L2 normalize pretrained embs
             'short_list': 100000000,    # Use all pretrained vocab
             'dropout': 0,               # Simple dropout layer
             'add_src_eos': True,        # Append <eos> or not to inputs
             'rnn_dropout': 0,           # RNN dropout if *_n_layers > 1
-            'emb_dim': 128,             # Source and target embedding sizes
-            'enc_gen_share': False,     # Share RNNs of generator and re-encoder
-            'tied_emb': False,          # Share embeddings: (False|2way|3way)
             'lambda_coherence': 0,      # Coherence penalty
             'lambda_sparsity': 0,       # Sparsity penalty
             'n_samples': 1,             # How many samples to get from generator
+            'tied_emb': False,          # Not used, always tied in this model
         }
 
     def __init__(self, opts):
         super().__init__(opts)
+
+        # Clip to short_list if given
+        self.n_src_vocab = min(self.n_src_vocab, self.opts.model['short_list'])
+        self.n_trg_vocab = min(self.n_trg_vocab, self.opts.model['short_list'])
 
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
@@ -80,34 +116,32 @@ class Rationale(NMT):
 
     def reset_parameters(self):
         for name, param in self.named_parameters():
-            if name == 'embs.weight' and self.opts.model['pretrained_embs']:
-                continue
             # Skip 1-d biases and scalars
             if param.requires_grad and param.dim() > 1:
                 nn.init.kaiming_normal_(param.data)
 
-        # Reset padding embedding to 0
         with torch.no_grad():
+            if self.opts.model['pretrained_embs']:
+                embs = torch.load(self.opts.model['pretrained_embs'])
+                embs = embs[:self.opts.model['short_list']].float()
+                if self.opts.model['pretrained_embs_l2']:
+                    embs.div_(embs.norm(p=2, dim=-1, keepdim=True))
+                self.embs.weight.data.copy_(embs)
+
+            # Reset padding embedding to 0
             self.embs.weight.data[0].fill_(0)
+
+        # Use the same PEmbedding for the decoder as well
+        self.dec.emb = self.embs
+        self.dec.out2prob = self.embs
 
     def setup(self, is_train=True):
         """Sets up NN topology by creating the layers."""
-        # Source embeddings
-        if self.opts.model['pretrained_embs']:
-            embs = torch.load(self.opts.model['pretrained_embs']).float()
-            embs = embs[:self.opts.model['short_list']]
-            self.embs = nn.Embedding.from_pretrained(
-                embs, freeze=self.opts.model['freeze_embs'], padding_idx=0)
-            self.opts.model['emb_dim'] = embs.shape[1]
-            if self.opts.model['freeze_embs']:
-                self.opts.train['freeze_layers'] = 'embs.'
-        else:
-            self.embs = nn.Embedding(
-                self.n_src_vocab, self.opts.model['emb_dim'], padding_idx=0)
-
-        if self.opts.model['proj_embs']:
-            self.proj_embs = FF(
-                self.opts.model['emb_dim'], self.opts.model['emb_dim'])
+        # Create embeddings followed by projection layer
+        self.embs = PEmbedding(
+            self.n_src_vocab, self.opts.model['emb_dim'],
+            out_dim=self.opts.model['proj_emb_dim'],
+            activ=self.opts.model['proj_emb_activ'])
 
         # Generic dropout layer
         self.do = nn.Dropout(self.opts.model['dropout'])
@@ -144,54 +178,48 @@ class Rationale(NMT):
         ###################
         # Create Re-encoder
         ###################
-        if self.opts.model['enc_gen_share']:
-            self.enc = self.gen
+        layers = []
+        enc_type = self.opts.model['enc_type'].upper()
+        is_rnn = enc_type in ('GRU', 'LSTM')
+        self.ctx_size = self.opts.model['enc_dim']
+        if is_rnn:
+            self.ctx_size *= int(self.opts.model['enc_bidir']) + 1
+
+            RNN = getattr(nn, enc_type)
+
+            # RNN Re-encoder
+            layers.append(RNN(
+                self.opts.model['emb_dim'], self.opts.model['gen_dim'],
+                self.opts.model['gen_n_layers'], batch_first=False,
+                dropout=self.opts.model['rnn_dropout'],
+                bidirectional=self.opts.model['gen_bidir']))
+            # Return the sequence of hidden outputs
+            layers.append(ArgSelect(0))
+
+            # Create the re-encoder wrapper
+            self.enc = nn.Sequential(*layers)
         else:
-            layers = []
-            enc_type = self.opts.model['enc_type'].upper()
-            is_rnn = enc_type in ('GRU', 'LSTM')
-            self.ctx_size = self.opts.model['enc_dim']
-            if is_rnn:
-                self.ctx_size *= int(self.opts.model['enc_bidir']) + 1
-
-                RNN = getattr(nn, enc_type)
-
-                # RNN Re-encoder
-                layers.append(RNN(
-                    self.opts.model['emb_dim'], self.opts.model['gen_dim'],
-                    self.opts.model['gen_n_layers'], batch_first=False,
-                    dropout=self.opts.model['rnn_dropout'],
-                    bidirectional=self.opts.model['gen_bidir']))
-                # Return the sequence of hidden outputs
-                layers.append(ArgSelect(0))
-            else:
-                # Pool generator's hidden states
-                layers.append(
-                    Pool(self.opts.model['enc_type'], pool_dim=0))
-
-        # Create the re-encoder wrapper
-        self.enc = nn.Sequential(*layers)
+            # Poolings will be done in the decoder
+            self.enc = lambda x: x
 
         ################
         # Create Decoder
         ################
-        Decoder = get_decoder(self.opts.model['dec_variant'])
-        self.dec = Decoder(
-            input_size=self.opts.model['emb_dim'],
+        self.dec = VectorDecoder(
+            input_size=self.opts.model['proj_emb_dim'],
             hidden_size=self.opts.model['dec_dim'],
             n_vocab=self.n_trg_vocab,
             rnn_type=self.opts.model['dec_type'],
             ctx_size_dict={str(self.sl): self.ctx_size},
             ctx_name=str(self.sl),
-            dec_init='mean_ctx',
-#             dec_init_activ='tanh',
-            # dec_init_size=self.ctx_size,
-            tied_emb=self.opts.model['tied_emb'],
+            dec_init=self.opts.model['dec_init'],
             dropout_out=self.opts.model['dropout'])
 
-        # Share encoder and decoder weights
-        if self.opts.model['tied_emb'] == '3way':
-            self.embs.weight = self.dec.emb.weight
+        if not is_train:
+            # NOTE: nmtpy translate does not call reset_parameters()
+            # Use the same PEmbedding for the decoder as well when decoding
+            self.dec.emb = self.embs
+            self.dec.out2prob = self.embs
 
     def encode(self, batch, **kwargs):
         # Fetch embeddings -> T x B x D
@@ -206,11 +234,12 @@ class Rationale(NMT):
         # Create a distribution
         dist = distributions.Binomial(total_count=self.n_samples, probs=p_z)
 
-        # Draw N samples from it -> N x B x T
-        z = dist.sample()
+        # Draw N samples from it -> N x B x T -> T x B x N
+        z = dist.sample().permute((2, 1, 0))
 
-        # Mask out non-rationale bits and pool -> 1, B, G
-        sent_rep = self.enc(z.permute((2, 1, 0)) * embs)
+        # Mask out non-rationale bits and re-encode -> 1, B, G
+        sent_rep = self.enc(z * embs)
+
         return {str(self.sl): (sent_rep, None)}
 
     def forward(self, batch, **kwargs):

@@ -1,6 +1,6 @@
+from .nmt import NMT
 from .sat import ShowAttendAndTell
 from .nli import NLI
-from .nmt import NMT
 from .mnmt import MultimodalNMT
 from .acapt import AttentiveCaptioning
 from .vcap import VideoCaptioner
@@ -25,6 +25,8 @@ from .multimodal_asr import MultimodalASR
 from .label_classifier import LabelClassifier
 
 from .rationale import Rationale
+from .rationalev2 import Rationalev2
+from .rationalev3 import Rationalev3
 
 ##########################################
 # Backward-compatibility with older models
