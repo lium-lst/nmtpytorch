@@ -19,7 +19,6 @@ from . import NMT
 
 logger = logging.getLogger('nmtpytorch')
 
-import ipdb
 
 class VectorDecoder(ConditionalDecoder):
     """Single-layer RNN decoder using fixed-size vector representation."""
@@ -129,6 +128,7 @@ class Rationalev4(NMT):
             'lambda_reinforce_maxent': 1,  # Add entropy to the reward with this scalar factor
             'enable_masking': True,     # Add the sigmoid ZLayer
             'reinforce_lr': 10,         # Learning rate for reinforce gradient
+            'reinforce_samples': 1,     # # of reinforce samples
             'tied_emb': False,          # Not used, always tied in this model
         }
 
@@ -319,7 +319,7 @@ class Rationalev4(NMT):
 
         # squeeze will work for 1-sample case -> (T x B)
         log_probs = -self.dist.log_prob(self.z).squeeze().t()
-        per_seq_logprobs = log_probs.mean(0)
+        per_seq_log_probs = log_probs.mean(0)
 
         if self.opts.model['reinforce_lr'] > 0:
             # Enrich the rewards with regularization terms
