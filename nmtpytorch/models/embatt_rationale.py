@@ -85,7 +85,7 @@ class VectorDecoder(ConditionalDecoder):
         return {'loss': losses.sum(), 'losses': losses}
 
 
-class Rationalev4(NMT):
+class EmbAttRationale(NMT):
     supports_beam_search = True
 
     def set_defaults(self):
@@ -114,6 +114,7 @@ class Rationalev4(NMT):
             'sampler_type': 'bucket',   # bucket or approximate
             # Other arguments
             'emb_dim': 128,             # Source and target embedding sizes
+            'emb_att': True,            # Apply a saliency attention
             'proj_emb_dim': 128,        # Additional embedding projection output
             'proj_emb_activ': 'linear',  # Additional embedding projection non-lin
             'pretrained_embs': '',      # optional path to embeddings tensor
@@ -181,70 +182,9 @@ class Rationalev4(NMT):
 
         # Generic dropout layer
         self.do = nn.Dropout(self.opts.model['dropout'])
+        self.ctx_size = self.opts.model['proj_emb_dim']
 
-        ##################
-        # Generator block
-        ##################
-        layers = []
-        gen_type = self.opts.model['gen_type'].upper()
-        if gen_type in ('GRU', 'LSTM'):
-            RNN = getattr(nn, gen_type)
-
-            # RNN Encoder
-            layers.append(RNN(
-                self.opts.model['proj_emb_dim'], self.opts.model['gen_dim'],
-                self.opts.model['gen_n_layers'], batch_first=False,
-                dropout=self.opts.model['rnn_dropout'],
-                bidirectional=self.opts.model['gen_bidir']))
-            # Return the sequence of hidden outputs
-            layers.append(ArgSelect(0))
-
-            # Consider bi-directionality
-            self.gen_out = self.opts.model['gen_dim'] * (int(self.opts.model['gen_bidir']) + 1)
-
-            # Create the generator wrapper
-            self.gen = nn.Sequential(*layers)
-        elif gen_type == 'EMB':
-            # Directly go from embeddings without processing with RNN
-            self.gen_out = self.opts.model['proj_emb_dim']
-            self.gen = lambda x: x
-
-        # If we don't have any re-encoder, the source encoding dim is gen_out
-        self.ctx_size = self.gen_out
-
-        ############################
-        # Independent selector layer
-        ############################
-        self.reinforce_samples = torch.ones(
-            (self.opts.model['reinforce_samples'], 1, 1))
-
-        # Assume an identity re-encoder
-        self.enc = lambda x: x
-
-        if self.opts.model['enable_masking']:
-            self.z_layer = FF(self.gen_out, 1, activ='sigmoid')
-
-            ###################
-            # Create Re-encoder
-            ###################
-            layers = []
-            enc_type = self.opts.model['enc_type'].upper()
-            if enc_type in ('GRU', 'LSTM'):
-                RNN = getattr(nn, enc_type)
-
-                # RNN Re-encoder
-                layers.append(RNN(
-                    self.opts.model['proj_emb_dim'], self.opts.model['enc_dim'],
-                    self.opts.model['gen_n_layers'], batch_first=False,
-                    dropout=self.opts.model['rnn_dropout'],
-                    bidirectional=self.opts.model['enc_bidir']))
-                # Return the sequence of hidden outputs
-                layers.append(ArgSelect(0))
-
-                # Create the re-encoder wrapper
-                self.enc = nn.Sequential(*layers)
-
-                self.ctx_size = self.opts.model['enc_dim'] * int(self.opts.model['enc_bidir'] + 1)
+        self.emb_query = FF(self.opts.model['proj_emb_dim'], 1, bias=False)
 
         ################
         # Create Decoder
@@ -260,94 +200,16 @@ class Rationalev4(NMT):
             dec_init=self.opts.model['dec_init'],
             dropout_out=self.opts.model['dropout'])
 
-        if self.opts.model['encode_set']:
-            self.encode = self.encode_set
-        else:
-            self.encode = self.generate_and_encode
-
-    def sample_z(self, gen_outputs):
-        # Apply the sigmoid layer and transpose -> B x T
-        self.p_z = self.z_layer(gen_outputs).squeeze(-1).t()
-
-        # Create a distribution
-        self.dist = distributions.Binomial(
-            total_count=self.reinforce_samples, probs=self.p_z)
-
-        # Draw N samples from it -> N x B x T
-        self.z = self.dist.sample()
-
-    def encode_set(self, batch, **kwargs):
-        # Fetch embeddings -> T x B x D -> Dropout
-        embs = self.do(self.embs(batch[str(self.sl)]))
-        sent_rep = self.enc(embs)
-        return {str(self.sl): (sent_rep, None)}
-
-    def generate_and_encode(self, batch, **kwargs):
-        # Fetch embeddings -> T x B x D -> Dropout
-        embs = self.do(self.embs(batch[str(self.sl)]))
-
-        # Pass embeddings through generator -> T x B x G
-        gen_outputs = self.gen(embs)
-
-        if self.opts.model['enable_masking']:
-            # Stores p_z and dist as model attributes
-            self.sample_z(gen_outputs)
-
-            # Mask out non-rationale bits and re-encode -> 1, B, G
-            sent_rep = self.enc(self.z.permute((2, 1, 0)) * embs)
-
-            return {str(self.sl): (sent_rep, None), 'z': (self.z, None)}
-        else:
-            # If no masking ==> autoencoder
-            return {str(self.sl): (self.enc(gen_outputs), None)}
+    def encode(self, batch, **kwargs):
+        embs = self.do(self.embs(batch[self.sl]))
+        if self.opts.model['emb_att']:
+            scores = self.emb_query(embs).softmax(dim=0)
+            embs = embs * scores
+        return {self.sl: (embs, None)}
 
     def forward(self, batch, **kwargs):
         result = self.dec(self.encode(batch), batch[self.tl])
         result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
-
-        if not self.opts.model['enable_masking']:
-            # autoencoder
-            return result
-
-        if self.opts.model['maximize_entropy']:
-            # minimize the negative entropy of p(z|x)
-            ent = self.p_z.mul(self.p_z.log2()).add((1 - self.p_z).mul((1 - self.p_z).log2()))
-            self.aux_loss['sum_neg_entropy'] = self.opts.model['maximize_entropy'] * ent.sum()
-
-        # z-> TxB
-        z = self.z.squeeze(0).t()
-
-        # per sequence rationale word counts
-        zsum = z.sum(0)
-
-        # continuity reward (probably not relevant for us)
-        zdif = (z[1:] - z[:-1]).abs().sum(0)
-        scaled_zsum = self.opts.model['lambda_sparsity'] * zsum
-        scaled_zdif = self.opts.model['lambda_coherence'] * zdif
-
-        # Per instance cross-entropy losses (T x B) (ignore <EOS> pos)
-        per_item_rewards = result.pop('losses').detach()[:-1]
-        per_seq_rewards = per_item_rewards.mean(0)
-
-        # squeeze will work for 1-sample case -> (T x B)
-        log_probs = -self.dist.log_prob(self.z).squeeze().t()
-        per_seq_log_probs = log_probs.mean(0)
-
-        if self.opts.model['reinforce_lr'] > 0:
-            # Enrich the rewards with regularization terms
-            per_seq_rewards.add_(scaled_zsum + scaled_zdif)
-
-            # (B, )
-            per_seq_gen_loss = (per_seq_rewards * per_seq_log_probs).mean()
-
-            self.aux_loss['gen_loss'] = self.opts.model['reinforce_lr'] * per_seq_gen_loss
-
-        # Log some stuff to tensorboard
-        if self.training and kwargs['uctr'] % self.opts.train['disp_freq'] == 0:
-            self.tboard.log_scalar('z_sum', z.mean().item(), kwargs['uctr'])
-            if self.opts.model['maximize_entropy']:
-                self.tboard.log_scalar('mean_entropy', -ent.mean().item(), kwargs['uctr'])
-
         return result
 
     @staticmethod

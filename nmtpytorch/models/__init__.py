@@ -28,6 +28,7 @@ from .rationale import Rationale
 from .rationalev2 import Rationalev2
 from .rationalev3 import Rationalev3
 from .rationalev4 import Rationalev4
+from .embatt_rationale import EmbAttRationale
 
 ##########################################
 # Backward-compatibility with older models
