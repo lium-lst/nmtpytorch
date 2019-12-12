@@ -110,10 +110,11 @@ class NMT(nn.Module):
             self.ctx_sizes = {str(self.sl): self.opts.model['enc_dim'] * 2}
 
         # Check vocabulary sizes for 3way tying
-        if self.opts.model['tied_emb'] not in [False, '2way', '3way']:
+        if self.opts.model.get('tied_emb', False) not in [False, '2way', '3way']:
             raise RuntimeError(
                 "'{}' not recognized for tied_emb.".format(self.opts.model['tied_emb']))
-        if self.opts.model['tied_emb'] == '3way':
+
+        if self.opts.model.get('tied_emb', False) == '3way':
             assert self.n_src_vocab == self.n_trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
 
