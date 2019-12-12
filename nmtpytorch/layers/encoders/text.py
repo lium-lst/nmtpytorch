@@ -4,6 +4,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from ...utils.data import sort_batch
 from .. import FF
+from .. import LayerNorm
 
 
 class TextEncoder(nn.Module):
@@ -93,7 +94,7 @@ class TextEncoder(nn.Module):
 
         output_layers = []
         if self.layer_norm:
-            output_layers.append(nn.LayerNorm(self.ctx_size))
+            output_layers.append(LayerNorm(self.ctx_size))
         if self.proj_dim:
             output_layers.append(
                 FF(self.ctx_size, self.proj_dim, activ=self.proj_activ))
