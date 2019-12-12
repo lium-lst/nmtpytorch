@@ -1,3 +1,10 @@
+try:
+    import apex
+    LayerNorm = apex.normalization.FusedLayerNorm
+except ImportError as ie:
+    import torch
+    LayerNorm = torch.nn.LayerNorm
+
 # Basic layers
 from .ff import FF
 from .fusion import Fusion
@@ -19,3 +26,5 @@ from .encoders import *
 
 # Decoder layers
 from .decoders import *
+
+

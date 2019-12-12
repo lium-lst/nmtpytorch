@@ -1,4 +1,5 @@
 from .nmt import NMT
+from .tfnmt import TransformerNMT
 from .sat import ShowAttendAndTell
 from .nli import NLI
 from .mnmt import MultimodalNMT

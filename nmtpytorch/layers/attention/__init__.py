@@ -4,6 +4,7 @@ from .hierarchical import HierarchicalAttention
 from .co import CoAttention
 from .mhco import MultiHeadCoAttention
 from .uniform import UniformAttention
+from .scaled_dot import ScaledDotAttention
 
 
 def get_attention(type_):
@@ -14,4 +15,5 @@ def get_attention(type_):
         'co': CoAttention,
         'mhco': MultiHeadCoAttention,
         'uniform': UniformAttention,
+        'scaled_dot': ScaledDotAttention,
     }[type_]
