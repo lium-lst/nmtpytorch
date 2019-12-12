@@ -27,8 +27,6 @@ if __name__ == '__main__':
                               help="Experiment configuration file")
     parser_train.add_argument('-s', '--suffix', type=str, default="",
                               help="Optional experiment suffix.")
-    parser_train.add_argument('-S', '--short', action='store_true',
-                              help="Use short experiment id in filenames.")
     parser_train.add_argument('-d', '--device-id', type=str, default='1gpu',
                               help='cpu or [N]gpu cuda (Default: 1gpu)')
     parser_train.add_argument('overrides', nargs="*", default=[],
@@ -113,7 +111,7 @@ if __name__ == '__main__':
         opts = Options(args.config, args.overrides)
 
         # Setup experiment folders
-        setup_experiment(opts, args.suffix, args.short)
+        setup_experiment(opts, args.suffix)
 
     # Reserve device(s)
     dev_mgr = DeviceManager(args.device_id)
