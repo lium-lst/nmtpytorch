@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from ..layers import FF
-from ..layers.embedding import get_partial_embedding_layer
+from ..utils.nn import get_partial_embedding_layer
 from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
@@ -135,9 +135,9 @@ class NLI(NMT):
             nn.Dropout(self.opts.model['dropout']),
             FF(proj_dim, proj_dim, activ=self.opts.model['nonlin']),
             nn.Dropout(self.opts.model['dropout']),
-            FF(proj_dim, proj_dim//2, activ=self.opts.model['nonlin']),
+            FF(proj_dim, proj_dim // 2, activ=self.opts.model['nonlin']),
             nn.Dropout(self.opts.model['dropout']),
-            FF(proj_dim//2, self.vocabs['lb'].n_tokens, bias=False),
+            FF(proj_dim // 2, self.vocabs['lb'].n_tokens, bias=False),
             nn.LogSoftmax(dim=-1))
         self.loss = nn.NLLLoss(reduction='sum')
 
