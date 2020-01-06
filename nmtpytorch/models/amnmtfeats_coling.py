@@ -21,7 +21,6 @@ class AttentiveMNMTFeaturesColing(NMT):
         # Set parent defaults
         super().set_defaults()
         self.defaults.update({
-            'alpha_c': 0.0,             # doubly stoch. attention
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
             'fusion_activ': 'tanh',     # Multimodal context non-linearity
             'vis_activ': 'linear',      # Visual feature transformation activ.
@@ -35,12 +34,11 @@ class AttentiveMNMTFeaturesColing(NMT):
             'persistent_dump': False,   # To save activations during beam-search
             'preatt': False,            # Apply filtered attention
             'preatt_activ': 'ReLU',     # Activation for convatt block
+            'dropout_img': 0.0,         # Dropout on image features
         })
 
     def __init__(self, opts):
         super().__init__(opts)
-        if self.opts.model['alpha_c'] > 0:
-            self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
         # Textual context dim
@@ -50,6 +48,8 @@ class AttentiveMNMTFeaturesColing(NMT):
         self.ff_img = FF(
             self.opts.model['n_channels'], txt_ctx_size,
             activ=self.opts.model['vis_activ'])
+
+        self.dropout_img = nn.Dropout(self.opts.model['dropout_img'])
 
         # Add vis ctx size
         self.ctx_sizes['image'] = txt_ctx_size
@@ -98,17 +98,6 @@ class AttentiveMNMTFeaturesColing(NMT):
         if self.opts.model['tied_emb'] == '3way':
             self.enc.emb.weight = self.dec.emb.weight
 
-        if self.opts.model['preatt']:
-            # From 640+640 to 640
-            # To 1*W*W for attention scores
-            in_channels = sum(self.ctx_sizes.values())
-            self.preatt = nn.Sequential(OrderedDict([
-                ('conv1', nn.Conv2d(in_channels, self.ctx_sizes[self.sl], 1, 1)),
-                ('nlin1', getattr(nn, self.opts.model['preatt_activ'])()),
-                ('conv2', nn.Conv2d(self.ctx_sizes[self.sl], 1, 1, 1)),
-                ('nlin2', getattr(nn, self.opts.model['preatt_activ'])()),
-            ]))
-
     def load_data(self, split, batch_size, mode='train'):
         """Loads the requested dataset split."""
         dataset = MultimodalDataset(
@@ -123,51 +112,13 @@ class AttentiveMNMTFeaturesColing(NMT):
 
     def encode(self, batch, **kwargs):
         # Transform the features to context dim
-        feats = self.ff_img(batch['image'])
+        feats = self.dropout_img(self.ff_img(batch['image']))
 
         # Get source language encodings (S*B*C)
         text_encoding = self.enc(batch[self.sl])
 
-        if self.opts.model['preatt']:
-            # Infer spatial width/height
-            w = int(math.sqrt(feats.shape[0]))
-
-            # image features will come as: (HW,B,C) -> (B, C, HW) -> (B, C, H, W)
-            conv_map = feats.permute(1, 2, 0).view(
-                *feats.shape[1:], w, w)
-
-            # Get last encoding (B*C)
-            last_encoding = text_encoding[0][-1]
-
-            # Tile over spatial dimensions: B*C*H*W
-            tiled_encoding = last_encoding[..., None, None].expand(
-                -1, -1, *conv_map.shape[2:])
-
-            # Final concat representation: B*(D+C)*H*W
-            concat = torch.cat([conv_map, tiled_encoding], dim=1)
-
-            att_scores = self.preatt(concat)
-            self.pre_att = nn.functional.softmax(
-                att_scores.view(batch.size, -1), dim=1).view_as(att_scores)
-
-            # Filter features
-            feats = conv_map * self.pre_att
-
-            # Get features into (B, C, HW) and then (HW, B, C)
-            feats = feats.view(*feats.shape[:2], -1).permute(2, 0, 1)
 
         return {
             str(self.sl): text_encoding,
             'image': (feats, None),
         }
-
-    def forward(self, batch, **kwargs):
-        result = super().forward(batch)
-
-        if self.training and self.opts.model['alpha_c'] > 0:
-            alpha_loss = (
-                1 - torch.cat(self.dec.history['alpha_img']).sum(0)).pow(2).sum(0)
-            self.aux_loss['alpha_reg'] = alpha_loss.mean().mul(
-                self.opts.model['alpha_c'])
-
-        return result
