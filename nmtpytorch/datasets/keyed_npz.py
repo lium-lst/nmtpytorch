@@ -17,18 +17,18 @@ class KeyedNPZDataset(Dataset):
 
     Arguments:
         fname (str or Path): A string or ``pathlib.Path`` object for the .npz file.
+        order_file (str, optional): An idx -> key mapping for tiled datasets.
         **kwargs (optional): Any other arguments.
     """
 
-    def __init__(self, fname, **kwargs):
+    def __init__(self, fname, order_file=None, **kwargs):
         self.path = Path(fname)
         if not self.path.exists():
             raise RuntimeError('{} does not exist.'.format(self.path))
 
         # Load the file into .data
         self.data = np.load(self.path)
-        self.keys = sorted(self.data.files)
-        self.size = len(self.keys)
+        self.keys = list(self.data.keys())
 
         # Introspect to determine feature size
         feat_shape = self.data[self.keys[0]].shape
@@ -39,7 +39,17 @@ class KeyedNPZDataset(Dataset):
         # Cache the data
         self.data = {key: self.data[key] for key in self.keys}
 
-        self.lengths = None
+
+        if order_file:
+            # Additional text file which will be indexed to map to the
+            # actual npz key. Useful if dataset contains multiple instances
+            # for a given video, for example.
+            self.keys = []
+            with open(order_file) as f:
+                for line in f:
+                    self.keys.append(line.strip())
+
+        self.size = len(self.keys)
         if self.ndim == 2:
             # Introspect the sequence lengths
             self.lengths = [self.data[key].shape[1] for key in self.keys]
