@@ -4,9 +4,10 @@ from .sat import ShowAttendAndTell
 from .nli import NLI
 from .mnmt import MultimodalNMT
 from .acapt import AttentiveCaptioning
-from .vcap import VideoCaptioner
-from .vatex_cap import VATEXCaptioner
-from .vatex_simple_cap import VATEXSimpleCaptioner
+#from .vcap import VideoCaptioner
+from .video_cap import VideoCap
+#from .vatex_cap import VATEXCaptioner
+#from .vatex_simple_cap import VATEXSimpleCaptioner
 
 # Raw images
 from .amnmtraw import AttentiveRawMNMT
