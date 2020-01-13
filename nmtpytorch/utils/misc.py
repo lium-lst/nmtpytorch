@@ -194,5 +194,5 @@ def setup_experiment(opts, suffix=None, short=False):
     run_id = sha256(run_id.encode('ascii')).hexdigest()[:5]
 
     # Finalize
-    model_type = opts.train['model_type'].lower()
+    model_type = opts.train['model']['type'].lower()
     opts.train['exp_id'] = f'{model_type}-r{run_id}'
