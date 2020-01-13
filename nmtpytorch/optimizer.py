@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import logging
 
 import torch.optim
@@ -30,17 +29,16 @@ class Optimizer:
     }
 
     @staticmethod
-    def get_params(model):
+    def filter_params(params):
         """Returns all name, parameter pairs with requires_grad=True."""
         return list(
-            filter(lambda p: p[1].requires_grad, model.named_parameters()))
+            filter(lambda p: p[1].requires_grad, params))
 
-    def __init__(self, name, model, lr=0, momentum=0.0,
+    def __init__(self, name, params, lr=0, momentum=0.0,
                  nesterov=False, weight_decay=0, gclip=0,
                  lr_decay=False, lr_decay_factor=0.1, lr_decay_mode='min',
                  lr_decay_patience=10, lr_decay_min=0.000001):
         self.name = name
-        self.model = model
         self.initial_lr = lr
         self.lr_decay = lr_decay
         self.lr_decay_factor = lr_decay_factor
@@ -62,7 +60,7 @@ class Optimizer:
             self.optim_args['nesterov'] = self.nesterov
 
         # Get all parameters that require grads
-        self.named_params = self.get_params(self.model)
+        self.named_params = self.filter_params(params)
 
         # Filter out names for gradient clipping
         self.params = [param for (name, param) in self.named_params]
