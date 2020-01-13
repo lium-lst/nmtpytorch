@@ -8,16 +8,47 @@ logger = logging.getLogger('nmtpytorch')
 
 
 class Vocabulary:
-    """Smart vocabulary class for integer<->token mapping."""
+    r"""Vocabulary class for integer<->token mapping.
 
-    TOKENS = {"<pad>": 0,
-              "<bos>": 1,
-              "<eos>": 2,
-              "<unk>": 3}
+    Arguments:
+        fname (str): The filename of the JSON vocabulary file created by
+            `nmtpy-build-vocab` script.
+        short_list (int, optional): If > 0, only the most frequent `short_list`
+            items are kept in the vocabulary.
 
-    def __init__(self, vocab, name, short_list=0):
-        self.vocab = pathlib.Path(vocab).expanduser()
-        self.name = name
+    Attributes:
+        vocab (pathlib.Path): A :class:`pathlib.Path` instance holding the
+            filepath of the vocabulary file.
+        short_list (int): Short-list threshold.
+        freqs (dict): A dictionary which maps vocabulary strings to their
+            normalized frequency across the training set.
+        counts (dict): A dictionary which maps vocabulary strings to their
+            occurrence counts across the training set.
+        n_tokens (int): The final number of elements in the vocabulary.
+        has_bos (bool): `True` if the vocabulary has <bos> token.
+        has_eos (bool): `True` if the vocabulary has <eos> token.
+        has_pad (bool): `True` if the vocabulary has <pad> token.
+        has_unk (bool): `True` if the vocabulary has <unk> token.
+
+    Note:
+        The final instance can be easily queried in both directions with
+        bracket notation using integers and strings.
+
+    Example:
+        >>> vocab = Vocabulary('train.vocab.en')
+        >>> vocab['woman']
+        23
+        >>> vocab[23]
+        'woman'
+
+    Returns:
+        A :class:`Vocabulary` instance.
+    """
+
+    TOKENS = {"<pad>": 0, "<bos>": 1, "<eos>": 2, "<unk>": 3}
+
+    def __init__(self, fname, short_list=0):
+        self.vocab = pathlib.Path(fname).expanduser()
         self.short_list = short_list
         self._map = None
         self._imap = None
@@ -50,7 +81,7 @@ class Vocabulary:
         # Sanity check for placeholder tokens
         for tok, idx in self.TOKENS.items():
             if self._map.get(tok, -1) != idx:
-                logger.info(f'{tok} not found in vocabulary \'{self.name}\'')
+                logger.info(f'{tok} not found in {self.vocab.name!r}')
                 setattr(self, f'has_{tok[1:-1]}', False)
 
         # Set # of tokens
@@ -97,7 +128,18 @@ class Vocabulary:
         return tidxs
 
     def idxs_to_sent(self, idxs, debug=False):
-        """Convert integer hypothesis to string."""
+        r"""Converts list of integers to string representation.
+
+        Arguments:
+            idxs (list): Python list of integers as previously mapped from
+                string tokens by this instance.
+            debug (bool, optional): If `True`, the string representation
+                will go beyond and include the end-of-sentence token as well.
+
+        Returns:
+            A whitespace separated string representing the given list of integers.
+
+        """
         result = []
         for idx in idxs:
             if not debug and self.has_eos and idx == self.TOKENS["<eos>"]:
@@ -107,7 +149,17 @@ class Vocabulary:
         return " ".join(result)
 
     def list_of_idxs_to_sents(self, lidxs):
-        """Convert a list of integer hypotheses to list of strings."""
+        r"""Converts list of list of integers to string representations. This is
+        handy for batched conversion after beam search for example.
+
+        Arguments:
+            lidxs(list): A list containing multiple lists of integers as
+                previously mapped from string tokens by this instance.
+
+        Returns:
+            A list of whitespace separated strings representing the given input.
+
+        """
         results = []
         unk = self.TOKENS["<unk>"]
         for idxs in lidxs:
@@ -120,5 +172,4 @@ class Vocabulary:
         return results
 
     def __repr__(self):
-        return "Vocabulary of %d items (name=%s)" % (self.n_tokens,
-                                                     self.name)
+        return f"Vocabulary of {self.n_tokens} items ({self.vocab.name!r})"
