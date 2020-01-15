@@ -1,4 +1,4 @@
-![nmtpytorch](https://github.com/lium-lst/nmtpytorch/blob/master/docs/logo.png?raw=true "nmtpytorch")
+![nmtpytorch](https://github.com/lium-lst/nmtpytorch/blob/master/doc/_static/img/logo.png?raw=true "nmtpytorch")
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)](https://www.python.org/downloads/release/python-360/)

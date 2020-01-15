@@ -4,5 +4,5 @@ nmtpytorch.egg-info
 .cache
 build/
 dist/
-docs/build/
+doc/_build/
 ipynb/.ipynb_checkpoints
