@@ -64,7 +64,8 @@ class DeviceManager:
 
             if self.req_n_gpu > len(self.cuda_dev_ids):
                 raise RuntimeError(
-                    self.__errors['NotEnoughGPU'].format(self.req_n_gpu, len(self.cuda_dev_ids)))
+                    self.__errors['NotEnoughGPU'].format(
+                        self.req_n_gpu, len(self.cuda_dev_ids)))
             else:
                 self.cuda_dev_ids = self.cuda_dev_ids[:self.req_n_gpu]
 
