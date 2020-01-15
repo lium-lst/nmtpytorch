@@ -5,7 +5,7 @@ import sys
 import argparse
 
 from nmtpytorch import logger
-from nmtpytorch.config import Options
+from nmtpytorch.configv2 import Options
 from nmtpytorch.utils.misc import setup_experiment, fix_seed
 from nmtpytorch.utils.device import DeviceManager
 
@@ -105,6 +105,9 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
 
+    # Reserve device(s)
+    dev_mgr = DeviceManager(args.device_id)
+
     # Mode selection
     if args.cmd == 'train':
         # Parse configuration file and merge with the rest
@@ -112,9 +115,6 @@ if __name__ == '__main__':
 
         # Setup experiment folders
         setup_experiment(opts, args.suffix)
-
-    # Reserve device(s)
-    dev_mgr = DeviceManager(args.device_id)
 
     # translate entry point
     if args.cmd in ('translate', 'test'):
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     import torch
     import platform
     import nmtpytorch
-    from nmtpytorch import models
+    from nmtpytorch import modelsv2 as models
     from nmtpytorch.mainloop import MainLoop
     log = logger.setup(opts.train)
 
@@ -148,11 +148,10 @@ if __name__ == '__main__':
     else:
         opts.train['seed'] = fix_seed()
 
-    # Be verbose and fire the loop!
     log.info(opts)
 
     # Instantiate the model object
-    model = getattr(models, opts.train['model_type'])(opts=opts)
+    model = getattr(models, opts.train['model']['type'])(opts=opts)
 
     log.info("Python {} -- torch {} with CUDA {} (on machine '{}')".format(
         platform.python_version(), torch.__version__,
@@ -163,6 +162,7 @@ if __name__ == '__main__':
 
     if 'SLURM_JOB_ID' in os.environ:
         log.info("SLURM Job ID: {}".format(os.environ['SLURM_JOB_ID']))
-    loop = MainLoop(model, opts.train, dev_mgr)
+
+    loop = MainLoop(model, opts, dev_mgr)
     loop()
     sys.exit(0)
