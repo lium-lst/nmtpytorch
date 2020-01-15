@@ -23,12 +23,12 @@ long_description = long_description.replace(
 setuptools.setup(
     name='nmtpytorch',
     version=get_nmtpytorch_version(),
-    description='Sequence-to-Sequence Framework in Pytorch',
+    description='Sequence-to-Sequence Framework in PyTorch',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/lium-lst/nmtpytorch',
     author='Ozan Caglayan',
-    author_email='ozan.caglayan@univ-lemans.fr',
+    author_email='ozancag@gmail.com',
     license='MIT',
     project_urls={
         'Wiki': 'https://github.com/lium-lst/nmtpytorch/wiki',
