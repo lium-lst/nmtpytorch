@@ -9,8 +9,7 @@ class FilterChain:
     """A sequential filter chain to post-process list of tokens.
 
         Arguments:
-            filters(str): A string containing comma-separated list of filters
-                to apply.
+            filters(list): A  list of strings representing filters to apply.
 
         Available Filters:
             'de-bpe': Stitches back subword units produced with apply_bpe
@@ -22,6 +21,7 @@ class FilterChain:
             'lower': Lowercase.
             'upper': Uppercase.
             'de-hyphen': De-hyphenate 'foo @-@ bar' constructs of Moses.
+
     """
     FILTERS = {
         'de-bpe': lambda s: s.replace("@@ ", "").replace("@@", ""),
@@ -37,19 +37,20 @@ class FilterChain:
         'de-compound': lambda s: (s.replace(" @@ ", "").replace(" @@", "")
                                   .replace(" @", "").replace("@ ", "")),
         # de-hyphenate when -a given to Moses tokenizer
-        'de-hyphen': lambda s: re.sub('\s*@-@\s*', '-', s),
+        'de-hyphen': lambda s: re.sub(r'\s*@-@\s*', '-', s),
         'lower': lambda s: s.lower(),
         'upper': lambda s: s.upper(),
     }
 
     def __init__(self, filters):
-        self.filters = filters.split(',')
-        assert not set(self.FILTERS).difference(self.FILTERS.keys()), \
-            "Unknown evaluation filter given in train.evalfilters"
-        self.funcs = [self.FILTERS[k] for k in self.filters]
+        assert not set(filters).difference(set(self.FILTERS.keys())), \
+            "Unknown evaluation filter given."
+        self.filters = filters
+        self._funcs = [self.FILTERS[k] for k in self.filters]
 
     def _apply(self, list_of_strs):
-        for func in self.funcs:
+        """Applies filters consecutively on a list of sentences."""
+        for func in self._funcs:
             list_of_strs = [func(s) for s in list_of_strs]
         return list_of_strs
 
@@ -59,8 +60,8 @@ class FilterChain:
         Arguments:
             inp(pathlib.Path or list): If a `Path` given, temporary
                 file(s) with filters applied are returned. The `Path` can
-                also be a glob expression.
-                Otherwise, a list with filtered sentences is returned.
+                also be a glob expression. Otherwise, a list with filtered
+                sentences is returned.
         """
         if isinstance(inp, Path):
             # Need to create copies of reference files with filters applied
