@@ -1,0 +1,57 @@
+import copy
+import json
+import logging
+
+from . import datasets
+from .vocabulary import Vocabulary
+
+
+logger = logging.getLogger('nmtpytorch')
+
+
+class DataStore:
+    """A holistic object which holds references to all `Dataset` instances
+    along with the associated :class:`Vocabulary` defined in the configuration
+    file.
+
+    Arguments:
+        opts(Options): An :class:`Options` instance as parsed from the
+            configuration file.
+
+    Attributes:
+        data(dict): A copy of the `data` section from the configuration file
+            with data definitions replaced with actual `torch.nn.Dataset`
+            instances.
+        vocabulary(dict): A copy of the `vocabulary` section from the configuration
+            file with vocabulary definitions replaced with actual `Vocabulary`
+            instances.
+
+    """
+    def __init__(self, opts):
+        self._cache = {}
+        for section in ['data', 'vocabulary']:
+            setattr(self, section, copy.deepcopy(opts.sections[section]))
+
+        for dset, spec in self.vocabulary.items():
+            for key, kwargs in spec.items():
+                self.vocabulary[dset][key] = Vocabulary(**kwargs)
+
+        for name, spec in self.data.items():
+            # spec is a dict: {'train': [], 'val': [], ..}
+            for split, dsets in spec.items():
+                for key, kwargs in dsets.items():
+                    ds_hash = str(kwargs)
+                    if ds_hash not in self._cache:
+                        klass = kwargs.pop('type')
+                        if kwargs.get('vocab', False):
+                            # Replace with the actual vocabulary
+                            kwargs['vocab'] = self.vocabulary[name][key]
+                        ds = getattr(datasets, klass)(**kwargs)
+                        self._cache[ds_hash] = ds
+                    self.data[name][split][key] = self._cache[ds_hash]
+                    logger.info(self.data[name][split][key])
+
+    def __repr__(self):
+        return json.dumps(
+            {'data': self. data, 'vocabulary': self.vocabulary},
+            indent=2, default=lambda obj: str(obj))
