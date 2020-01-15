@@ -50,6 +50,11 @@ def fix_seed(seed=None):
     return seed
 
 
+def validate_or_assert(option_name, option_value, valid_options):
+    assert option_value in valid_options, \
+        f"{option_name!r} should be one of {valid_options!r}"
+
+
 def get_meteor_jar(ver='1.5'):
     root = pathlib.Path(os.getenv('HOME')) / '.nmtpy' / 'meteor-data'
     jar = root / 'meteor-1.5.jar'
@@ -71,10 +76,11 @@ def load_pt_file(fname, device='cpu'):
 
 
 def get_language(fname):
+    """Heuristic to detect the language from filename components."""
     suffix = pathlib.Path(fname).suffix[1:]
     if suffix not in LANGUAGES:
-        logger.info("Can not detect language from {}, fallback to 'en'".format(fname))
-        return 'en'
+        logger.info(f"Can not detect language from {fname}, fallback to 'en'")
+        suffix = 'en'
     return suffix
 
 
