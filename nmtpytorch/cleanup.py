@@ -55,12 +55,12 @@ class Cleanup:
 
         def exception_handler(exctype, val, trace):
             """Let Python call this when an exception is uncaught."""
-            logger.info(
+            logger._logger.debug(
                 ''.join(traceback.format_exception(exctype, val, trace)))
 
         def exception_handler_quits(exctype, val, trace):
             """Let Python call this when an exception is uncaught."""
-            logger.info(
+            logger._logger.debug(
                 ''.join(traceback.format_exception(exctype, val, trace)))
             sys.exit(1)
 
