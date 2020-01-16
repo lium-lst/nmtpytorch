@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import pathlib
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 class TensorBoard:
     def __init__(self, model, log_dir, exp_id, subfolder):
@@ -22,8 +24,6 @@ class TensorBoard:
         if not self.available:
             self.replace_loggers()
             return
-
-        from torch.utils.tensorboard import SummaryWriter
 
         # Construct full folder path
         self.log_dir = pathlib.Path(self.log_dir).expanduser()
