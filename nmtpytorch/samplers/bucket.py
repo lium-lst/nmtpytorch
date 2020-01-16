@@ -49,6 +49,9 @@ class BucketBatchSampler(Sampler):
         self.n_rejects = 0
         self.order = order
 
+        assert sort_lens is not None, \
+            "BucketBatchSampler() received `sort_lens` == None"
+
         assert self.order in (None, 'ascending', 'descending'), \
             "order should be None, 'ascending' or 'descending'"
 
@@ -142,3 +145,6 @@ class BucketBatchSampler(Sampler):
     def __len__(self):
         """Returns how many batches are inside."""
         return self.n_batches
+
+    def __repr__(self):
+        return f"BucketBatchSampler(order={self.order}, max_len={self.max_len}, n_rejects={self.n_rejects})"
