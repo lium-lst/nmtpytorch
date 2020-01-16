@@ -98,6 +98,7 @@ class TextEncoder(nn.Module):
         if self.proj_dim:
             output_layers.append(
                 FF(self.ctx_size, self.proj_dim, activ=self.proj_activ))
+            self.ctx_size = self.proj_dim
         if self.dropout_ctx > 0:
             output_layers.append(nn.Dropout(p=self.dropout_ctx))
         self.output = nn.Sequential(*output_layers)
