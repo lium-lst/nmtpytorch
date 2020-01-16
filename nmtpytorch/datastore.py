@@ -1,12 +1,12 @@
 import copy
 import json
-import logging
 
 from . import datasets
+from .logger import Logger
 from .vocabulary import Vocabulary
 
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class DataStore:
@@ -37,7 +37,6 @@ class DataStore:
                 self.vocabulary[dset][key] = Vocabulary(**kwargs)
 
         for name, spec in self.data.items():
-            # spec is a dict: {'train': [], 'val': [], ..}
             for split, dsets in spec.items():
                 for key, kwargs in dsets.items():
                     ds_hash = str(kwargs)
@@ -49,9 +48,9 @@ class DataStore:
                         ds = getattr(datasets, klass)(**kwargs)
                         self._cache[ds_hash] = ds
                     self.data[name][split][key] = self._cache[ds_hash]
-                    logger.info(self.data[name][split][key])
+                    log.log(self.data[name][split][key])
 
     def __repr__(self):
         return json.dumps(
             {'data': self. data, 'vocabulary': self.vocabulary},
-            indent=2, default=lambda obj: str(obj))
+            indent=1, default=lambda obj: str(obj))
