@@ -25,7 +25,7 @@ def readInteger(f):
     a = f.read(n)[::-1]
     try:
         return int.from_bytes(a, byteorder='big', signed=False)
-    except Exception as e:
+    except Exception:
         return functools.reduce(lambda x, y: x * 256 + ord(y), a, 0)
 
 
