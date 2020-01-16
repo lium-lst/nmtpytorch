@@ -1,12 +1,7 @@
-# -*- coding: utf-8 -*-
 import os
-import bz2
-import gzip
-import lzma
 import time
 import random
 import pathlib
-import logging
 import tempfile
 from hashlib import sha256
 
@@ -14,9 +9,10 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from ..logger import Logger
 from ..cleanup import cleanup
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 LANGUAGES = [
@@ -62,8 +58,8 @@ def get_meteor_jar(ver='1.5'):
     return jar
 
 
-def pbar(iterator, unit='it'):
-    return tqdm(iterator, unit=unit, ncols=70, smoothing=0)
+def pbar(iterator, unit='it', **kwargs):
+    return tqdm(iterator, unit=unit, ncols=80, smoothing=0, **kwargs)
 
 
 def load_pt_file(fname, device='cpu'):
@@ -79,7 +75,7 @@ def get_language(fname):
     """Heuristic to detect the language from filename components."""
     suffix = pathlib.Path(fname).suffix[1:]
     if suffix not in LANGUAGES:
-        logger.info(f"Can not detect language from {fname}, fallback to 'en'")
+        log.log(f"Can not detect language from {fname}, fallback to 'en'")
         suffix = 'en'
     return suffix
 
@@ -102,28 +98,6 @@ def ensure_dirs(dirs):
     dirs = [pathlib.Path(d) for d in listify(dirs)]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
-
-
-def fopen(filename, key=None):
-    """gzip,bzip2,xz,numpy aware file opening function."""
-    assert '*' not in str(filename), "Glob patterns not supported in fopen()"
-
-    filename = str(pathlib.Path(filename).expanduser())
-    if filename.endswith('.gz'):
-        return gzip.open(filename, 'rt')
-    elif filename.endswith('.bz2'):
-        return bz2.open(filename, 'rt')
-    elif filename.endswith(('.xz', '.lzma')):
-        return lzma.open(filename, 'rt')
-    elif filename.endswith(('.npy', '.npz')):
-        if filename.endswith('.npz'):
-            assert key is not None, "No key= given for .npz file."
-            return np.load(filename)[key]
-        else:
-            return np.load(filename)
-    else:
-        # Plain text
-        return open(filename, 'r')
 
 
 def readable_size(n):

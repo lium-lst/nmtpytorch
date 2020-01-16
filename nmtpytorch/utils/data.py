@@ -1,12 +1,34 @@
-# -*- coding: utf-8 -*-
-import torch
-import logging
-from torch.utils.data import DataLoader
+import bz2
+import gzip
+import lzma
+import pathlib
+
 import numpy as np
+import torch
 
-from ..utils.misc import fopen, pbar
+from ..utils.misc import pbar
 
-logger = logging.getLogger('nmtpytorch')
+
+def fopen(filename, key=None):
+    """gzip,bzip2,xz,numpy aware file opening function."""
+    assert '*' not in str(filename), "Glob patterns not supported in fopen()"
+
+    filename = str(pathlib.Path(filename).expanduser())
+    if filename.endswith('.gz'):
+        return gzip.open(filename, 'rt')
+    elif filename.endswith('.bz2'):
+        return bz2.open(filename, 'rt')
+    elif filename.endswith(('.xz', '.lzma')):
+        return lzma.open(filename, 'rt')
+    elif filename.endswith(('.npy', '.npz')):
+        if filename.endswith('.npz'):
+            assert key is not None, "No key= given for .npz file."
+            return np.load(filename)[key]
+        else:
+            return np.load(filename)
+    else:
+        # Plain text
+        return open(filename, 'r')
 
 
 def sort_predictions(data_loader, results):
@@ -15,17 +37,6 @@ def sort_predictions(data_loader, results):
         results = [results[i] for i, j in sorted(
             enumerate(data_loader.batch_sampler.orig_idxs), key=lambda k: k[1])]
     return results
-
-
-def make_dataloader(dataset, pin_memory=False, num_workers=0):
-    if num_workers != 0:
-        logger.info('Forcing num_workers to 0 since it fails with torch 0.4')
-        num_workers = 0
-
-    return DataLoader(
-        dataset, batch_sampler=dataset.sampler,
-        collate_fn=dataset.collate_fn,
-        pin_memory=pin_memory, num_workers=num_workers)
 
 
 def sort_batch(seqbatch):
@@ -73,13 +84,14 @@ def convert_to_onehot(idxs, n_classes):
 def read_sentences(fname, vocab, bos=False, eos=True):
     lines = []
     lens = []
+    basename = pathlib.Path(fname).name
     with fopen(fname) as f:
-        for idx, line in enumerate(pbar(f, unit='sents')):
+        for idx, line in enumerate(pbar(f, unit='sents', desc=f'Reading {basename}')):
             line = line.strip()
 
             # Empty lines will cause a lot of headaches,
             # get rid of them during preprocessing!
-            assert line, "Empty line (%d) found in %s" % (idx + 1, fname)
+            assert line, f"Empty line ({idx + 1}) found in {fname}"
 
             # Map and append
             seq = vocab.sent_to_idxs(line, explicit_bos=bos, explicit_eos=eos)

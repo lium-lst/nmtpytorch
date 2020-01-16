@@ -2,7 +2,8 @@
 import re
 from pathlib import Path
 
-from .misc import get_temp_file, fopen
+from .misc import get_temp_file
+from .data import fopen
 
 
 class FilterChain:
