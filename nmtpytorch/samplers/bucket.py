@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
 import math
-import logging
 from collections import defaultdict
 
 import numpy as np
 
 from torch.utils.data.sampler import Sampler
 
-logger = logging.getLogger('nmtpytorch')
+from ..logger import Logger
+
+log = Logger()
 
 
 class BucketBatchSampler(Sampler):
@@ -62,7 +62,7 @@ class BucketBatchSampler(Sampler):
                     self.buckets[len_].append(idx)
                 else:
                     self.n_rejects += 1
-            logger.info('{} samples rejected because of length filtering @ {}'.format(
+            log.log('{} samples rejected because of length filtering @ {}'.format(
                 self.n_rejects, self.max_len))
         else:
             # No length filtering

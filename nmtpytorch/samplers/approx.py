@@ -1,14 +1,13 @@
-# -*- coding: utf-8 -*-
 import math
-import logging
 from collections import defaultdict
 
 import numpy as np
 
+from ..logger import Logger
 from ..utils.device import DEVICE_IDS
 from . import BucketBatchSampler
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class ApproximateBucketBatchSampler(BucketBatchSampler):
@@ -60,7 +59,7 @@ class ApproximateBucketBatchSampler(BucketBatchSampler):
                     self.buckets[len_].append(idx)
                 else:
                     self.n_rejects += 1
-            logger.info('{} samples rejected because of length filtering @ {}'.format(
+            log.log('{} samples rejected because of length filtering @ {}'.format(
                 self.n_rejects, self.max_len))
         else:
             # No length filtering
@@ -93,7 +92,7 @@ class ApproximateBucketBatchSampler(BucketBatchSampler):
         end_point = last_bucket_size - n_remove_from_last
         self.buckets[idx] = self.buckets[idx][:end_point]
         if n_remove_from_last > 0:
-            logger.info('Removed {} samples to balance buckets.'.format(
+            log.log('Removed {} samples to balance buckets.'.format(
                 n_remove_from_last))
 
         self.stats = {k: len(self.buckets[k]) for k in sorted(self.buckets)}
