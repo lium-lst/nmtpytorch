@@ -93,42 +93,34 @@ class TextEncoder(nn.Module):
                        bidirectional=self.bidirectional)
 
         output_layers = []
-        if self.layer_norm:
-            output_layers.append(LayerNorm(self.ctx_size))
         if self.proj_dim:
             output_layers.append(
                 FF(self.ctx_size, self.proj_dim, activ=self.proj_activ))
             self.ctx_size = self.proj_dim
+        if self.layer_norm:
+            output_layers.append(LayerNorm(self.ctx_size))
         if self.dropout_ctx > 0:
             output_layers.append(nn.Dropout(p=self.dropout_ctx))
         self.output = nn.Sequential(*output_layers)
 
     def forward(self, x, **kwargs):
-        mask = None
-        if (x == 0).nonzero().numel():
-            # Non-homogeneous batch
-            # sort the batch by decreasing length of sequences
-            # oidxs: to recover original order
-            # sidxs: idxs to sort the batch
-            # slens: lengths in sorted order for pack_padded_sequence()
-            oidxs, sidxs, slens, mask = sort_batch(x)
+        # Non-homogeneous batches possible
+        # sort the batch by decreasing length of sequences
+        # oidxs: to recover original order
+        # sidxs: idxs to sort the batch
+        # slens: lengths in sorted order for pack_padded_sequence()
+        oidxs, sidxs, slens, mask = sort_batch(x)
 
-            # Fetch embeddings for the sorted batch
-            embs = self.do_emb(self.emb(x[:, sidxs]))
+        # Fetch embeddings for the sorted batch
+        embs = self.do_emb(self.emb(x[:, sidxs]))
 
-            # Pack and encode
-            packed_emb = pack_padded_sequence(embs, slens)
+        # Pack and encode
+        packed_emb = pack_padded_sequence(embs, slens)
 
-            # We ignore last_state since we don't use it
-            packed_hs, _ = self.enc(packed_emb)
+        # We ignore last_state since we don't use it
+        packed_hs, _ = self.enc(packed_emb)
 
-            # Get hidden states and revert the order
-            hs = pad_packed_sequence(packed_hs)[0][:, oidxs]
-        else:
-            # Fetch embeddings
-            embs = self.do_emb(self.emb(x))
-
-            # Encode
-            hs, _ = self.enc(embs)
+        # Get hidden states and revert the order
+        hs = pad_packed_sequence(packed_hs)[0][:, oidxs]
 
         return self.output(hs), mask
