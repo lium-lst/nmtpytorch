@@ -38,6 +38,10 @@ class Loss:
             return 0
         return self._loss / self._denom
 
+    @property
+    def denom(self):
+        return self._denom
+
 
 class Precision:
     """Wrapper metric around `pytorch-ignite`."""
