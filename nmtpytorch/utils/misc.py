@@ -3,7 +3,6 @@ import time
 import random
 import pathlib
 import tempfile
-from hashlib import sha256
 
 import numpy as np
 import torch
@@ -153,26 +152,3 @@ def get_temp_file(delete=False, close=False):
     if close:
         t.close()
     return t
-
-
-def setup_experiment(opts, suffix=None, short=False):
-    """Return a representative string for the experiment."""
-
-    # subfolder is conf filename without .conf suffix
-    opts.train['subfolder'] = pathlib.Path(opts.filename).stem
-
-    # add suffix to subfolder name to keep experiment names shorter
-    if suffix:
-        opts.train['subfolder'] += "-{}".format(suffix)
-
-    # Create folders
-    folder = pathlib.Path(opts.train['save_path']) / opts.train['subfolder']
-    folder.mkdir(parents=True, exist_ok=True)
-
-    # Set random experiment ID
-    run_id = time.strftime('%Y%m%d%H%m%S') + str(random.random())
-    run_id = sha256(run_id.encode('ascii')).hexdigest()[:5]
-
-    # Finalize
-    model_type = opts.train['model']['type'].lower()
-    opts.train['exp_id'] = f'{model_type}-r{run_id}'
