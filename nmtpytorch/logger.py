@@ -5,23 +5,43 @@ import logging
 from .cleanup import cleanup
 
 
-def setup(opts=None):
-    _format = '%(message)s'
+class Logger:
+    _logger = None
 
-    formatter = logging.Formatter(_format)
-    logger = logging.getLogger('nmtpytorch')
-    logger.setLevel(logging.DEBUG)
+    def __init__(self, opts=None):
+        if Logger._logger is None:
+            print('Creating logger')
+            _format = '%(message)s'
+            _formatter = logging.Formatter(_format)
+            Logger._logger = logging.getLogger('nmtpytorch')
+            Logger._logger.setLevel(logging.DEBUG)
 
-    con_handler = logging.StreamHandler()
-    con_handler.setFormatter(formatter)
-    logger.addHandler(con_handler)
+            con_handler = logging.StreamHandler()
+            con_handler.setFormatter(_formatter)
+            Logger._logger.addHandler(con_handler)
 
-    if opts is not None:
-        log_file = str(pathlib.Path(opts['save_path']) /
-                       opts['subfolder'] / opts['exp_id']) + '.log'
-        file_handler = logging.FileHandler(log_file, mode='w')
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+            if opts is not None:
+                log_root = pathlib.Path(opts['save_path'])
+                log_root = log_root / opts['subfolder'] / opts['exp_id']
+                log_file = str(log_root) + '.log'
+                print(f' Will save logs to {log_file}')
+                file_handler = logging.FileHandler(log_file, mode='w')
+                file_handler.setFormatter(_formatter)
+                Logger._logger.addHandler(file_handler)
 
-    cleanup.register_handler(logger)
-    return logger
+            cleanup.register_handler(Logger._logger)
+
+    @classmethod
+    def log(cls, msg):
+        """Plain logging."""
+        cls._logger.info(msg)
+
+    def log_prefix(cls, msg, prefix):
+        """Plain logging with prefix string."""
+        cls._logger.info(f'{prefix} {msg}')
+
+    def log_header(cls, msg):
+        """Adds a fancy header before and after the message."""
+        header_len = len(msg.split('\n')[0])
+        header_str = '-' * header_len
+        cls._logger.info(f"{header_str}\n{msg}\n{header_str}")
