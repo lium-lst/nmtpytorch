@@ -3,7 +3,7 @@ import sys
 import math
 import json
 import time
-import logging
+from .logger import Logger
 import pickle as pkl
 from pathlib import Path
 
@@ -12,13 +12,14 @@ import torch
 from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 from .utils.data import make_dataloader
+# FIXME: no longer exists
 from .utils.topology import Topology
 from .utils.device import DEVICE
 
 from . import models
 from .config import Options
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class Translator:
@@ -29,7 +30,7 @@ class Translator:
         self.__dict__.update(kwargs)
 
         for key, value in kwargs.items():
-            logger.info('-- {} -> {}'.format(key, value))
+            log.log('-- {} -> {}'.format(key, value))
 
         # How many models?
         self.n_models = len(self.models)
@@ -50,8 +51,7 @@ class Translator:
             instance = getattr(models, opts.train['model_type'])(opts=opts)
 
             if not instance.supports_beam_search:
-                logger.error(
-                    "Model does not support beam search. Try 'nmtpy test'")
+                log.log("Model does not support beam search. Try 'nmtpy test'")
                 sys.exit(1)
 
             # Setup layers
@@ -63,12 +63,12 @@ class Translator:
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)
-            logger.info(instance)
+            log.log(instance)
 
         try:
             self.beam_func = getattr(self.instances[0], self.beam_func)
         except AttributeError as ae:
-            logger.info(f'Error: model does not have .{self.beam_func!r}()')
+            log.log(f'Error: model does not have .{self.beam_func!r}()')
             sys.exit(1)
 
         # Split the string
@@ -81,36 +81,36 @@ class Translator:
         eval_filters = self.instances[0].opts.train['eval_filters']
 
         if self.disable_filters or not eval_filters:
-            logger.info('Post-processing filters disabled.')
+            log.log('Post-processing filters disabled.')
             self.filter = lambda s: s
         else:
-            logger.info('Post-processing filters enabled.')
+            log.log('Post-processing filters enabled.')
             self.filter = FilterChain(eval_filters)
 
         # Can be a comma separated list of hardcoded test splits
-        logger.info('Will translate "{}"'.format(self.splits))
+        log.log('Will translate "{}"'.format(self.splits))
         if self.source:
             # We have to have single split name in this case
             split_set = '{}_set'.format(self.splits[0])
             input_dict = self.instances[0].opts.data.get(split_set, {})
-            logger.info('Input configuration:')
+            log.log('Input configuration:')
             for data_source in self.source.split(','):
                 key, path = data_source.split(':', 1)
                 input_dict[key] = Path(path)
-                logger.info(' {}: {}'.format(key, input_dict[key]))
+                log.log(' {}: {}'.format(key, input_dict[key]))
             # Overwrite config's set name
             self.instances[0].opts.data[split_set] = input_dict
 
     def sanity_check(self):
         if self.source and len(self.splits) > 1:
-            logger.info('You can only give one split name when -S is provided.')
+            log.log('You can only give one split name when -S is provided.')
             sys.exit(1)
 
         eval_filters = set([i.opts.train['eval_filters'] for i in self.instances])
         assert len(eval_filters) < 2, "eval_filters differ between instances."
 
         if len(self.instances) > 1:
-            logger.info('Make sure you ensemble models with compatible vocabularies.')
+            log.log('Make sure you ensemble models with compatible vocabularies.')
 
         # check that all instances can perform the task
         if self.task_id is not None:
@@ -139,7 +139,7 @@ class Translator:
         # otherwise it gets too complicated
         loader = make_dataloader(dataset)
 
-        logger.info('Starting translation')
+        log.log('Starting translation')
         start = time.time()
 
         hyps = self.beam_func(self.instances, loader, task_id=self.task_id,
@@ -147,7 +147,7 @@ class Translator:
                               lp_alpha=self.lp_alpha, suppress_unk=self.suppress_unk,
                               n_best=self.n_best)
         up_time = time.time() - start
-        logger.info('Took {:.3f} seconds, {} sent/sec'.format(
+        log.log('Took {:.3f} seconds, {} sent/sec'.format(
             up_time, math.floor(len(hyps) / up_time)))
 
         if hasattr(self.instances[0].dec, 'persistent_dump') and \

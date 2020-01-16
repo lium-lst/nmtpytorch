@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import time
-import logging
+from .logger import Logger
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +13,7 @@ from .utils.device import DEVICE
 from . import models
 from .config import Options
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class Tester:
@@ -39,7 +39,7 @@ class Tester:
         instance = getattr(models, opts.train['model_type'])(opts=opts)
 
         if instance.supports_beam_search:
-            logger.info("Model supports beam-search by the way.")
+            log.log("Model supports beam-search by the way.")
 
         # Setup layers
         instance.setup(is_train=False)
@@ -54,16 +54,16 @@ class Tester:
 
         # Can be a comma separated list of hardcoded test splits
         if self.splits:
-            logger.info('Will process "{}"'.format(self.splits))
+            log.log('Will process "{}"'.format(self.splits))
             self.splits = self.splits.split(',')
         elif self.source:
             # Split into key:value's and parse into dict
             input_dict = {}
-            logger.info('Will process input configuration:')
+            log.log('Will process input configuration:')
             for data_source in self.source.split(','):
                 key, path = data_source.split(':', 1)
                 input_dict[key] = Path(path)
-                logger.info(' {}: {}'.format(key, input_dict[key]))
+                log.log(' {}: {}'.format(key, input_dict[key]))
             self.instance.opts.data['new_set'] = input_dict
             self.splits = ['new']
 
@@ -74,7 +74,7 @@ class Tester:
         n_samples = len(dataset)
         feats = []
         ord_feats = []
-        logger.info('Starting extraction')
+        log.log('Starting extraction')
         start = time.time()
         for batch in pbar(loader, unit='batch'):
             batch.device(DEVICE)
@@ -88,19 +88,19 @@ class Tester:
         ord_feats = [ord_feats[i[0]].numpy() for i in idxs]
         np.save('{}_{}.encodings.npy'.format(self.model_file, split), ord_feats)
         up_time = time.time() - start
-        logger.info('Took {:.3f} seconds'.format(up_time))
+        log.log('Took {:.3f} seconds'.format(up_time))
 
     def test(self, instance, split):
         dataset = instance.load_data(split, self.batch_size, mode='eval')
         loader = make_dataloader(dataset)
 
-        logger.info('Starting computation')
+        log.log('Starting computation')
         start = time.time()
         results = instance.test_performance(
             loader,
             dump_file="{}.{}".format(self.model_file, split))
         up_time = time.time() - start
-        logger.info('Took {:.3f} seconds'.format(up_time))
+        log.log('Took {:.3f} seconds'.format(up_time))
         return results
 
     def __call__(self):

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
 import pathlib
-import logging
+from .logger import Logger
 from collections import OrderedDict
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class Vocabulary:
@@ -74,7 +74,7 @@ class Vocabulary:
         # Sanity check for placeholder tokens
         for tok, idx in self.TOKENS.items():
             if self._map.get(tok, -1) != idx:
-                logger.info(f'{tok} not found in {self.vocab.name!r}')
+                log.log(f'{tok} not found in {self.vocab.name!r}')
                 setattr(self, f'has_{tok[1:-1]}', False)
             else:
                 setattr(self, f'has_{tok[1:-1]}', True)
@@ -111,7 +111,7 @@ class Vocabulary:
                 except KeyError as _:
                     # make this verbose and repetitive as this should be
                     # used cautiously only for some specific models
-                    logger.info('No <unk> token, removing word from sentence')
+                    log.log('No <unk> token, removing word from sentence')
 
         if explicit_eos and self.has_eos:
             tidxs.append(self.TOKENS["<eos>"])

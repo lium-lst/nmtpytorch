@@ -1,10 +1,10 @@
-import logging
+from .logger import Logger
 
 import torch.optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.utils import clip_grad_norm_
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 # Setup optimizer (should always come after model.to())
 # iterable of dicts for per-param options where each dict
@@ -117,7 +117,7 @@ class Optimizer:
             self.scheduler.step(metric)
             if self.get_lr() != self.cur_lr:
                 self.cur_lr = self.get_lr()
-                logger.info('** Learning rate changed -> {}'.format(self.cur_lr))
+                log.log('** Learning rate changed -> {}'.format(self.cur_lr))
                 # Signal it back
                 return True
         return False
