@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 from torch import nn
 import torch.nn.functional as F
@@ -8,7 +8,7 @@ from ..layers import ImageEncoder, TextEncoder, ConditionalMMDecoder
 from ..datasets import MultimodalDataset
 from .nmt import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class AttentiveRawMNMT(NMT):
@@ -44,11 +44,11 @@ class AttentiveRawMNMT(NMT):
         for name, param in self.named_parameters():
             if (param.requires_grad and 'bias' not in name and
                     not name.startswith('cnn')):
-                logger.info('  Initializing weights for {}'.format(name))
+                log.log('  Initializing weights for {}'.format(name))
                 nn.init.kaiming_normal_(param.data)
 
     def setup(self, is_train=True):
-        logger.info('Loading CNN')
+        log.log('Loading CNN')
         cnn_encoder = ImageEncoder(
             cnn_type=self.opts.model['cnn_type'],
             pretrained=self.opts.model['cnn_pretrained'])
@@ -72,7 +72,7 @@ class AttentiveRawMNMT(NMT):
         self.cnn = cnn_encoder.get()
 
         # Nicely printed table of summary for the CNN
-        logger.info(cnn_encoder)
+        log.log(cnn_encoder)
 
         ########################
         # Create Textual Encoder
@@ -124,7 +124,7 @@ class AttentiveRawMNMT(NMT):
             warmup=(split != 'train'),
             resize=self.opts.model['resize'],
             crop=self.opts.model['crop'])
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
 import math
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -10,7 +10,7 @@ from ..datasets import MultimodalDataset
 from ..layers import ConditionalMMDecoder, FF, MultimodalTextEncoder
 from .nmt import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class HybridAttentiveMNMTFeatures(NMT):
@@ -109,7 +109,7 @@ class HybridAttentiveMNMTFeatures(NMT):
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model.get('max_len', None),
             order_file=self.opts.data[split + '_set'].get('ord', None))
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

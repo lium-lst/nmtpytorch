@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -16,7 +16,7 @@ from ..utils.data import sort_predictions
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class NMT(nn.Module):
@@ -132,7 +132,7 @@ class NMT(nn.Module):
                 # Override defaults from config
                 self.defaults[opt] = value
             else:
-                logger.info('Warning: unused model option: {}'.format(opt))
+                log.log('Warning: unused model option: {}'.format(opt))
         return self.defaults
 
     def reset_parameters(self):
@@ -210,7 +210,7 @@ class NMT(nn.Module):
             max_len=self.opts.model['max_len'],
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'])
-        logger.info(self.dataset)
+        log.log(self.dataset)
         return self.dataset
 
     def get_bos(self, batch_size):

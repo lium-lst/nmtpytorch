@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -16,7 +16,7 @@ from . import NMT
 
 from ..layers import FF, Pool, ArgSelect
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class LabelClassifier(NMT):
@@ -163,7 +163,7 @@ class LabelClassifier(NMT):
             bucket_by=self.opts.model['bucket_by'],
             bucket_order=None,
             sampler_type=self.opts.model['sampler_type'])
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def forward(self, batch, **kwargs):

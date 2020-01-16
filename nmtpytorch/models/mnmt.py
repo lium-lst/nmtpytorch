@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import torch
-import logging
+from ..logger import Logger
 
 from .nmt import NMT
 from ..layers import MultimodalTextEncoder
 from ..layers import ConditionalDecoder
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class MultimodalNMT(NMT):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 import torch.nn.functional as F
@@ -9,7 +9,7 @@ from ..datasets import MultimodalDataset
 
 from .nmt import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class ShowAttendAndTell(NMT):
@@ -61,7 +61,7 @@ class ShowAttendAndTell(NMT):
             self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
-        logger.info('Loading CNN')
+        log.log('Loading CNN')
         cnn_encoder = ImageEncoder(
             cnn_type=self.opts.model['cnn_type'],
             pretrained=self.opts.model['cnn_pretrained'])
@@ -82,7 +82,7 @@ class ShowAttendAndTell(NMT):
         self.cnn = cnn_encoder.get()
 
         # Nicely printed table of summary for the CNN
-        logger.info(cnn_encoder)
+        log.log(cnn_encoder)
 
         # Create Decoder
         self.dec = XuDecoder(
@@ -119,7 +119,7 @@ class ShowAttendAndTell(NMT):
             resize=self.opts.model['resize'],
             replicate=self.opts.model['replicate'] if split == 'train' else 1,
             crop=self.opts.model['crop'])
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

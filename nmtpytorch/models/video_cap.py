@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
-import logging
+from ..logger import Logger
 
 from torch import nn
 
@@ -12,7 +12,7 @@ from ..layers import FF
 
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class VideoCap(NMT):
@@ -182,7 +182,7 @@ class VideoCap(NMT):
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'],
             order_file=order_file)
-        logger.info(self.dataset)
+        log.log(self.dataset)
         return self.dataset
 
     def encode(self, batch, **kwargs):

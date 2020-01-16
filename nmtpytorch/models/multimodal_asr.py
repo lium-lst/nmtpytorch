@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 from ..layers import MultimodalBiLSTMp, ConditionalDecoder
 from . import ASR
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class MultimodalASR(ASR):

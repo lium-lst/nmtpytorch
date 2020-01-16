@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import random
-import logging
+from ..logger import Logger
 
 import torch
 
@@ -9,7 +9,7 @@ from ..layers import ConditionalMMDecoder, TextEncoder, FF
 from ..utils.topology import Topology
 from .nmt import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class AttentiveMNMTFeaturesColingMasked(NMT):
@@ -105,7 +105,7 @@ class AttentiveMNMTFeaturesColingMasked(NMT):
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model.get('max_len', None),
             order_file=self.opts.data[split + '_set'].get('ord', None))
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

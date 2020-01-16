@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -12,7 +12,7 @@ from ..utils.topology import Topology
 from ..datasets import MultimodalDataset
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class VideoCaptioner(NMT):
@@ -177,7 +177,7 @@ class VideoCaptioner(NMT):
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'],
             master=self.opts.model['master'])
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -17,7 +17,7 @@ from ..metrics import Metric
 
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class NLI(NMT):
@@ -83,7 +83,7 @@ class NLI(NMT):
                 # Override defaults from config
                 self.defaults[opt] = value
             else:
-                logger.info('Warning: unused model option: {}'.format(opt))
+                log.log('Warning: unused model option: {}'.format(opt))
         return self.defaults
 
     def reset_parameters(self):
@@ -151,7 +151,7 @@ class NLI(NMT):
             max_len=self.opts.model['max_len'],
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'])
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

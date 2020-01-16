@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -8,7 +8,7 @@ from ..layers.transformers import *
 
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class TransformerNMT(NMT):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 
@@ -7,7 +7,7 @@ from ..datasets import MultimodalDataset
 from ..layers import ConditionalMMDecoder, TextEncoder
 from .nmt import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class AttentiveMNMTFeatures(NMT):
@@ -94,7 +94,7 @@ class AttentiveMNMTFeatures(NMT):
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model.get('max_len', None),
             order_file=self.opts.data[split + '_set'].get('ord', None))
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):

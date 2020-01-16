@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 from torch import nn
 
@@ -10,7 +10,7 @@ from ..utils.topology import Topology
 from ..datasets import MultimodalDataset
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 import ipdb
 
@@ -92,7 +92,7 @@ class VATEXCaptioner(NMT):
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'],
             repeat_by=10 if mode != 'beam' else 1)
-        logger.info(self.dataset)
+        log.log(self.dataset)
         return self.dataset
 
     def setup(self, is_train=True):

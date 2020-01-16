@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -11,7 +11,7 @@ from ..datasets import MultimodalDataset
 
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class Rationale(NMT):
@@ -75,7 +75,7 @@ class Rationale(NMT):
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'],
             eos=self.opts.model['add_src_eos'])
-        logger.info(self.dataset)
+        log.log(self.dataset)
         return self.dataset
 
     def reset_parameters(self):

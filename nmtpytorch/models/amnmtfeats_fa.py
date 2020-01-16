@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 import math
 from collections import OrderedDict
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
 
 from .amnmtfeats import AttentiveMNMTFeatures
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 class AttentiveMNMTFeaturesFA(AttentiveMNMTFeatures):

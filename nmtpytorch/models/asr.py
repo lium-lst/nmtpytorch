@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+from ..logger import Logger
 
 import torch
 from torch import nn
@@ -10,7 +10,7 @@ from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from . import NMT
 
-logger = logging.getLogger('nmtpytorch')
+log = Logger()
 
 
 # ASR with ESPNet style BiLSTMp encoder
@@ -191,7 +191,7 @@ class ASR(NMT):
             max_len=self.opts.model['max_len'],
             bucket_order=self.opts.model['bucket_order'],
             sampler_type=self.opts.model['sampler_type'])
-        logger.info(dataset)
+        log.log(dataset)
         return dataset
 
     def encode(self, batch, **kwargs):
