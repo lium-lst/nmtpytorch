@@ -4,10 +4,38 @@ import os
 import sys
 import argparse
 
-from nmtpytorch import logger
+# These imports should not call Logger() or the log file will not be
+# recorded
 from nmtpytorch.configv2 import Options
-from nmtpytorch.utils.misc import setup_experiment, fix_seed
 from nmtpytorch.utils.device import DeviceManager
+
+
+def setup_experiment(opts, suffix=None, short=False):
+    """Return a representative string for the experiment."""
+
+    import time
+    import random
+    import pathlib
+    import hashlib
+
+    # subfolder is conf filename without .conf suffix
+    opts.train['subfolder'] = pathlib.Path(opts.filename).stem
+
+    # add suffix to subfolder name to keep experiment names shorter
+    if suffix:
+        opts.train['subfolder'] += "-{}".format(suffix)
+
+    # Create folders
+    folder = pathlib.Path(opts.train['save_path']) / opts.train['subfolder']
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # Set random experiment ID
+    run_id = time.strftime('%Y%m%d%H%m%S') + str(random.random())
+    run_id = hashlib.sha256(run_id.encode('ascii')).hexdigest()[:5]
+
+    # Finalize
+    model_type = opts.train['model']['type'].lower()
+    opts.train['exp_id'] = f'{model_type}-r{run_id}'
 
 
 if __name__ == '__main__':
@@ -108,17 +136,26 @@ if __name__ == '__main__':
     # Reserve device(s)
     dev_mgr = DeviceManager(args.device_id)
 
+    from nmtpytorch.logger import Logger
+
     # Mode selection
     if args.cmd == 'train':
+
         # Parse configuration file and merge with the rest
         opts = Options(args.config, args.overrides)
 
         # Setup experiment folders
         setup_experiment(opts, args.suffix)
 
+    # setup logger
+    log = Logger(opts.train)
+
+    from nmtpytorch.utils.misc import fix_seed
+
     # translate entry point
     if args.cmd in ('translate', 'test'):
-        logger.setup()
+        # no logging to file in inference mode
+        Logger.setup(None)
         if not args.stochastic:
             fix_seed(1234)
         cmd = args.__dict__.pop('cmd')
@@ -140,29 +177,32 @@ if __name__ == '__main__':
     import nmtpytorch
     from nmtpytorch import modelsv2 as models
     from nmtpytorch.mainloop import MainLoop
-    log = logger.setup(opts.train)
 
     # If given, seed that; if not generate a random seed and print it
+    from nmtpytorch.utils.misc import fix_seed
     if opts.train['seed'] > 0:
         seed = fix_seed(opts.train['seed'])
     else:
         opts.train['seed'] = fix_seed()
 
-    log.info(opts)
+    log.log_header('Experiment configuration')
+    log.log(opts)
 
     # Instantiate the model object
     model = getattr(models, opts.train['model']['type'])(opts=opts)
 
-    log.info("Python {} -- torch {} with CUDA {} (on machine '{}')".format(
+    log.log_header('Software details')
+    log.log("Python {} -- torch {} with CUDA {} (on machine '{}')".format(
         platform.python_version(), torch.__version__,
         torch.version.cuda, platform.node()))
-    log.info("nmtpytorch {}".format(nmtpytorch.__version__))
-    log.info(dev_mgr)
-    log.info("Seed for further reproducibility: {}".format(opts.train['seed']))
+    log.log(f"nmtpytorch {nmtpytorch.__version__}")
+    log.log(dev_mgr)
+    log.log(f"Seed for further reproducibility: {opts.train['seed']}")
 
     if 'SLURM_JOB_ID' in os.environ:
-        log.info("SLURM Job ID: {}".format(os.environ['SLURM_JOB_ID']))
+        log.log(f"SLURM Job ID: {os.environ['SLURM_JOB_ID']}")
 
+    log.log_header('Creating mainloop')
     loop = MainLoop(model, opts, dev_mgr)
     loop()
     sys.exit(0)
