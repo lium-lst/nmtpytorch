@@ -31,14 +31,6 @@ def fopen(filename, key=None):
         return open(filename, 'r')
 
 
-def sort_predictions(data_loader, results):
-    """Recovers the dataset order when bucketing samplers are used."""
-    if getattr(data_loader.batch_sampler, 'store_indices', False):
-        results = [results[i] for i, j in sorted(
-            enumerate(data_loader.batch_sampler.orig_idxs), key=lambda k: k[1])]
-    return results
-
-
 def sort_batch(seqbatch):
     """Sorts torch tensor of integer indices by decreasing order."""
     # 0 is padding_idx
