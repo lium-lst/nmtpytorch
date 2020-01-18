@@ -1,5 +1,15 @@
 ## Release Notes
 
+### v5.0.0 (dd/mm/2020)
+A complete refactoring of the code to allow for enhanced flexibility,
+and easy multi-tasking & multi-modal & multi-lingual setups.
+
+ - Configuration files are now stand-alone `.py` files which enjoy
+   Python's facilities.
+ - Default to `PyTorch` >= 1.3.1, use the new internal TensorBoard API
+ - Implement `Transformer` layers (experimental)
+ - Added `BaseDataset` abstract class for datasets to derive from
+
 This release supports Pytorch >= 0.4.1 including the recent 1.0 release. The relevant
 `setup.py` and `environment.yml` files will default to `1.0.0` installation.
 
