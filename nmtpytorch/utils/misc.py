@@ -1,4 +1,5 @@
 import os
+import stat
 import time
 import random
 import pathlib
@@ -8,10 +9,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from ..logger import Logger
 from ..cleanup import cleanup
-
-log = Logger()
 
 
 LANGUAGES = [
@@ -77,8 +75,7 @@ def get_language(fname):
     """Heuristic to detect the language from filename components."""
     suffix = pathlib.Path(fname).suffix[1:]
     if suffix not in LANGUAGES:
-        log.log(f"Can not detect language from {fname}, fallback to 'en'")
-        suffix = 'en'
+        return None
     return suffix
 
 
@@ -142,7 +139,7 @@ def get_n_params(module):
         readable_size(n_param_all), readable_size(n_param_learnable))
 
 
-def get_temp_file(delete=False, close=False):
+def get_temp_file(delete=False, close=False, executable=False):
     """Creates a temporary file under a folder."""
     root = pathlib.Path(os.environ.get('NMTPY_TMP', '/tmp'))
     if not root.exists():
@@ -154,4 +151,6 @@ def get_temp_file(delete=False, close=False):
     cleanup.register_tmp_file(t.name)
     if close:
         t.close()
+    if executable:
+        os.chmod(t.name, mode=stat.S_IRWXU)
     return t
