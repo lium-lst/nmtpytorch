@@ -3,9 +3,11 @@
 import sys
 import torch
 
-from nmtpytorch.config import Options
+from nmtpytorch.config import Config
 from nmtpytorch.metrics import Evaluator
 from nmtpytorch.utils.misc import load_pt_file
+
+# TODO: This is broken after the new API
 
 if __name__ == '__main__':
     try:
@@ -21,7 +23,7 @@ if __name__ == '__main__':
         print('This is not a .ckpt file with history information.')
         sys.exit(1)
 
-    opts = Options.from_dict(opts)
+    opts = Config.from_dict(opts)
 
     early_metric = opts.train['eval_metrics'].split(',')[0]
 
