@@ -60,10 +60,6 @@ class TextDataset(BaseDataset):
         """Collates a batch into tensor."""
         return pad_sequence(elems)
 
-    def get_batch_tensor(self, idxs):
-        """Prepares the batch for the given integer list of samples `idxs`."""
-        return self.collate([self.__getitem__(idx) for idx in idxs])
-
     def __len__(self):
         """Returns the number of items in the dataset."""
         return self._size
