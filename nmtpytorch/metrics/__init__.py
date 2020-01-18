@@ -7,24 +7,18 @@ from .cer import CERScorer
 from .rouge import ROUGEScorer
 from .coco import COCOMETEORScorer, COCOBLEUScorer, COCOROUGEScorer, COCOCIDERScorer
 
-beam_metrics = ["BLEU", "SACREBLEU", "METEOR",
-                "COCOMETEOR", "COCOCIDER", "COCOBLEU", "COCOROUGE",
-                "WER", "CER", "ROUGE"]
 
 metric_info = {
-    'LOSS': 'min',
-    'WER': 'min',
-    'CER': 'min',
-    'BLEU': 'max',
-    'SACREBLEU': 'max',
-    'COCOBLEU': 'max',
-    'METEOR': 'max',
-    'COCOMETEOR': 'max',
-    'COCOCIDER': 'max',
-    'ROUGE': 'max',
-    'COCOROUGE': 'max',
-    'ACC': 'max',
-    'RECALL': 'max',
-    'PRECISION': 'max',
-    'F1': 'max',
+    # minimized metrics
+    'loss': {'lr_decay_mode': 'min', 'beam_metric': False},
+    'wer': {'lr_decay_mode': 'min', 'beam_metric': True},
+    'cer': {'lr_decay_mode': 'min', 'beam_metric': True},
 }
+
+__maximized_metrics = [
+    "bleu", "sacrebleu", "meteor", "rouge",
+    "cocobleu", "cocometeor", "cococider", "cocorouge",
+]
+
+for metric in __maximized_metrics:
+    metric_info[metric] = {'lr_decay_mode': 'max', 'beam_metric': True}
