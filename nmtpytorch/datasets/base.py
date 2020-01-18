@@ -22,14 +22,14 @@ class BaseDataset(metaclass=ABCMeta):
         """Returns the `idx`'th item of the dataset."""
         pass
 
-    def get_batch_tensor(self, idxs):
-        """Collates by looking up elements of the `idxs` list."""
-        return self.collate([self.__getitem__(idx) for idx in idxs])
-
     @abstractmethod
     def collate(self, elems):
         """Collates a list of elements into a `torch.Tensor`."""
         pass
+
+    def get_batch_tensor(self, idxs):
+        """Collates by looking up elements of the `idxs` list."""
+        return self.collate([self.__getitem__(idx) for idx in idxs])
 
     def __repr__(self):
         public_attrs = [s for s in self.__dict__.keys() if s[0] != '_']
