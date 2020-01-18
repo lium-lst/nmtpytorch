@@ -91,3 +91,25 @@ def read_sentences(fname, vocab, bos=False, eos=True):
             lens.append(len(seq))
 
     return lines, lens
+
+
+def read_tsv_sentences(fname, vocab, bos=False, eos=True):
+    lines, keys, lens = [], [], []
+    with fopen(fname) as f:
+        basename = pathlib.Path(fname).name
+        for idx, line in enumerate(pbar(f, unit='sents', desc=f'Reading {basename}')):
+            line = line.strip()
+
+            # Empty lines will cause a lot of headaches,
+            # get rid of them during preprocessing!
+            assert line, f"Empty line ({idx + 1}) found in {fname}"
+
+            key, sent = line.split('\t', 1)
+
+            # Map and append
+            seq = vocab.sent_to_idxs(sent, explicit_bos=bos, explicit_eos=eos)
+            lines.append(seq)
+            keys.append(key)
+            lens.append(len(seq))
+
+    return lines, lens, keys
