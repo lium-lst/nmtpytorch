@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
 import pathlib
-from .logger import Logger
+
 from collections import OrderedDict
+
+from .logger import Logger
 
 log = Logger()
 
