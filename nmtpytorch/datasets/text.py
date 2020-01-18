@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
-import logging
 from pathlib import Path
 
 import torch
 
-from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 
 from ..utils.data import read_sentences
+from .base import BaseDataset
 
-logger = logging.getLogger('nmtpytorch')
 
-
-class TextDataset(Dataset):
+class TextDataset(BaseDataset):
     r"""A PyTorch dataset for sentences.
 
     Arguments:
@@ -21,41 +17,53 @@ class TextDataset(Dataset):
         vocab (Vocabulary): A ``Vocabulary`` instance for the given corpus.
         bos (bool, optional): If ``True``, a special beginning-of-sentence
             "<bos>" marker will be prepended to sentences.
-    """
+        eos (bool, optional): If ``False``, end-of-sentence marker <eos>
+            will not be appended to sentences.
 
-    def __init__(self, fname, vocab, bos=False, eos=True, **kwargs):
+    """
+    def __init__(self, fname, vocab, bos=False, eos=True):
+        # Public fields will be dumped from __repr__()
         self.path = Path(fname)
         self.vocab = vocab
         self.bos = bos
         self.eos = eos
 
-        # Detect glob patterns
-        self.fnames = sorted(self.path.parent.glob(self.path.name))
-
-        if len(self.fnames) == 0:
-            raise RuntimeError('{} does not exist.'.format(self.path))
-        elif len(self.fnames) > 1:
-            logger.info('Multiple files found, using first: {}'.format(self.fnames[0]))
-
-        # Read the sentences and map them to vocabulary
-        self.data, self.lengths = read_sentences(
-            self.fnames[0], self.vocab, bos=self.bos, eos=self.eos)
+        # Read the dataset into memory
+        self._data, self._lengths, self._keys = self._read()
 
         # Dataset size
-        self.size = len(self.data)
+        self._size = len(self._data)
 
-    @staticmethod
-    def to_torch(batch, **kwargs):
-        return pad_sequence(
-            [torch.tensor(b, dtype=torch.long) for b in batch], batch_first=False)
+    def _read(self):
+        """Reads the sentences and map them to vocabulary."""
+        data, lengths = read_sentences(
+            self.path, self.vocab, bos=self.bos, eos=self.eos)
+
+        # map to torch tensors
+        data = [torch.LongTensor(t) for t in data]
+
+        # keys for indirect mapping are identity for plain text datasets
+        keys = None
+
+        return data, lengths, keys
+
+    @property
+    def lengths(self):
+        """Returns the lengths of each element in the dataset."""
+        return self._lengths
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        """Returns the `idx`'th item where `idx` is a single integer."""
+        return self._data[idx]
+
+    def collate(self, elems):
+        """Collates a batch into tensor."""
+        return pad_sequence(elems)
+
+    def get_batch_tensor(self, idxs):
+        """Prepares the batch for the given integer list of samples `idxs`."""
+        return self.collate([self.__getitem__(idx) for idx in idxs])
 
     def __len__(self):
-        return self.size
-
-    def __repr__(self):
-        s = "{} '{}' ({} sentences)".format(
-            self.__class__.__name__, self.fnames[0].name, self.__len__())
-        return s
+        """Returns the number of items in the dataset."""
+        return self._size
