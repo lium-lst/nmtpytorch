@@ -57,8 +57,11 @@ def get_meteor_jar(ver='1.5'):
     return jar
 
 
-def pbar(iterator, unit='it', **kwargs):
-    return tqdm(iterator, unit=unit, ncols=80, smoothing=0, **kwargs)
+def pbar(iterator, unit='it', task=None, ncols=80, **kwargs):
+    if task:
+        kwargs['desc'] = f'|{task:<30}| '
+        ncols += len(kwargs['desc'])
+    return tqdm(iterator, unit=unit, ncols=ncols, smoothing=0, **kwargs)
 
 
 def load_pt_file(fname, device='cpu'):
