@@ -15,7 +15,7 @@ class DataStore:
     file.
 
     Arguments:
-        opts(Options): An :class:`Options` instance as parsed from the
+        opts(Config): An :class:`Config` instance as parsed from the
             configuration file.
 
     Attributes:
@@ -29,8 +29,8 @@ class DataStore:
     """
     def __init__(self, opts):
         self._cache = {}
-        for section in ['data', 'vocabulary']:
-            setattr(self, section, copy.deepcopy(opts.sections[section]))
+        self.data = copy.deepcopy(opts.sections['data'])
+        self.vocabulary = copy.deepcopy(opts.sections['vocabulary'])
 
         for dset, spec in self.vocabulary.items():
             for key, kwargs in spec.items():
