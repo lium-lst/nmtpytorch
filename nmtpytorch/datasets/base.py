@@ -22,10 +22,9 @@ class BaseDataset(metaclass=ABCMeta):
         """Returns the `idx`'th item of the dataset."""
         pass
 
-    @abstractmethod
     def get_batch_tensor(self, idxs):
         """Collates by looking up elements of the `idxs` list."""
-        pass
+        return self.collate([self.__getitem__(idx) for idx in idxs])
 
     @abstractmethod
     def collate(self, elems):
