@@ -10,7 +10,9 @@ class FilterChain:
     """A sequential filter chain to post-process list of tokens.
 
         Arguments:
-            filters(list): A  list of strings representing filters to apply.
+            filters(list): Alist of strings representing filters to apply.
+                If a string starts with "lambda", it is applied as an
+                anonymous custom function.
 
         Available Filters:
             'de-bpe': Stitches back subword units produced with apply_bpe
@@ -44,10 +46,15 @@ class FilterChain:
     }
 
     def __init__(self, filters):
-        assert not set(filters).difference(set(self.FILTERS.keys())), \
-            "Unknown evaluation filter given."
+        self._funcs = []
         self.filters = filters
-        self._funcs = [self.FILTERS[k] for k in self.filters]
+
+        for filt in filters:
+            if filt.split()[0] == 'lambda':
+                self._funcs.append(eval(filt))
+            else:
+                assert filt in self.FILTERS.keys(), f"Unknown filter {filt!r}"
+                self._funcs.append(self.FILTERS[filt])
 
     def _apply(self, list_of_strs):
         """Applies filters consecutively on a list of sentences."""
