@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse
 import pickle as pkl
-from pathlib import Path
 
 import numpy as np
 import torch
