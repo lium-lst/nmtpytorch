@@ -38,7 +38,7 @@ class Logger:
 
     def log_prefix(cls, msg, prefix):
         """Plain logging with prefix string."""
-        cls._logger.info(f'{prefix} {msg}')
+        cls._logger.info(f'|{prefix:<30}| {msg}')
 
     def log_header(cls, msg):
         """Adds a fancy header before and after the message."""
