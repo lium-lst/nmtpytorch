@@ -27,7 +27,7 @@ class DataStore:
             instances.
 
     """
-    def __init__(self, opts):
+    def __init__(self, opts, load_splits=('train', 'val')):
         self._cache = {}
         self.data = copy.deepcopy(opts.sections['data'])
         self.vocabulary = copy.deepcopy(opts.sections['vocabulary'])
@@ -38,6 +38,9 @@ class DataStore:
 
         for name, spec in self.data.items():
             for split, dsets in spec.items():
+                if split not in load_splits:
+                    continue
+
                 for key, kwargs in dsets.items():
                     ds_hash = str(kwargs)
                     if ds_hash not in self._cache:
