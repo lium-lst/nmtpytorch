@@ -1,13 +1,21 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 import os
 import sys
 import argparse
+import subprocess
 
 # These imports should not call Logger() or the log file will not be
 # recorded
-from nmtpytorch.configv2 import Options
+from nmtpytorch.config import Config
 from nmtpytorch.utils.device import DeviceManager
+from nmtpytorch.utils.misc import get_temp_file
+
+
+def prepare(bash_script):
+    tmp_file = get_temp_file(close=True, executable=True)
+    with open(tmp_file.name, 'w') as f:
+        f.write(bash_script)
+    subprocess.check_output(tmp_file.name, universal_newlines=True)
 
 
 def setup_experiment(opts, suffix=None, short=False):
@@ -34,7 +42,7 @@ def setup_experiment(opts, suffix=None, short=False):
     run_id = hashlib.sha256(run_id.encode('ascii')).hexdigest()[:5]
 
     # Finalize
-    model_type = opts.train['model']['type'].lower()
+    model_type = opts.train['model_type'].lower()
     opts.train['exp_id'] = f'{model_type}-r{run_id}'
 
 
@@ -142,7 +150,7 @@ if __name__ == '__main__':
     if args.cmd == 'train':
 
         # Parse configuration file and merge with the rest
-        opts = Options(args.config, args.overrides)
+        opts = Config(args.config, args.overrides)
 
         # Setup experiment folders
         setup_experiment(opts, args.suffix)
@@ -169,13 +177,20 @@ if __name__ == '__main__':
             tester()
         sys.exit(0)
 
+    ############################################################
+    # Check if the configuration includes a preprocessing script
+    ############################################################
+    if opts.prepare_script:
+        log.log_header('Preparation script found! Running it')
+        prepare(opts.prepare_script)
+
     #################################
     # Training / Resuming entry point
     #################################
     import torch
     import platform
     import nmtpytorch
-    from nmtpytorch import modelsv2 as models
+    from nmtpytorch import models
     from nmtpytorch.mainloop import MainLoop
 
     # If given, seed that; if not generate a random seed and print it
@@ -189,7 +204,7 @@ if __name__ == '__main__':
     log.log(opts)
 
     # Instantiate the model object
-    model = getattr(models, opts.train['model']['type'])(opts=opts)
+    model = getattr(models, opts.train['model_type'])(opts=opts)
 
     log.log_header('Software details')
     log.log("Python {} -- torch {} with CUDA {} (on machine '{}')".format(
