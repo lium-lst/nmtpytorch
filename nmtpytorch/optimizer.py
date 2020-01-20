@@ -117,8 +117,7 @@ class Optimizer:
             self.scheduler.step(metric)
             if self.get_lr() != self.cur_lr:
                 self.cur_lr = self.get_lr()
-                log.log('** Learning rate changed -> {}'.format(self.cur_lr))
-                # Signal it back
+                log.log_prefix(f'Learning rate changed -> {self.cur_lr}', '[Optimizer] ')
                 return True
         return False
 
@@ -139,7 +138,6 @@ class Optimizer:
             repr_ += ', momentum: {}, nesterov: {}'.format(
                 self.momentum, self.nesterov)
         if self.lr_decay:
-            repr_ += ', lr_decay: (patience={}, factor={})'.format(
-                self.lr_decay_patience, self.lr_decay_factor)
+            repr_ += f', lr_decay: (mode={self.lr_decay_mode}, patience={self.lr_decay_patience}, factor={self.lr_decay_factor})'
         repr_ += ')'
         return repr_
