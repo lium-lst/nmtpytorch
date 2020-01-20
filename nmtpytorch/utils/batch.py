@@ -1,3 +1,5 @@
+from .task import Task
+
 class Batch:
     r"""A custom batch object used through data representation.
 
@@ -5,6 +7,8 @@ class Batch:
         data(dict): A dictionary with keys representing the data sources
             as defined by the configuration file and values being the
             already collated `torch.Tensor` objects for a given batch.
+
+        task(str): The task name associated with the batch.
 
         device(`torch.device`, optional): If given, the batch will be moved
             to the device right after instance creation.
@@ -22,11 +26,13 @@ class Batch:
         is accessible through the `.size` attribute.
 
     """
-    def __init__(self, data, device=None, non_blocking=False):
+    def __init__(self, data, task, device=None, non_blocking=False):
         if device:
             self.data = {k: v.to(device, non_blocking=non_blocking) for k, v in data.items()}
         else:
             self.data = data
+
+        self.task = Task(task)
 
         dim1s = set([x.size(1) for x in data.values()])
         assert len(dim1s) == 1, \
@@ -40,7 +46,7 @@ class Batch:
         self.data.update({k: v.to(device, non_blocking=non_blocking) for k, v in self.data.items()})
 
     def __repr__(self):
-        s = f"Batch(size={self.size})\n"
+        s = f"Batch(size={self.size}, task={self.task})\n"
         for key, value in self.data.items():
             s += f"  {key:10s} -> {value.shape} - {value.device}\n"
         return s[:-1]
