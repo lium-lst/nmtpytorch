@@ -7,6 +7,7 @@ from .utils.io import FileRotator
 from .utils.filterchain import FilterChain
 from .utils.misc import get_language
 from .utils.ml_metrics import Loss
+from .utils.exceptions import EarlyStoppedError
 from .metrics import metric_info
 from . import metrics as available_metrics
 from .logger import Logger
@@ -104,7 +105,6 @@ class TaskMonitor:
         self.epoch_losses = []
         self.batch_timings = []
         self._tboard = None
-        self._iterators = {}
 
         # metric to be used for early-stopping (single metric)
         self.early_metric = early_metric
@@ -127,8 +127,6 @@ class TaskMonitor:
 
         self.do_compute_val_loss = 'loss' in self.all_metrics
 
-        self.lr_decay_mode = metric_info[self.early_metric]['lr_decay_mode']
-
         if self.beam_metrics:
             self.do_score_hypotheses = True
             # Create an evaluator for beam search results
@@ -149,17 +147,6 @@ class TaskMonitor:
     def register_tensorboard(self, handle):
         """Registers the tensorboard handle for further usage from monitor."""
         self._tboard = handle
-
-    def load_validation_iterators(self):
-        if self.do_compute_val_loss:
-            ds = self.model.load_data(self.task_name, 'val', 'eval')
-            log.log(ds)
-            self._iterators['eval'] = ds
-
-        if self.do_score_hypotheses:
-            ds = self.model.load_data(self.task_name, 'val', 'beam')
-            log.log(ds)
-            self._iterators['beam'] = ds
 
     @property
     def uctr(self):
@@ -228,15 +215,16 @@ class TaskMonitor:
 
         if self.do_compute_val_loss:
             log.log_prefix(f'Computing validation loss', self.task_name)
-            results.extend(
-                self.model.test_performance(self._iterators['eval'], self.task_name))
+            dataset = self.model.iterators[self.task_name]['val.loss']
+            results.extend(self.model.test_performance(dataset, self.task_name))
 
         if self.do_score_hypotheses:
             log.log_prefix('Performing beam search', self.task_name)
+            dataset = self.model.iterators[self.task_name]['val.beam']
 
             hyps = self.model.beam_search(
-                [self.model], self._iterators['beam'], task=self.task_name,
-                beam_size=self.beam_size, max_len=self.beam_max_len)
+                [self.model], dataset, beam_size=self.beam_size,
+                max_len=self.beam_max_len)
 
             # Compute metrics and update results
             results.extend(self.evaluator.score(hyps))
@@ -262,18 +250,23 @@ class TaskMonitor:
 
         # Check early-stop criteria and save snapshots if any
         self.save_models()
-
-        # Dump summary and switch back to training mode
-        for name, (vctr, score) in self.cur_bests.items():
-            log.log_prefix(
-                f'Best {name.upper()} so far: {score.score:.2f} @ validation {vctr}', self.task_name)
+        self.dump_scores()
 
         self.model.train(True)
         torch.set_grad_enabled(True)
 
+        if self._early_bad == self.patience:
+            raise EarlyStoppedError()
+
     def state_dict(self):
         """Returns a dictionary of stateful variables."""
         return {k: getattr(self, k) for k in self.VARS}
+
+    def dump_scores(self):
+        # Dump summary and switch back to training mode
+        for name, (vctr, score) in self.cur_bests.items():
+            log.log_prefix(
+                f'Best {name.upper()} so far: {score.score:.2f} @ validation {vctr}', self.task_name)
 
     def epoch_summary(self):
         """Prints statistics about the finished epoch."""
@@ -363,9 +356,6 @@ class TaskMonitor:
         else:
             # Increment counter
             self._early_bad += 1
-
-        rem_patience = self.patience - self._early_bad
-        log.log_prefix(f'Early stopping patience: {rem_patience}', self.task_name)
 
     def reload_previous_best(self):
         raise NotImplementedError()
