@@ -103,7 +103,7 @@ class TextEncoder(nn.Module):
             output_layers.append(nn.Dropout(p=self.dropout_ctx))
         self.output = nn.Sequential(*output_layers)
 
-    def forward(self, x, **kwargs):
+    def forward(self, x):
         # Non-homogeneous batches possible
         # sort the batch by decreasing length of sequences
         # oidxs: to recover original order
