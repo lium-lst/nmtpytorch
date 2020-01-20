@@ -7,19 +7,19 @@ from torch import nn
 import torch.nn.functional as F
 
 from ...utils.nn import get_rnn_hidden_state, get_activation_fn
+from ..utils.vocabulary import Vocabulary
 from .. import FF
 from ..attention import get_attention
 
 
 class ConditionalDecoder(nn.Module):
     """A conditional decoder with attention à la dl4mt-tutorial."""
-    def __init__(self, input_size, hidden_size, ctx_size_dict, ctx_name, n_vocab,
+    def __init__(self, input_size, hidden_size, enc_sizes, input_name, vocab_fname,
                  rnn_type, tied_emb=False, dec_init='zero', dec_init_activ='tanh',
                  dec_init_size=None, att_type='mlp',
                  att_activ='tanh', att_bottleneck='ctx', att_temp=1.0,
                  att_ctx2hid=True,
-                 transform_ctx=True, mlp_bias=False, dropout_out=0,
-                 emb_maxnorm=None, emb_gradscale=False, sched_sample=0,
+                 transform_ctx=True, mlp_bias=False, dropout_out=0, sched_sample=0,
                  bos_type='emb', bos_dim=None, bos_activ=None, bos_bias=False,
                  out_logic='simple', emb_interact=None, emb_interact_dim=None,
                  emb_interact_activ=None, dec_inp_activ=None):
@@ -57,9 +57,10 @@ class ConditionalDecoder(nn.Module):
         # Other arguments
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.ctx_size_dict = ctx_size_dict
-        self.ctx_name = ctx_name
-        self.n_vocab = n_vocab
+        self.enc_sizes = enc_sizes
+        self.input_name = input_name
+        self.vocab = Vocabulary(vocab_fname)
+        self.n_vocab = len(self.vocab)
         self.tied_emb = tied_emb
         self.dec_init = dec_init
         self.dec_init_size = dec_init_size
@@ -72,8 +73,6 @@ class ConditionalDecoder(nn.Module):
         self.att_ctx2hid = att_ctx2hid
         self.mlp_bias = mlp_bias
         self.dropout_out = dropout_out
-        self.emb_maxnorm = emb_maxnorm
-        self.emb_gradscale = emb_gradscale
         self.sched_sample = sched_sample
         self.bos_type = bos_type
         self.bos_dim = bos_dim
@@ -106,15 +105,13 @@ class ConditionalDecoder(nn.Module):
                              activ=self.bos_activ)
 
         # Create target embeddings
-        self.emb = nn.Embedding(self.n_vocab, self.input_size,
-                                padding_idx=0, max_norm=self.emb_maxnorm,
-                                scale_grad_by_freq=self.emb_gradscale)
+        self.emb = nn.Embedding(self.n_vocab, self.input_size, padding_idx=0)
 
         if self.att_type:
             # Create attention layer
             Attention = get_attention(self.att_type)
             self.att = Attention(
-                self.ctx_size_dict[self.ctx_name],
+                self.enc_sizes[self.input_name],
                 self.hidden_size,
                 transform_ctx=self.transform_ctx,
                 ctx2hid=self.att_ctx2hid,
@@ -127,7 +124,7 @@ class ConditionalDecoder(nn.Module):
             # For source-based inits, input size is the encoding size
             # For 'feats', it's given by dec_init_size, no need to infer
             if self.dec_init.endswith('_ctx'):
-                self.dec_init_size = self.ctx_size_dict[self.ctx_name]
+                self.dec_init_size = self.enc_sizes[self.input_name]
             # Add a FF layer for decoder initialization
             self.ff_dec_init = FF(
                 self.dec_init_size,
@@ -177,34 +174,34 @@ class ConditionalDecoder(nn.Module):
         """Unpack LSTM hidden and cell state to tuple."""
         return torch.split(h, self.hidden_size, dim=-1)
 
-    def _rnn_init_zero(self, ctx_dict):
+    def _rnn_init_zero(self, enc_dict):
         """Zero initialization."""
-        ctx, _ = ctx_dict[self.ctx_name]
+        ctx, _ = enc_dict[self.input_name]
         return torch.zeros(
             ctx.shape[1], self.hidden_size * self.n_states, device=ctx.device)
 
-    def _rnn_init_mean_ctx(self, ctx_dict):
+    def _rnn_init_mean_ctx(self, enc_dict):
         """Initialization with mean-pooled source annotations."""
-        ctx, ctx_mask = ctx_dict[self.ctx_name]
+        ctx, ctx_mask = enc_dict[self.input_name]
         return self.ff_dec_init(
             ctx.sum(0).div(ctx_mask.unsqueeze(-1).sum(0))
             if ctx_mask is not None else ctx.mean(0))
 
-    def _rnn_init_sum_ctx(self, ctx_dict):
+    def _rnn_init_sum_ctx(self, enc_dict):
         """Initialization with sum-pooled source annotations."""
-        ctx, ctx_mask = ctx_dict[self.ctx_name]
+        ctx, ctx_mask = enc_dict[self.input_name]
         assert ctx_mask is None
         return self.ff_dec_init(ctx.sum(0))
 
-    def _rnn_init_max_ctx(self, ctx_dict):
+    def _rnn_init_max_ctx(self, enc_dict):
         """Initialization with max-pooled source annotations."""
-        ctx, ctx_mask = ctx_dict[self.ctx_name]
+        ctx, ctx_mask = enc_dict[self.input_name]
         # Max-pooling may not care about mask (depends on non-linearity maybe)
         return self.ff_dec_init(ctx.max(0)[0])
 
-    def _rnn_init_last_ctx(self, ctx_dict):
+    def _rnn_init_last_ctx(self, enc_dict):
         """Initialization with the last source annotation."""
-        ctx, ctx_mask = ctx_dict[self.ctx_name]
+        ctx, ctx_mask = enc_dict[self.input_name]
         if ctx_mask is None:
             h_0 = self.ff_dec_init(ctx[-1])
         else:
@@ -212,9 +209,9 @@ class ConditionalDecoder(nn.Module):
             h_0 = self.ff_dec_init(ctx[last_idxs, range(ctx.shape[1])])
         return h_0
 
-    def _rnn_init_feats(self, ctx_dict):
+    def _rnn_init_feats(self, enc_dict):
         """Feature based decoder initialization."""
-        return self.ff_dec_init(ctx_dict['feats'][0].squeeze(0))
+        return self.ff_dec_init(enc_dict['feats'][0].squeeze(0))
 
     def get_emb(self, idxs, tstep=-1):
         """Returns time-step based embeddings."""
@@ -228,26 +225,26 @@ class ConditionalDecoder(nn.Module):
                 return self.bos
         # For other timesteps, look up the embedding layer
         if self.emb_interact and idxs.ndimension() == 1:
-                # beam search
-                embs = self.emb(idxs)
-                return self.emb_fn(
-                    embs.view((self.v_emb.shape[0], -1, self.v_emb.shape[1])),
-                    self.v_emb.unsqueeze(1)).view(embs.shape)
+            # beam search
+            embs = self.emb(idxs)
+            return self.emb_fn(
+                embs.view((self.v_emb.shape[0], -1, self.v_emb.shape[1])),
+                self.v_emb.unsqueeze(1)).view(embs.shape)
         else:
             return self.emb_fn(self.emb(idxs), self.v_emb)
 
-    def f_init(self, ctx_dict):
+    def f_init(self, enc_dict):
         """Returns the initial h_0 for the decoder."""
         self.history = defaultdict(list)
         # Compute <bos> out of 'feats' if requested
         if self.bos_type == 'feats':
-            self.bos = self.ff_bos(ctx_dict['feats'][0]).squeeze(0)
+            self.bos = self.ff_bos(enc_dict['feats'][0]).squeeze(0)
         if self.emb_interact:
             # We have features for embedding interaction
-            self.v_emb = self.ff_feats(ctx_dict['feats'][0]).squeeze(0)
-        return self._init_func(ctx_dict)
+            self.v_emb = self.ff_feats(enc_dict['feats'][0]).squeeze(0)
+        return self._init_func(enc_dict)
 
-    def f_next(self, ctx_dict, y, h):
+    def f_next(self, enc_dict, y, h):
         """Applies one timestep of recurrence."""
         # Get hidden states from the first decoder (purely cond. on LM)
         h1_c1 = self.dec0(y, self._rnn_unpack_states(h))
@@ -255,7 +252,7 @@ class ConditionalDecoder(nn.Module):
 
         # Apply attention
         txt_alpha_t, txt_z_t = self.att(
-            h1.unsqueeze(0), *ctx_dict[self.ctx_name])
+            h1.unsqueeze(0), *enc_dict[self.input_name])
 
         if not self.training:
             self.history['alpha_txt'].append(txt_alpha_t)
@@ -280,13 +277,13 @@ class ConditionalDecoder(nn.Module):
         # Return log probs and new hidden states
         return log_p, self._rnn_pack_states(h2_c2)
 
-    def forward(self, ctx_dict, y):
-        """Computes the softmax outputs given source annotations `ctx_dict[self.ctx_name]`
+    def forward(self, enc_dict, y):
+        """Computes the softmax outputs given source annotations `enc_dict[self.input_name]`
         and ground-truth target token indices `y`. Only called during training.
 
         Arguments:
-            ctx_dict(dict): A dictionary of tensors that should at least contain
-                the key `ctx_name` as the main source representation of shape
+            enc_dict(dict): A dictionary of tensors that should at least contain
+                the key `input_name` as the main source representation of shape
                 S*B*ctx_dim`.
             y(Tensor): A tensor of `T*B` containing ground-truth target
                 token indices for the given batch.
@@ -295,7 +292,7 @@ class ConditionalDecoder(nn.Module):
         loss = 0.0
 
         # Get initial hidden state
-        h = self.f_init(ctx_dict)
+        h = self.f_init(enc_dict)
 
         # are we doing scheduled sampling?
         sched = self.training and (random.random() > (1 - self.sched_sample))
@@ -303,13 +300,13 @@ class ConditionalDecoder(nn.Module):
         # Convert token indices to embeddings -> T*B*E
         # Skip <bos> now
         bos = self.get_emb(y[0], 0)
-        log_p, h = self.f_next(ctx_dict, bos, h)
+        log_p, h = self.f_next(enc_dict, bos, h)
         loss += self.nll_loss(log_p, y[1])
         y_emb = self.get_emb(y[1:])
 
         for t in range(y_emb.shape[0] - 1):
             emb = self.emb(log_p.argmax(1)) if sched else y_emb[t]
-            log_p, h = self.f_next(ctx_dict, emb, h)
+            log_p, h = self.f_next(enc_dict, emb, h)
             loss += self.nll_loss(log_p, y[t + 2])
 
         return {'loss': loss}
