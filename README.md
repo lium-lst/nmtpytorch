@@ -9,8 +9,7 @@ speech recognition systems. The initial codebase was in `Theano` and was
 inspired from the famous [dl4mt-tutorial](https://github.com/nyu-dl/dl4mt-tutorial)
 codebase.
 
-`nmtpytorch` is mainly developed by the **Language and Speech Team** of **Le Mans University** but
-received valuable contributions from the [Grounded Sequence-to-sequence Transduction Team](https://github.com/srvk/jsalt-2018-grounded-s2s)
+`nmtpytorch` received valuable contributions from the [Grounded Sequence-to-sequence Transduction Team](https://github.com/srvk/jsalt-2018-grounded-s2s)
 of *Frederick Jelinek Memorial Summer Workshop 2018*:
 
 Loic Barrault, Ozan Caglayan, Amanda Duarte, Desmond Elliott, Spandana Gella, Nils Holzenberger,
