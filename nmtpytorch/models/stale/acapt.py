@@ -79,7 +79,7 @@ class AttentiveCaptioning(NMT):
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, name=name)
+            self.vocabs[name] = Vocabulary(fname)
 
         # Inherently non multi-lingual aware
         tlangs = self.topology.get_trg_langs()

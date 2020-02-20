@@ -86,8 +86,7 @@ class NMT(nn.Module):
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(
-                fname, name=name, short_list=self.opts.model['short_list'])
+            self.vocabs[name] = Vocabulary(fname, short_list=self.opts.model['short_list'])
 
         # Inherently non multi-lingual aware
         slangs = self.topology.get_src_langs()

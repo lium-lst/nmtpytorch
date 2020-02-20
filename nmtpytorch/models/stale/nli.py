@@ -67,7 +67,7 @@ class NLI(NMT):
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, name=name)
+            self.vocabs[name] = Vocabulary(fname)
 
     def __repr__(self):
         s = super().__repr__() + '\n'

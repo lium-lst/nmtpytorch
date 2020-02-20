@@ -86,7 +86,7 @@ class ASR(NMT):
 
         # Load vocabularies here
         for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, name=name)
+            self.vocabs[name] = Vocabulary(fname)
 
         # Inherently non multi-lingual aware
         self.src = self.topology.first_src
