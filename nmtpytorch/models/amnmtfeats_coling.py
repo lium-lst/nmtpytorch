@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
-import math
 import logging
 
-import torch
 from torch import nn
 
 from ..datasets import MultimodalDataset
@@ -116,7 +113,6 @@ class AttentiveMNMTFeaturesColing(NMT):
 
         # Get source language encodings (S*B*C)
         text_encoding = self.enc(batch[self.sl])
-
 
         return {
             str(self.sl): text_encoding,
