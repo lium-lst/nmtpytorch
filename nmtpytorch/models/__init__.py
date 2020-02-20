@@ -5,8 +5,7 @@ from .tfnmt import TransformerNMT
 from .mnmt import MultimodalNMT
 
 # Spatial features + NMT
-from .amnmtfeats import AttentiveMNMTFeatures
-from .amnmtfeats_coling import AttentiveMNMTFeaturesColing
+from .attentive_mmt import AttentiveMMT
 
 # Speech models
 from .asr import ASR

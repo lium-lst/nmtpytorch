@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 import logging
 
-import torch
+from torch import nn
 
 from ..datasets import MultimodalDataset
-from ..layers import ConditionalMMDecoder, TextEncoder
+from ..layers import ConditionalMMDecoder, TextEncoder, FF
 from .nmt import NMT
 
 logger = logging.getLogger('nmtpytorch')
 
 
-class AttentiveMNMTFeatures(NMT):
+class AttentiveMMT(NMT):
     """An end-to-end sequence-to-sequence NMT model with visual attention over
     pre-extracted convolutional features.
     """
@@ -19,27 +19,37 @@ class AttentiveMNMTFeatures(NMT):
         super().set_defaults()
         self.defaults.update({
             'fusion_type': 'concat',    # Multimodal context fusion (sum|mul|concat)
-            'fusion_activ': None,       # Multimodal context non-linearity
+            'fusion_activ': 'tanh',     # Multimodal context non-linearity
+            'vis_activ': 'linear',      # Visual feature transformation activ.
             'n_channels': 2048,         # depends on the features used
-            'alpha_c': 0.0,             # doubly stoch. attention
             'mm_att_type': 'md-dd',     # multimodal attention type
                                         # md: modality dep.
                                         # mi: modality indep.
                                         # dd: decoder state dep.
                                         # di: decoder state indep.
-            'out_logic': 'simple',      # simple vs deep output
+            'out_logic': 'deep',        # simple vs deep output
             'persistent_dump': False,   # To save activations during beam-search
-            'img_sequence': False,      # if true img is sequence of img features,
-                                        # otherwise it's a conv map
+            'preatt': False,            # Apply filtered attention
+            'preatt_activ': 'ReLU',     # Activation for convatt block
+            'dropout_img': 0.0,         # Dropout on image features
         })
 
     def __init__(self, opts):
         super().__init__(opts)
-        if self.opts.model['alpha_c'] > 0:
-            self.aux_loss['alpha_reg'] = 0.0
 
     def setup(self, is_train=True):
-        self.ctx_sizes['image'] = self.opts.model['n_channels']
+        # Textual context dim
+        txt_ctx_size = self.ctx_sizes[self.sl]
+
+        # Add visual context transformation (sect. 3.2 in paper)
+        self.ff_img = FF(
+            self.opts.model['n_channels'], txt_ctx_size,
+            activ=self.opts.model['vis_activ'])
+
+        self.dropout_img = nn.Dropout(self.opts.model['dropout_img'])
+
+        # Add vis ctx size
+        self.ctx_sizes['image'] = txt_ctx_size
 
         ########################
         # Create Textual Encoder
@@ -73,7 +83,7 @@ class AttentiveMNMTFeatures(NMT):
             out_logic=self.opts.model['out_logic'],
             att_activ=self.opts.model['att_activ'],
             transform_ctx=self.opts.model['att_transform_ctx'],
-            att_ctx2hid=self.opts.model['att_ctx2hid'],
+            att_ctx2hid=False,
             mlp_bias=self.opts.model['att_mlp_bias'],
             att_bottleneck=self.opts.model['att_bottleneck'],
             dropout_out=self.opts.model['dropout_out'],
@@ -98,26 +108,13 @@ class AttentiveMNMTFeatures(NMT):
         return dataset
 
     def encode(self, batch, **kwargs):
-        # Let's start with a None mask by assuming that
-        # we have a fixed-length feature collection
-        feats, feats_mask = batch['image'], None
+        # Transform the features to context dim
+        feats = self.dropout_img(self.ff_img(batch['image']))
 
-        if self.opts.model['img_sequence']:
-            # Let's create mask in this case
-            feats_mask = feats.ne(0).float().sum(2).ne(0).float()
+        # Get source language encodings (S*B*C)
+        text_encoding = self.enc(batch[self.sl])
 
         return {
-            'image': (feats, feats_mask),
-            str(self.sl): self.enc(batch[self.sl]),
+            str(self.sl): text_encoding,
+            'image': (feats, None),
         }
-
-    def forward(self, batch, **kwargs):
-        result = super().forward(batch)
-
-        if self.training and self.opts.model['alpha_c'] > 0:
-            alpha_loss = (
-                1 - torch.cat(self.dec.history['alpha_img']).sum(0)).pow(2).sum(0)
-            self.aux_loss['alpha_reg'] = alpha_loss.mean().mul(
-                self.opts.model['alpha_c'])
-
-        return result
