@@ -9,7 +9,7 @@ from ..layers import ConditionalDecoder
 logger = logging.getLogger('nmtpytorch')
 
 
-class MultimodalNMT(NMT):
+class SimpleMMT(NMT):
     """A encoder/decoder enriched multimodal NMT.
 
         Integration types (feat_fusion argument)
