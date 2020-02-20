@@ -5,7 +5,7 @@ from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSamp
 
 from . import get_dataset
 from .collate import get_collate
-from ..samplers import BucketBatchSampler, ApproximateBucketBatchSampler
+from ..samplers import get_sampler
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -49,10 +49,13 @@ class MultimodalDataset(Dataset):
         # This is only useful for training
         self.bucket_order = bucket_order if self.mode == 'train' else None
 
+        # Collect dataset sizes
+        self.size_dict = {}
+
         # For old models to work, set it to the first source
         if self.bucket_by is None:
             logger.info(
-                'WARNING: Bucketing sampler disabled. It is up to the model '
+                'WARNING: Bucketing disabled. It is up to the model '
                 'to take care of packing/padding/masking if any.')
 
         for key, ds in self.topology.all.items():
@@ -71,13 +74,13 @@ class MultimodalDataset(Dataset):
             self.datasets[ds] = dataset_constructor(
                 fname=data[key],
                 vocab=vocabs.get(key, None), bos=ds.trg, **kwargs)
-
-        # Detect dataset sizes
-        sizes = set([len(dataset) for dataset in self.datasets.values()])
-        assert len(sizes) == 1, "Non-parallel datasets are not supported."
+            self.size_dict[ds] = len(self.datasets[ds])
 
         # Set dataset size
-        self.size = list(sizes)[0]
+        if len(set(self.size_dict.values())) > 1:
+            raise RuntimeError("Underlying datasets are not parallel!")
+        else:
+            self.size = list(self.size_dict.values())[0]
 
         # Set list of available datasets
         self.keys = list(self.datasets.keys())
@@ -85,13 +88,9 @@ class MultimodalDataset(Dataset):
         # Get collator
         self.collate_fn = get_collate(self.keys)
 
-        if self.bucket_by is not None and self.bucket_by in self.datasets:
-            if self.sampler_type == 'approximate':
-                gen_sampler = ApproximateBucketBatchSampler
-            elif self.sampler_type == 'bucket':
-                gen_sampler = BucketBatchSampler
+        if self.bucket_by in self.datasets:
             self.sort_lens = self.datasets[self.bucket_by].lengths
-            self.sampler = gen_sampler(
+            self.sampler = get_sampler(self.sampler_type)(
                 batch_size=self.batch_size,
                 sort_lens=self.sort_lens,
                 max_len=self.max_len,
