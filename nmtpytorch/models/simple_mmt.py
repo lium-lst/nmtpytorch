@@ -3,6 +3,7 @@ import torch
 import logging
 
 from .nmt import NMT
+from ..datasets import MultimodalDataset
 from ..layers import MultimodalTextEncoder
 from ..layers import ConditionalDecoder
 
@@ -106,6 +107,18 @@ class SimpleMMT(NMT):
         # Use the same representation everywhere
         if self.opts.model['feat_fusion'] == 'encdecinit':
             self.enc.ff_vis.weight = self.dec.ff_dec_init.weight
+
+    def load_data(self, split, batch_size, mode='train'):
+        """Loads the requested dataset split."""
+        dataset = MultimodalDataset(
+            data=self.opts.data[split + '_set'],
+            mode=mode, batch_size=batch_size,
+            vocabs=self.vocabs, topology=self.topology,
+            bucket_by=self.opts.model['bucket_by'],
+            max_len=self.opts.model.get('max_len', None),
+            order_file=self.opts.data[split + '_set'].get('ord', None))
+        logger.info(dataset)
+        return dataset
 
     def encode(self, batch, **kwargs):
         d = {str(self.sl): self.enc(batch[self.sl], v=batch.get('feats', None))}
