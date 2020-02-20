@@ -38,6 +38,10 @@ If you use **nmtpytorch**, you may want to cite the following [paper](https://uf
 
 ## Installation
 
+You may want to install NVIDIA's [Apex](https://github.com/NVIDIA/apex)
+extensions. As of February 2020, we only monkey-patched `nn.LayerNorm`
+with Apex' one if the library is installed and found.
+
 ### pip
 
 You can install `nmtpytorch` from `PyPI` using `pip` (or `pip3` depending on your
