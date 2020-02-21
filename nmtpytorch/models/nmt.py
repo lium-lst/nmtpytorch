@@ -30,6 +30,7 @@ class NMT(nn.Module):
             'enc_dim': 256,             # Encoder hidden size
             'enc_type': 'gru',          # Encoder type (gru|lstm)
             'enc_lnorm': False,         # Add layer-normalization to encoder output
+            'enc_bidirectional': True,  # Whether the RNN encoder should be bidirectional
             'n_encoders': 1,            # Number of stacked encoders
             'dec_dim': 256,             # Decoder hidden size
             'dec_type': 'gru',          # Decoder type (gru|lstm)
@@ -103,11 +104,6 @@ class NMT(nn.Module):
             # NOTE: This should come from config or elsewhere
             self.val_refs = self.opts.data['val_set'][self.tl]
 
-        # Textual context size is always equal to enc_dim * 2 since
-        # it is the concatenation of forward and backward hidden states
-        if 'enc_dim' in self.opts.model:
-            self.ctx_sizes = {str(self.sl): self.opts.model['enc_dim'] * 2}
-
         # Check vocabulary sizes for 3way tying
         if self.opts.model.get('tied_emb', False) not in [False, '2way', '3way']:
             raise RuntimeError(
@@ -153,6 +149,7 @@ class NMT(nn.Module):
             input_size=self.opts.model['emb_dim'],
             hidden_size=self.opts.model['enc_dim'],
             n_vocab=self.n_src_vocab,
+            bidirectional=self.opts.model['enc_bidirectional'],
             rnn_type=self.opts.model['enc_type'],
             dropout_emb=self.opts.model['dropout_emb'],
             dropout_ctx=self.opts.model['dropout_ctx'],
@@ -161,6 +158,8 @@ class NMT(nn.Module):
             emb_maxnorm=self.opts.model['emb_maxnorm'],
             emb_gradscale=self.opts.model['emb_gradscale'],
             layer_norm=self.opts.model['enc_lnorm'])
+
+        self.ctx_sizes = {str(self.sl): self.enc.ctx_size}
 
         ################
         # Create Decoder
