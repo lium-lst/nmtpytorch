@@ -105,7 +105,8 @@ class Translator:
             logger.info('You can only give one split name when -S is provided.')
             sys.exit(1)
 
-        eval_filters = set([i.opts.train['eval_filters'] for i in self.instances])
+        eval_filters = set(
+            [','.join(i.opts.train['eval_filters']) for i in self.instances])
         assert len(eval_filters) < 2, "eval_filters differ between instances."
 
         if len(self.instances) > 1:
