@@ -2,17 +2,79 @@
 import json
 import pathlib
 import logging
+import numpy as np
+
 from collections import OrderedDict
 
 logger = logging.getLogger('nmtpytorch')
+
+def freqs_to_dict(token_freqs, min_freq=0, max_items=0, exclude_symbols=False):
+    # Get list of tokens
+    tokens = list(token_freqs.keys())
+
+    # Collect their frequencies in a numpy array
+    freqs = np.array(list(token_freqs.values()))
+
+    tokendict = OrderedDict()
+    if not exclude_symbols:
+        for key, value in Vocabulary.TOKENS.items():
+            # Second value is the count information
+            tokendict[key] = "{} 0".format(value)
+
+    # Sort in descending order of frequency
+    sorted_idx = np.argsort(freqs)
+    if min_freq > 0:
+        sorted_tokens = [(tokens[ii], freqs[ii]) for ii in sorted_idx[::-1]
+                         if freqs[ii] >= min_freq]
+    else:
+        sorted_tokens = [(tokens[ii], freqs[ii]) for ii in sorted_idx[::-1]]
+
+    if max_items > 0:
+        sorted_tokens = sorted_tokens[:max_items]
+
+    # Start inserting from index offset
+    offset = len(tokendict)
+    for iidx, (token, freq) in enumerate(sorted_tokens):
+        tokendict[token] = '{} {}'.format(iidx + offset, int(freq))
+
+    return tokendict
+
+
+def get_freqs(content):
+    # We'll first count frequencies in content (a list of strings)
+    token_freqs = OrderedDict()
+
+    for line in content:
+        line = line.strip()
+        if line:
+            # Collect frequencies
+            for word in line.split():
+                if word not in token_freqs:
+                    token_freqs[word] = 0
+                token_freqs[word] += 1
+
+    # Remove already available special tokens
+    for key in Vocabulary.TOKENS:
+        if key in token_freqs:
+            print('Removing ', key)
+            del token_freqs[key]
+
+    return token_freqs
+
+
+def write_dict(fname, vocab):
+    print("Dumping vocabulary (%d tokens) to %s..." % (len(vocab), fname))
+    with open(fname, 'w') as fhandle:
+        json.dump(vocab, fhandle, ensure_ascii=False, indent=2)
 
 
 class Vocabulary:
     r"""Vocabulary class for integer<->token mapping.
 
     Arguments:
-        fname (str): The filename of the JSON vocabulary file created by
-            `nmtpy-build-vocab` script.
+        content (str): text representing a filename or an OrderedDict:
+            1. A filename of the JSON vocabulary file created by `nmtpy-build-vocab` script if beat_platform is False.
+            2. An OrderedDict containing the vocabulary if beat_platform is True
         short_list (int, optional): If > 0, only the most frequent `short_list`
             items are kept in the vocabulary.
 
@@ -47,9 +109,10 @@ class Vocabulary:
 
     TOKENS = {"<pad>": 0, "<bos>": 1, "<eos>": 2, "<unk>": 3}
 
-    def __init__(self, fname, short_list=0):
-        self.vocab = pathlib.Path(fname).expanduser()
+    def __init__(self, content, short_list=0, min_freq=0, beat_platform=False):
+
         self.short_list = short_list
+        self.min_freq = min_freq
         self._map = None
         self._imap = None
         self.freqs = None
@@ -57,9 +120,16 @@ class Vocabulary:
         self._allmap = None
         self.n_tokens = None
 
-        # Load file
-        with open(self.vocab) as f:
-            data = json.load(f)
+        if not beat_platform:
+            self.vocab = pathlib.Path(content).expanduser()
+            # Load file
+            with open(self.vocab) as f:
+                data = json.load(f)
+        else:
+            self.vocab = pathlib.Path('/not/used/because/in/beat_platform').expanduser()
+            freqs = get_freqs(content)
+            # Build dictionary from frequencies
+            data = freqs_to_dict(freqs, self.min_freq, self.short_list)
 
         if self.short_list > 0:
             # Get a slice of most frequent `short_list` items

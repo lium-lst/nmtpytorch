@@ -13,14 +13,17 @@ from .utils.ml_metrics import Loss
 from .utils.data import make_dataloader
 from .utils.tensorboard import TensorBoard
 
+from pathlib import Path
+import ipdb
+
 logger = logging.getLogger('nmtpytorch')
 
 
 class MainLoop:
-    def __init__(self, model, train_opts, dev_mgr):
+    def __init__(self, model, train_opts, dev_mgr, beat_platform=False):
         # Get all training options into this mainloop
         self.__dict__.update(train_opts)
-
+        self.beat_platform = beat_platform
         self.print = logger.info
         self.model = model
         self.dev_mgr = dev_mgr
@@ -36,11 +39,15 @@ class MainLoop:
             self.pin_memory, self.num_workers)
 
         # Create monitor for validation, evaluation, checkpointing stuff
+        if beat_platform:
+            self.subfolder = Path("")
+     
         self.monitor = Monitor(self.save_path / self.subfolder, self.exp_id,
                                self.model, logger, self.patience,
                                self.eval_metrics,
                                save_best_metrics=self.save_best_metrics,
-                               n_checkpoints=self.n_checkpoints)
+                               n_checkpoints=self.n_checkpoints,
+                               beat_platform = self.beat_platform)
 
         # If a validation set exists
         if 'val_set' in self.model.opts.data and self.eval_freq >= 0:
@@ -118,7 +125,7 @@ class MainLoop:
             # from the checkpoint without obeying to new config file!
             self.optim.load_state_dict(self._found_optim_state)
 
-        if self.save_optim_state:
+        if self.save_optim_state and not self.beat_platform:
             self.monitor.set_optimizer(self.optim)
 
         # Create TensorBoard logger if possible and requested
@@ -217,7 +224,7 @@ class MainLoop:
                 eval_sec += time.time() - eval_start
 
             if (self.checkpoint_freq and self.n_checkpoints > 0 and
-                    self.monitor.uctr % self.checkpoint_freq == 0):
+                    self.monitor.uctr % self.checkpoint_freq == 0 and not self.beat_platform):
                 self.print('Saving checkpoint...')
                 self.monitor.save_checkpoint()
 
@@ -275,14 +282,14 @@ class MainLoop:
         results.extend(self.net.test_performance(self.vloss_iterator))
 
         if self.monitor.beam_metrics:
-            self.print('Performing beam search (beam_size:{})'.format(
-                self.eval_beam))
+            self.print('Performing beam search (beam_size:{})'.format(self.eval_beam))
             beam_time = time.time()
             # For multitask learning models, language-specific validation uses
             # by default the 0th Topology in val_tasks
             task = None
             if hasattr(self.net, 'val_tasks'):
                 task = self.net.val_tasks[0].direction
+
             hyps = self.net.beam_search(
                 [self.net], self.beam_iterator, task_id=task,
                 beam_size=self.eval_beam, max_len=self.eval_max_len)

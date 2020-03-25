@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 
-from ..utils.data import read_sentences
+from ..utils.data import read_sentences, read_sentences_beat
 
 logger = logging.getLogger('nmtpytorch')
 
@@ -23,23 +23,30 @@ class TextDataset(Dataset):
             "<bos>" marker will be prepended to sentences.
     """
 
-    def __init__(self, fname, vocab, bos=False, eos=True, **kwargs):
-        self.path = Path(fname)
+    def __init__(self, fname, vocab, bos=False, eos=True, beat_platform=False, **kwargs):
         self.vocab = vocab
         self.bos = bos
         self.eos = eos
 
-        # Detect glob patterns
-        self.fnames = sorted(self.path.parent.glob(self.path.name))
+        if not beat_platform:
+            self.path = Path(fname)
+            # Detect glob patterns
+            self.fnames = sorted(self.path.parent.glob(self.path.name))
 
-        if len(self.fnames) == 0:
-            raise RuntimeError('{} does not exist.'.format(self.path))
-        elif len(self.fnames) > 1:
-            logger.info('Multiple files found, using first: {}'.format(self.fnames[0]))
+            if len(self.fnames) == 0:
+                raise RuntimeError('{} does not exist.'.format(self.path))
+            elif len(self.fnames) > 1:
+                logger.info('Multiple files found, using first: {}'.format(self.fnames[0]))
 
-        # Read the sentences and map them to vocabulary
-        self.data, self.lengths = read_sentences(
-            self.fnames[0], self.vocab, bos=self.bos, eos=self.eos)
+            # Read the sentences and map them to vocabulary
+            self.data, self.lengths = read_sentences(
+                self.fnames[0], self.vocab, bos=self.bos, eos=self.eos)
+        else:
+            self.fnames = []
+            self.fnames.append(Path('/not/used/because/beat_platform'))
+            
+            self.data, self.lengths = read_sentences_beat(
+                    fname, self.vocab, bos=self.bos, eos=self.eos)
 
         # Dataset size
         self.size = len(self.data)

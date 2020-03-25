@@ -23,7 +23,7 @@ class Monitor:
 
     def __init__(self, save_path, exp_id,
                  model, logger, patience, eval_metrics, history=None,
-                 save_best_metrics=False, n_checkpoints=0):
+                 save_best_metrics=False, n_checkpoints=0, beat_platform=False):
         self.print = logger.info
         self.save_path = save_path
         self.exp_id = exp_id
@@ -32,6 +32,10 @@ class Monitor:
         self.eval_metrics = [e.strip() for e in eval_metrics.upper().split(',')]
         self.save_best_metrics = save_best_metrics
         self.optimizer = None
+        self.beat_platform = beat_platform
+        if self.beat_platform:
+            n_checkpoints = 0
+            self.best_obj = {}
         self.checkpoints = FileRotator(n_checkpoints)
         self.beam_metrics = None
 
@@ -97,6 +101,14 @@ class Monitor:
     def save_model(self, metric=None, suffix='', do_symlink=False):
         """Saves a checkpoint with arbitrary suffix(es) appended."""
         # Construct file name
+        if self.beat_platform:
+            self.print("save_model: creating  new best_obj")
+            self.best_obj = {
+                    'opts':self.model.opts.to_dict(),
+                    'model':self.model.state_dict(),
+                    'history':self.state_dict()
+            }
+            return True
         fname = self.exp_id
         if metric:
             self.print('Saving best model based on {}'.format(metric.name))

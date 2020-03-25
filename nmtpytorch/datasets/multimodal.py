@@ -7,6 +7,8 @@ from . import get_dataset
 from .collate import get_collate
 from ..samplers import get_sampler
 
+import ipdb
+
 logger = logging.getLogger('nmtpytorch')
 
 
@@ -34,7 +36,7 @@ class MultimodalDataset(Dataset):
     """
     def __init__(self, data, mode, batch_size, vocabs, topology,
                  bucket_by, bucket_order=None, max_len=None,
-                 sampler_type='bucket', **kwargs):
+                 sampler_type='bucket', beat_platform=False, **kwargs):
         self.datasets = {}
         self.mode = mode
         self.vocabs = vocabs
@@ -42,6 +44,7 @@ class MultimodalDataset(Dataset):
         self.topology = topology
         self.bucket_by = bucket_by
         self.sampler_type = sampler_type
+        self.beat_platform = beat_platform
 
         # Disable filtering if not training
         self.max_len = max_len if self.mode == 'train' else None
@@ -77,7 +80,7 @@ class MultimodalDataset(Dataset):
                 # Construct the dataset
                 self.datasets[ds] = dataset_constructor(
                     fname=data[key],
-                    vocab=vocabs.get(key, None), bos=ds.trg, **kwargs)
+                    vocab=vocabs.get(key, None), bos=ds.trg, beat_platform=self.beat_platform, **kwargs)
                 self.size_dict[ds] = len(self.datasets[ds])
             else:
                 logger.info("  Skipping as '{}' not defined. This may be an issue.".format(key))

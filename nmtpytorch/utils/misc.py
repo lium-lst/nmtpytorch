@@ -181,19 +181,19 @@ def get_temp_file(delete=False, close=False):
     return t
 
 
-def setup_experiment(opts, suffix=None, short=False):
+def setup_experiment(opts, suffix=None, short=False, beat_platform=False):
     """Return a representative string for the experiment."""
+    if not beat_platform:
+        # subfolder is conf filename without .conf suffix
+        opts.train['subfolder'] = pathlib.Path(opts.filename).stem
 
-    # subfolder is conf filename without .conf suffix
-    opts.train['subfolder'] = pathlib.Path(opts.filename).stem
+        # add suffix to subfolder name to keep experiment names shorter
+        if suffix:
+            opts.train['subfolder'] += "-{}".format(suffix)
 
-    # add suffix to subfolder name to keep experiment names shorter
-    if suffix:
-        opts.train['subfolder'] += "-{}".format(suffix)
-
-    # Create folders
-    folder = pathlib.Path(opts.train['save_path']) / opts.train['subfolder']
-    folder.mkdir(parents=True, exist_ok=True)
+        # Create folders
+        folder = pathlib.Path(opts.train['save_path']) / opts.train['subfolder']
+        folder.mkdir(parents=True, exist_ok=True)
 
     # Set random experiment ID
     run_id = time.strftime('%Y%m%d%H%m%S') + str(random.random())

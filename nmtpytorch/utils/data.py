@@ -69,6 +69,16 @@ def convert_to_onehot(idxs, n_classes):
         row.scatter_(0, indices, 1)
     return out
 
+def read_sentences_beat(data, vocab, bos=False, eos=True):
+    lines = []
+    lens = []
+    for line in data:
+        line = line.strip()
+        seq = vocab.sent_to_idxs(line, explicit_bos=bos, explicit_eos=eos)
+        lines.append(seq)
+        lens.append(len(seq))
+    return lines, lens
+
 
 def read_sentences(fname, vocab, bos=False, eos=True):
     lines = []

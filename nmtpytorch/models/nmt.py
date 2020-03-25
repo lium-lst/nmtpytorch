@@ -16,6 +16,8 @@ from ..utils.data import sort_predictions
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
+import ipdb
+
 logger = logging.getLogger('nmtpytorch')
 
 
@@ -66,8 +68,11 @@ class NMT(nn.Module):
             'dec_inp_activ': None,      # Non-linearity for GRU2 input in dec
         }
 
-    def __init__(self, opts):
+    def __init__(self, opts, beat_platform=False):
         super().__init__()
+
+        # Are we operating in the BEAT platform?
+        self.beat_platform = beat_platform
 
         # opts -> config file sections {.model, .data, .vocabulary, .train}
         self.opts = opts
@@ -85,9 +90,9 @@ class NMT(nn.Module):
         # Parse topology & languages
         self.topology = Topology(self.opts.model['direction'])
 
-        # Load vocabularies here
-        for name, fname in self.opts.vocabulary.items():
-            self.vocabs[name] = Vocabulary(fname, short_list=self.opts.model['short_list'])
+        # Load vocabularies here: if beat_platform, content=vocab in an OrderedDict, otherwise content=filename
+        for name, content in self.opts.vocabulary.items():
+            self.vocabs[name] = Vocabulary(content, short_list=self.opts.model['short_list'], beat_platform=self.beat_platform)
 
         # Inherently non multi-lingual aware
         slangs = self.topology.get_src_langs()
@@ -112,6 +117,8 @@ class NMT(nn.Module):
         if self.opts.model.get('tied_emb', False) == '3way':
             assert self.n_src_vocab == self.n_trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
+     
+        print("nmt::init: DEVICE = ", DEVICE)
 
     def __repr__(self):
         s = super().__repr__() + '\n'
@@ -207,7 +214,8 @@ class NMT(nn.Module):
             bucket_by=self.opts.model['bucket_by'],
             max_len=self.opts.model['max_len'],
             bucket_order=self.opts.model['bucket_order'],
-            sampler_type=self.opts.model['sampler_type'])
+            sampler_type=self.opts.model['sampler_type'],
+            beat_platform=self.beat_platform)
         logger.info(self.dataset)
         return self.dataset
 
@@ -246,14 +254,22 @@ class NMT(nn.Module):
                 A scalar loss normalized w.r.t batch size and token counts.
         """
         # Get loss dict
-        result = self.dec(self.encode(batch), batch[self.tl])
+        print("nmt::forward: batch = ", batch, " batch[{}] = ".format(self.tl), batch[self.tl])
+        enc = self.encode(batch)
+        print("nmt::forward: enc = ", enc)
+
+        #result = self.dec(self.encode(batch), batch[self.tl])
+        result = self.dec(enc, batch[self.tl])
+        print("nmt::forward: result = ", result)
         result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
+        print("nmt::forward: n_items = ", result['n_items'])
         return result
 
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
-
+        ipdb.set_trace()
+        print("nmt::test_performance: DEVICE = ", DEVICE)
         for batch in pbar(data_loader, unit='batch'):
             batch.device(DEVICE)
             out = self.forward(batch)
@@ -342,6 +358,8 @@ class NMT(nn.Module):
         unk = vocab['<unk>']
         eos = vocab['<eos>']
         n_vocab = len(vocab)
+
+        print("nmt::beam_search: DEVICE = ", DEVICE)
 
         # Tensorized beam that will shrink and grow up to max_batch_size
         beam_storage = torch.zeros(
