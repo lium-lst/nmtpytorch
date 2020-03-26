@@ -5,7 +5,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from ..utils.device import DEVICE_IDS
+from ..utils.device import DeviceManager
 from . import BucketBatchSampler
 
 logger = logging.getLogger('nmtpytorch')
@@ -45,7 +45,7 @@ class ApproximateBucketBatchSampler(BucketBatchSampler):
         self.store_indices = store_indices
 
         # Additional balancing logic for multi-GPU
-        self.n_devices = len(DEVICE_IDS) if DEVICE_IDS else 1
+        self.n_devices = len(DeviceManager.DEVICE_IDS) if DeviceManager.DEVICE_IDS else 1
 
         # Buckets: sort_lens -> list of sample indices
         self.buckets = defaultdict(list)

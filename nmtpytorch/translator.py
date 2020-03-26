@@ -12,7 +12,7 @@ from .utils.misc import load_pt_file
 from .utils.filterchain import FilterChain
 from .utils.data import make_dataloader
 from .utils.topology import Topology
-from .utils.device import DEVICE
+from .utils.device import DeviceManager
 
 from . import models
 from .config import Options
@@ -58,7 +58,7 @@ class Translator:
             # Load weights
             instance.load_state_dict(weights, strict=False)
             # Move to device
-            instance.to(DEVICE)
+            instance.to(DeviceManager.DEVICE)
             # Switch to eval mode
             instance.train(False)
             self.instances.append(instance)

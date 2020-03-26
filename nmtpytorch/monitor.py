@@ -2,11 +2,15 @@
 from collections import defaultdict
 
 import torch
+import struct
+import numpy as np
+from io import BytesIO
 
 from .utils.io import FileRotator
 from .utils.misc import load_pt_file
 from .metrics import beam_metrics, metric_info
 
+import pdb
 
 class Monitor:
     """Class that tracks training progress. The following informations are
@@ -35,7 +39,7 @@ class Monitor:
         self.beat_platform = beat_platform
         if self.beat_platform:
             n_checkpoints = 0
-            self.best_obj = {}
+            self.best_obj = None
         self.checkpoints = FileRotator(n_checkpoints)
         self.beam_metrics = None
 
@@ -100,15 +104,27 @@ class Monitor:
 
     def save_model(self, metric=None, suffix='', do_symlink=False):
         """Saves a checkpoint with arbitrary suffix(es) appended."""
-        # Construct file name
+
+        # Save the file
+        model_dict = {
+            'opts': self.model.opts.to_dict(),
+            'model': self.model.state_dict(),
+            'history': self.state_dict(),
+        }
+        # Add optimizer states
+        if self.optimizer is not None:
+            model_dict['optimizer'] = self.optimizer.state_dict()
+
+        # Generate the String containing the model if running on BEAT platform
         if self.beat_platform:
-            self.print("save_model: creating  new best_obj")
-            self.best_obj = {
-                    'opts':self.model.opts.to_dict(),
-                    'model':self.model.state_dict(),
-                    'history':self.state_dict()
-            }
+            self.print("monitor::save_model: we are in BEAT so not saving in a file but in a BytesIO ")
+            output = BytesIO()
+            torch.save(model_dict, output)
+            self.best_model = np.array(struct.unpack("{}B".format(len(output.getvalue())), output.getvalue()), dtype=np.uint8)
+            output.close()
             return True
+
+        # Construct file name
         fname = self.exp_id
         if metric:
             self.print('Saving best model based on {}'.format(metric.name))
@@ -117,17 +133,6 @@ class Monitor:
         if suffix:
             fname += "-{}".format(suffix)
         fname = self.save_path / (fname + ".ckpt")
-
-        # Save the file
-        model_dict = {
-            'opts': self.model.opts.to_dict(),
-            'model': self.model.state_dict(),
-            'history': self.state_dict(),
-        }
-
-        # Add optimizer states
-        if self.optimizer is not None:
-            model_dict['optimizer'] = self.optimizer.state_dict()
 
         torch.save(model_dict, fname)
 

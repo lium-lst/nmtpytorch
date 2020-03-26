@@ -10,7 +10,7 @@ from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss
-from ..utils.device import DEVICE
+from ..utils.device import DeviceManager
 from ..utils.misc import pbar
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
@@ -181,7 +181,7 @@ class NLI(NMT):
         acc = Loss()
 
         for batch in pbar(data_loader, unit='batch'):
-            batch.device(DEVICE)
+            batch.device(DeviceManager.DEVICE)
             out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
             acc.update(

@@ -5,8 +5,6 @@ import subprocess
 
 import torch
 
-DEVICE = None
-DEVICE_IDS = None
 
 
 class DeviceManager:
@@ -18,6 +16,9 @@ class DeviceManager:
         'NoMultiGPU': 'Multi-GPU not supported for now.',
         'NotEnoughGPU': 'You requested {} GPUs while you have access to only {}.',
     }
+
+    DEVICE = None
+    DEVICE_IDS = None
 
     def __init__(self, dev):
         self.dev = dev.lower()
@@ -73,9 +74,8 @@ class DeviceManager:
             # restriction)
             self.dev = torch.device('cuda:0')
 
-            global DEVICE, DEVICE_IDS
-            DEVICE = self.dev
-            DEVICE_IDS = self.cuda_dev_ids
+            DeviceManager.DEVICE = self.dev
+            DeviceManager.DEVICE_IDS = self.cuda_dev_ids
 
     def get_cuda_mem_usage(self, name=True):
         if self.req_cpu:

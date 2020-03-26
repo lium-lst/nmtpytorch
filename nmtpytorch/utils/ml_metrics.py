@@ -8,7 +8,7 @@ from sklearn.metrics import label_ranking_average_precision_score as lrap
 
 from ignite import metrics as ig_metrics
 
-from .device import DEVICE
+from .device import DeviceManager
 
 from ..metrics import Metric
 
@@ -134,7 +134,7 @@ class MeanReciprocalRank:
     """Computes the mean reciprocal rank (MRR) metric for a batch along with
     per time-step MRR statistics that accumulate."""
     def __init__(self, n_classes):
-        self.denom = torch.arange(1, 1 + n_classes, device=DEVICE, dtype=torch.float)
+        self.denom = torch.arange(1, 1 + n_classes, device=DeviceManager.DEVICE, dtype=torch.float)
         self._mrr_per_timestep = defaultdict(float)
         self._per_timestep_counts = defaultdict(int)
 

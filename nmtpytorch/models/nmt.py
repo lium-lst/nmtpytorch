@@ -10,7 +10,7 @@ from ..utils.misc import get_n_params
 from ..vocabulary import Vocabulary
 from ..utils.topology import Topology
 from ..utils.ml_metrics import Loss
-from ..utils.device import DEVICE
+from ..utils.device import DeviceManager
 from ..utils.misc import pbar
 from ..utils.data import sort_predictions
 from ..datasets import MultimodalDataset
@@ -117,8 +117,6 @@ class NMT(nn.Module):
         if self.opts.model.get('tied_emb', False) == '3way':
             assert self.n_src_vocab == self.n_trg_vocab, \
                 "The vocabulary sizes do not match for 3way tied embeddings."
-     
-        print("nmt::init: DEVICE = ", DEVICE)
 
     def __repr__(self):
         s = super().__repr__() + '\n'
@@ -254,24 +252,18 @@ class NMT(nn.Module):
                 A scalar loss normalized w.r.t batch size and token counts.
         """
         # Get loss dict
-        print("nmt::forward: batch = ", batch, " batch[{}] = ".format(self.tl), batch[self.tl])
         enc = self.encode(batch)
-        print("nmt::forward: enc = ", enc)
 
         #result = self.dec(self.encode(batch), batch[self.tl])
         result = self.dec(enc, batch[self.tl])
-        print("nmt::forward: result = ", result)
         result['n_items'] = torch.nonzero(batch[self.tl][1:]).shape[0]
-        print("nmt::forward: n_items = ", result['n_items'])
         return result
 
     def test_performance(self, data_loader, dump_file=None):
         """Computes test set loss over the given DataLoader instance."""
         loss = Loss()
-        ipdb.set_trace()
-        print("nmt::test_performance: DEVICE = ", DEVICE)
         for batch in pbar(data_loader, unit='batch'):
-            batch.device(DEVICE)
+            batch.device(DeviceManager.DEVICE)
             out = self.forward(batch)
             loss.update(out['loss'], out['n_items'])
 
@@ -359,16 +351,14 @@ class NMT(nn.Module):
         eos = vocab['<eos>']
         n_vocab = len(vocab)
 
-        print("nmt::beam_search: DEVICE = ", DEVICE)
-
         # Tensorized beam that will shrink and grow up to max_batch_size
         beam_storage = torch.zeros(
-            max_len, max_batch_size, k, dtype=torch.long, device=DEVICE)
-        mask = torch.arange(max_batch_size * k, device=DEVICE)
-        nll_storage = torch.zeros(max_batch_size, device=DEVICE)
+            max_len, max_batch_size, k, dtype=torch.long, device=DeviceManager.DEVICE)
+        mask = torch.arange(max_batch_size * k, device=DeviceManager.DEVICE)
+        nll_storage = torch.zeros(max_batch_size, device=DeviceManager.DEVICE)
 
         for batch in pbar(data_loader, unit='batch'):
-            batch.device(DEVICE)
+            batch.device(DeviceManager.DEVICE)
 
             # Always use the initial storage
             beam = beam_storage.narrow(1, 0, batch.size).zero_()
@@ -393,7 +383,7 @@ class NMT(nn.Module):
 
             # we always have <bos> tokens except that the returned embeddings
             # may differ from one model to another.
-            idxs = models[0].get_bos(batch.size).to(DEVICE)
+            idxs = models[0].get_bos(batch.size).to(DeviceManager.DEVICE)
 
             for tstep in range(max_len):
                 # Select correct positions from source context

@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from .. import FF
-from ...utils.device import DEVICE
+from ...utils.device import DeviceManager
 from ..attention import get_attention
 
 
@@ -63,7 +63,7 @@ class SwitchingGRUDecoder(nn.Module):
         self.history = defaultdict(list)
         batch_size = next(iter(sources.values()))[0].shape[1]
         # NOTE: Non-scatter aware, fix this
-        return torch.zeros(batch_size, self.hidden_size, device=DEVICE)
+        return torch.zeros(batch_size, self.hidden_size, device=DeviceManager.DEVICE)
 
     def f_next(self, sources, y, h):
         # Get hidden states from the first decoder (purely cond. on LM)

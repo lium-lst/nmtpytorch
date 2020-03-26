@@ -8,7 +8,7 @@ import torch
 
 from .utils.misc import load_pt_file, pbar
 from .utils.data import make_dataloader
-from .utils.device import DEVICE
+from .utils.device import DeviceManager
 
 from . import models
 from .config import Options
@@ -46,7 +46,7 @@ class Tester:
         # Load weights
         instance.load_state_dict(weights, strict=False)
         # Move to device
-        instance.to(DEVICE)
+        instance.to(DeviceManager.DEVICE)
         # Switch to eval mode
         instance.train(False)
 
@@ -77,7 +77,7 @@ class Tester:
         logger.info('Starting extraction')
         start = time.time()
         for batch in pbar(loader, unit='batch'):
-            batch.device(DEVICE)
+            batch.device(DeviceManager.DEVICE)
             out, _ = list(instance.encode(batch).values())[0]
             feats.append(out.data.cpu().transpose(0, 1))
         for feat in feats:

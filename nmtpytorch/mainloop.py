@@ -73,7 +73,10 @@ class MainLoop:
         ################################################
         if train_opts['pretrained_file']:
             # Relax the strict condition for partial initialization
-            data = load_pt_file(train_opts['pretrained_file'])
+            if beat_platform:
+                data = train_opts['pretrained_file']
+            else:
+                data = load_pt_file(train_opts['pretrained_file'])
             weights = data['model']
             self._found_optim_state = data.get('optimizer', None)
             if train_opts['pretrained_layers']:
@@ -347,3 +350,5 @@ class MainLoop:
         self.print('Training finished on %s' % time.strftime('%d-%m-%Y %H:%M'))
         # Close tensorboard
         self.tboard.close()
+        return self.monitor.best_model
+
