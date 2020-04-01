@@ -44,7 +44,7 @@ class TextDataset(Dataset):
         else:
             self.fnames = []
             self.fnames.append(Path('/not/used/because/beat_platform'))
-            
+
             self.data, self.lengths = read_sentences_beat(
                     fname, self.vocab, bos=self.bos, eos=self.eos)
 

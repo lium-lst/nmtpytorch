@@ -16,7 +16,7 @@ from ..utils.data import sort_predictions
 from ..datasets import MultimodalDataset
 from ..metrics import Metric
 
-import ipdb
+import pdb
 
 logger = logging.getLogger('nmtpytorch')
 

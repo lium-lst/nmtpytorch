@@ -5,6 +5,7 @@ import time
 import logging
 import pickle as pkl
 from pathlib import Path
+from io import BytesIO
 
 import torch
 
@@ -17,21 +18,30 @@ from .utils.device import DeviceManager
 from . import models
 from .config import Options
 
-logger = logging.getLogger('nmtpytorch')
+import pdb
 
+logger = logging.getLogger('nmtpytorch')
 
 class Translator:
     """A utility class to pack translation related features."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, beat_platform=False,  **kwargs):
         # Store attributes directly. See bin/nmtpy for their list.
         self.__dict__.update(kwargs)
+        self.beat_platform = beat_platform
 
         for key, value in kwargs.items():
-            logger.info('-- {} -> {}'.format(key, value))
+            if self.beat_platform is True:
+                if key is 'models':
+                    logger.info("-- {} -> We're on BEAT, I'm not going to print the entire model!".format(key))
+                    continue
+                elif key is 'source':
+                    logger.info("-- {} -> We're on BEAT, I'm not going to print the entire source of {} sentences!".format(key, len(value)))
+                    continue
+            #logger.info('-- {} -> {}'.format(key, value))
 
-        # How many models?
-        self.n_models = len(self.models)
+        #if self.beat_platform:
+        #    logger.setLevel(logging.CRITICAL)
 
         # Store each model instance
         self.instances = []
@@ -39,14 +49,24 @@ class Translator:
         # Disable gradient tracking
         torch.set_grad_enabled(False)
 
+        # How many models?
+        self.n_models = len(self.models)
+
         # Create model instances and move them to device
+        #NOTE: if on BEAT platform, model_file is not a filename but the model data directly (pickled with torch.save)
         for model_file in self.models:
-            data = load_pt_file(model_file)
+            if beat_platform:
+                in_stream = BytesIO(model_file)
+                data = torch.load(in_stream)
+                in_stream.close()
+            else:
+                data = load_pt_file(model_file)
+
             weights, _, opts = data['model'], data['history'], data['opts']
             opts = Options.from_dict(opts, override_list=self.override)
 
             # Create model instance
-            instance = getattr(models, opts.train['model_type'])(opts=opts)
+            instance = getattr(models, opts.train['model_type'])(opts=opts, beat_platform=self.beat_platform)
 
             if not instance.supports_beam_search:
                 logger.error(
@@ -64,11 +84,11 @@ class Translator:
             self.instances.append(instance)
             logger.info(instance)
 
-        try:
-            self.beam_func = getattr(self.instances[0], self.beam_func)
-        except AttributeError as ae:
-            logger.info(f'Error: model does not have .{self.beam_func!r}()')
-            sys.exit(1)
+            try:
+                self.beam_func = getattr(self.instances[0], self.beam_func)
+            except AttributeError as ae:
+                logger.info(f'Error: model does not have .{self.beam_func!r}()')
+                sys.exit(1)
 
         # Split the string
         self.splits = self.splits.split(',')
@@ -88,20 +108,23 @@ class Translator:
 
         # Can be a comma separated list of hardcoded test splits
         logger.info('Will translate "{}"'.format(self.splits))
-        if self.source:
+        if self.source is not None:
             # We have to have single split name in this case
             split_set = '{}_set'.format(self.splits[0])
             input_dict = self.instances[0].opts.data.get(split_set, {})
             logger.info('Input configuration:')
-            for data_source in self.source.split(','):
-                key, path = data_source.split(':', 1)
-                input_dict[key] = Path(path)
-                logger.info(' {}: {}'.format(key, input_dict[key]))
+            if self.beat_platform:
+                input_dict['src'] = self.source
+            else:
+                for data_source in self.source.split(','):
+                    key, path = data_source.split(':', 1)
+                    input_dict[key] = Path(path)
+                    logger.info(' {}: {}'.format(key, input_dict[key]))
             # Overwrite config's set name
             self.instances[0].opts.data[split_set] = input_dict
 
     def sanity_check(self):
-        if self.source and len(self.splits) > 1:
+        if self.source is not None and len(self.splits) > 1:
             logger.info('You can only give one split name when -S is provided.')
             sys.exit(1)
 
@@ -118,6 +141,15 @@ class Translator:
             incl = [task.is_included_in(i.topology) for i in self.instances]
             assert False not in incl, \
                 'Not all models are compatible with task "{}"!'.format(task.direction)
+
+    def update_split_source(self, split, source):
+        split_set = '{}_set'.format(split)
+        if split not in self.splits:
+            logger.error("Translator::update_split_source; Unkown split '{}' cannot be updated, known splits are: ".format(split_set), self.splits)
+        else:
+            input_dict = self.instances[0].opts.data.get(split_set, {})
+            input_dict['src'] = source
+            self.instances[0].opts.data[split_set] = input_dict
 
     def translate(self, split):
         """Returns the hypotheses generated by translating the given split
@@ -151,7 +183,7 @@ class Translator:
             up_time, math.floor(len(hyps) / up_time)))
 
         if hasattr(self.instances[0].dec, 'persistent_dump') and \
-                self.instances[0].dec.persistent_dump:
+                self.instances[0].dec.persistent_dump and not self.beat_platform:
             with open('{}.dump'.format(self.models[0]), 'wb') as f:
                 pkl.dump(self.instances[0].dec.persistence, f)
 
@@ -193,4 +225,10 @@ class Translator:
         """Dumps the hypotheses for each of the requested split/file."""
         for input_ in self.splits:
             hyps = self.translate(input_)
+            # If on BEAT, only 1 split is processed, the hyps are returned instead of being written in a file
+            if self.beat_platform:
+                return hyps
             self.dump(hyps, input_)
+
+
+

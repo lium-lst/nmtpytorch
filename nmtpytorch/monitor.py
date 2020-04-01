@@ -117,7 +117,9 @@ class Monitor:
 
         # Generate the String containing the model if running on BEAT platform
         if self.beat_platform:
-            self.print("monitor::save_model: we are in BEAT so not saving in a file but in a BytesIO ")
+            #TODO: remove the train/valid data from the options before saving otherwise, we are keeping ALL train data into the model_dict for nothing!
+            #model_dict['opts']['data']['train_set'] = {}
+            #model_dict['opts']['data']['val_set'] = {}
             output = BytesIO()
             torch.save(model_dict, output)
             self.best_model = np.array(struct.unpack("{}B".format(len(output.getvalue())), output.getvalue()), dtype=np.uint8)

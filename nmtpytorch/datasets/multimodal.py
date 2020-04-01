@@ -46,6 +46,9 @@ class MultimodalDataset(Dataset):
         self.sampler_type = sampler_type
         self.beat_platform = beat_platform
 
+        #if self.beat_platform:
+        #    logger.setLevel(logging.CRITICAL)
+
         # Disable filtering if not training
         self.max_len = max_len if self.mode == 'train' else None
 
@@ -71,7 +74,7 @@ class MultimodalDataset(Dataset):
                 # Get the relevant dataset class
                 dataset_constructor = get_dataset(ds._type)
             except KeyError as ke:
-                logger.info("ERROR: Unknown dataset type '{}'".format(ds._type))
+                logger.error("ERROR: Unknown dataset type '{}'".format(ds._type))
 
             logger.info("Initializing dataset for '{}'...".format(ds))
             if key in data:
@@ -83,7 +86,7 @@ class MultimodalDataset(Dataset):
                     vocab=vocabs.get(key, None), bos=ds.trg, beat_platform=self.beat_platform, **kwargs)
                 self.size_dict[ds] = len(self.datasets[ds])
             else:
-                logger.info("  Skipping as '{}' not defined. This may be an issue.".format(key))
+                logger.warning("  Skipping as '{}' not defined. This may be an issue.".format(key))
 
         # Set dataset size
         if len(set(self.size_dict.values())) > 1:

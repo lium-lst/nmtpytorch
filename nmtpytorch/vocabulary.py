@@ -3,6 +3,8 @@ import json
 import pathlib
 import logging
 import numpy as np
+import io
+import pdb
 
 from collections import OrderedDict
 
@@ -39,7 +41,8 @@ def freqs_to_dict(token_freqs, min_freq=0, max_items=0, exclude_symbols=False):
 
     return tokendict
 
-
+# This function is similar to get_frqs in nmtpy-build-vocab 
+# but it operates on content (text) directly instead of reading from a file
 def get_freqs(content):
     # We'll first count frequencies in content (a list of strings)
     token_freqs = OrderedDict()
@@ -127,9 +130,7 @@ class Vocabulary:
                 data = json.load(f)
         else:
             self.vocab = pathlib.Path('/not/used/because/in/beat_platform').expanduser()
-            freqs = get_freqs(content)
-            # Build dictionary from frequencies
-            data = freqs_to_dict(freqs, self.min_freq, self.short_list)
+            data = json.loads(content)
 
         if self.short_list > 0:
             # Get a slice of most frequent `short_list` items

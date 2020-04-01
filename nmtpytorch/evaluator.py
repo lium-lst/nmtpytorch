@@ -7,18 +7,23 @@ from .utils.misc import get_language
 
 
 class Evaluator:
-    def __init__(self, refs, beam_metrics, filters=''):
+    def __init__(self, refs, beam_metrics, filters='', beat_platform=False):
         # metrics: list of upper-case beam-search metrics
+
+        self.language=None
         self.kwargs = {}
         self.scorers = OrderedDict()
-        self.refs = list(refs.parent.glob(refs.name))
-        self.language = get_language(self.refs[0])
+        if not beat_platform:
+            self.refs = list(refs.parent.glob(refs.name))
+            self.language = get_language(self.refs[0])
+        else:
+            self.refs = [refs]
         if self.language is None:
             # Fallback to en (this is only relevant for METEOR)
             self.language = 'en'
 
         self.filter = lambda s: s
-        if filters:
+        if filters and not beat_platform:
             self.filter = FilterChain(filters)
             self.refs = self.filter(refs)
 

@@ -18,7 +18,6 @@ import ipdb
 
 logger = logging.getLogger('nmtpytorch')
 
-
 class MainLoop:
     def __init__(self, model, train_opts, dev_mgr, beat_platform=False):
         # Get all training options into this mainloop
@@ -61,7 +60,7 @@ class MainLoop:
                 # Create hypothesis evaluator
                 self.evaluator = Evaluator(
                     self.model.val_refs, self.monitor.beam_metrics,
-                    filters=self.eval_filters)
+                    filters=self.eval_filters, beat_platform=self.beat_platform)
 
         # Setup model
         self.model.setup()
