@@ -7,7 +7,7 @@ from . import get_dataset
 from .collate import get_collate
 from ..samplers import get_sampler
 
-import ipdb
+import pdb
 
 logger = logging.getLogger('nmtpytorch')
 

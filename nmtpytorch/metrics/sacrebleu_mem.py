@@ -4,8 +4,8 @@ import subprocess
 from ..utils.misc import listify
 from .metric import Metric
 import sacrebleu
-from sacrebleu import sacrelogger
 import logging
+
 
 class SACREBLEU_MEMScorer:
     """SACREBLEU_MEMScorer class."""
@@ -28,7 +28,7 @@ class SACREBLEU_MEMScorer:
         #    hypstring = open(hyps).read().strip()
         #elif isinstance(hyps, list):
         #    hypstring = "\n".join(hyps)
-        sacrelogger.setLevel(logging.ERROR)
+        logging.getLogger("sacrebleu").setLevel(logging.ERROR)
         bleu = sacrebleu.corpus_bleu(hyps, refs, lowercase=lowercase, force=True)
 
         if bleu is None:

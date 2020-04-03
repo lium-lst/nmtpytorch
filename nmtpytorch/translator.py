@@ -143,9 +143,10 @@ class Translator:
                 'Not all models are compatible with task "{}"!'.format(task.direction)
 
     def update_split_source(self, split, source):
+        logger.debug("Translator::update_split_source: updating split {} with source {}".format(split, source))
         split_set = '{}_set'.format(split)
         if split not in self.splits:
-            logger.error("Translator::update_split_source; Unkown split '{}' cannot be updated, known splits are: ".format(split_set), self.splits)
+            logger.error("Translator::update_split_source: Unkown split '{}' cannot be updated, known splits are: ".format(split_set), self.splits)
         else:
             input_dict = self.instances[0].opts.data.get(split_set, {})
             input_dict['src'] = source
