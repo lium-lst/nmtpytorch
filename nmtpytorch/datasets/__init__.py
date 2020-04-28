@@ -1,5 +1,5 @@
 # First the basic types
-from .numpy import NumpyDataset
+from .npy import NumpyDataset
 from .kaldi import KaldiDataset
 from .imagefolder import ImageFolderDataset
 from .text import TextDataset
