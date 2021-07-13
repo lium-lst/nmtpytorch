@@ -3,6 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
 
+# Note
+
+This project is not actively maintained so issues created are unlikely to be addressed in a timely way. If you are interested, there's a recent fork of this repository called [pysimt](https://github.com/ImperialNLP/pysimt) which includes Transformer-based architectures as well.
+
+# Overview
 `nmtpytorch` allows training of various end-to-end neural architectures including
 but not limited to neural machine translation, image captioning and automatic
 speech recognition systems. The initial codebase was in `Theano` and was
